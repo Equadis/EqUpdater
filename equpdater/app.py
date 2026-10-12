@@ -1415,6 +1415,7 @@ def write_config_wtf(client_dir: str, tweaks: dict | None = None):
     fov_rad   = round(fov_deg * math.pi / 180.0, 6)
     bg_sound  = 1 if tweaks.get("soundInBackground",
                                 TWEAKS_DEFAULTS["soundInBackground"]) else 0
+    channels  = sound_channels(tweaks)
 
     di  = _get_display_info_safe()
     # No realmList here. The login route lives in realmlist.wtf
@@ -1461,8 +1462,8 @@ def write_config_wtf(client_dir: str, tweaks: dict | None = None):
         "minimapZoom": 0, "minimapInsideZoom": 0,
         "EnableErrorSpeech": 0,
         "SoundZoneMusicNoDelay": 1,
-        "SoundMaxHardwareChannels": 64,
-        "SoundSoftwareChannels": 64,
+        "SoundMaxHardwareChannels": channels,
+        "SoundSoftwareChannels": channels,
         "UncapSounds": 1,
         "BackgroundSound": bg_sound,
         "NP_NameplateDistance": nameplate,
@@ -1495,6 +1496,19 @@ def write_config_wtf(client_dir: str, tweaks: dict | None = None):
         log(f"Could not write Config.wtf: {e}", "err")
 
 
+def sound_channels(tweaks: dict) -> int:
+    """The Sound Channels tweak as a whole number in range: the game reads
+    both of its channel settings as integers, and a hand-edited config can
+    hold anything."""
+    lo, hi = TWEAKS_LIMITS["soundChannels"]
+    try:
+        value = int(round(float(tweaks.get("soundChannels",
+                                           TWEAKS_DEFAULTS["soundChannels"]))))
+    except (TypeError, ValueError):
+        value = TWEAKS_DEFAULTS["soundChannels"]
+    return max(lo, min(hi, value))
+
+
 def update_config_wtf(client_dir: str, tweaks: dict):
     cfg_path = gamepaths.game_path(client_dir, "WTF", "Config.wtf")
     if not os.path.exists(cfg_path):
@@ -1508,6 +1522,7 @@ def update_config_wtf(client_dir: str, tweaks: dict):
     fov_rad   = round(fov_deg * math.pi / 180.0, 6)
     bg_sound  = 1 if tweaks.get("soundInBackground",
                                 TWEAKS_DEFAULTS["soundInBackground"]) else 0
+    channels  = sound_channels(tweaks)
     updates = {
         "farClip":              str(far_clip),
         "CameraDistanceMax":    str(cam_dist),
@@ -1515,6 +1530,8 @@ def update_config_wtf(client_dir: str, tweaks: dict):
         "FoV":                  str(fov_rad),
         "NameplateRange":       str(nameplate),
         "BackgroundSound":      str(bg_sound),
+        "SoundSoftwareChannels":    str(channels),
+        "SoundMaxHardwareChannels": str(channels),
     }
 
     with open(cfg_path, "r", encoding="utf-8") as f:
@@ -3435,6 +3452,8 @@ TWEAKS_DEFAULTS = {
     "frillDistance":   70,
     "cameraDistance":  100,
     "soundInBackground": True,
+    # What EqUpdater has always written for both channel settings.
+    "soundChannels":   64,
 }
 
 TWEAKS_ITEMS = [
@@ -3477,6 +3496,10 @@ TWEAKS_ITEMS = [
     ("soundInBackground", N_("Sound in Background"),        "checkbox", True,  None,
      N_("Allows game sounds to play in the background."),
      None, None, None),
+
+    ("soundChannels",     N_("Sound Channels"),           "number",   False, None,
+     N_("How many sounds can play at once. More keeps sounds from cutting out in busy fights. [12 - 64]"),
+     12, 64, 1),
 ]
 
 
@@ -4943,8 +4966,28 @@ class EqUpdaterApp(tk.Tk):
                          highlightcolor=C_PANEL_BDR)
         self._tweaks_panel_frame = outer
 
-        self._tweaks_inner = tk.Frame(outer, bg=C_PANEL)
-        self._tweaks_inner.pack(fill="both", expand=True)
+        # The rows scroll. They outgrew the panel: OpenDyslexic already hid
+        # the SOUND section, and every new tweak pushes the bottom further
+        # out. The scrollbar draws nothing while everything fits.
+        canvas = tk.Canvas(outer, bg=C_PANEL, highlightthickness=0, bd=0,
+                           yscrollincrement=self._px(12))
+        sb = SlimScrollbar(outer, command=canvas.yview, bg=C_PANEL,
+                           width=self._px(10), thumb="#31547e")
+        canvas.configure(yscrollcommand=sb.set)
+        # Below the Apply/Reset bar, which sits over the top right corner.
+        sb.pack(side="right", fill="y", pady=(self._px(40), self._px(4)))
+        canvas.pack(side="left", fill="both", expand=True)
+        self._tweaks_canvas = canvas
+        self._wheel_canvases.append(canvas)
+
+        self._tweaks_inner = tk.Frame(canvas, bg=C_PANEL)
+        window = canvas.create_window((0, 0), window=self._tweaks_inner,
+                                      anchor="nw")
+        self._tweaks_inner.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.bind("<Configure>",
+                    lambda e: canvas.itemconfigure(window, width=e.width))
 
         bar = tk.Frame(outer, bg=C_PANEL)
         bar.place(relx=1.0, x=-self._px(16), y=self._px(3), anchor="ne")

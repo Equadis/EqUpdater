@@ -135,6 +135,15 @@ class TestAppStarts(unittest.TestCase):
     def test_the_window_carries_the_product_icon(self):
         self.assertIsNotNone(getattr(self.app, "_window_icon_photo", None))
 
+    def test_the_tweaks_list_scrolls(self):
+        """The Tweaks rows outgrew their panel (OpenDyslexic hid SOUND), so
+        they sit in a canvas the wheel scrolls -- Sound Channels included."""
+        app = self.app
+        self.assertIn(app._tweaks_canvas, app._wheel_canvases)
+        self.assertIn("soundChannels", app._tweak_vars)
+        self.assertEqual(app._tweak_vars["soundChannels"].get(), "64")
+        self.assertIs(app._tweaks_inner.master, app._tweaks_canvas)
+
     def test_the_mouse_wheel_scrolls_lists_on_every_platform(self):
         """Linux (X11) sends no <MouseWheel>: a wheel notch is a press of
         button 4 or 5. Only <MouseWheel> was bound, so on Linux the Addons,

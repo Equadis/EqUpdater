@@ -321,6 +321,10 @@ STRINGS = {
     "Game launcher…": "游戏启动方式…",
     "Picks the OctoWoW login server that answers first and the world server with the lowest ping. Its settings and log are in the mods folder.":
         "选择最先响应的 OctoWoW 登录服务器和延迟最低的世界服务器。其设置和日志位于 mods 文件夹中。",
+    "Sound Channels":
+        "声音通道",
+    "How many sounds can play at once. More keeps sounds from cutting out in busy fights. [12 - 64]":
+        "可同时播放的声音数量。数值越大，激烈战斗中声音越不容易中断。[12 - 64]",
     "Verify game files": "校验游戏文件",
     "Verifying game files…": "正在校验游戏文件…",
     "Verifying…": "正在校验…",

@@ -321,6 +321,10 @@ STRINGS = {
     "Game launcher…": "Inicialização do jogo…",
     "Picks the OctoWoW login server that answers first and the world server with the lowest ping. Its settings and log are in the mods folder.":
         "Escolhe o servidor de login do OctoWoW que responde primeiro e o servidor de mundo com o menor ping. As configurações e o registro ficam na pasta mods.",
+    "Sound Channels":
+        "Canais de som",
+    "How many sounds can play at once. More keeps sounds from cutting out in busy fights. [12 - 64]":
+        "Quantos sons podem tocar ao mesmo tempo. Mais evita que os sons sejam cortados em lutas intensas. [12 - 64]",
     "Verify game files": "Verificar arquivos do jogo",
     "Verifying game files…": "Verificando arquivos do jogo…",
     "Verifying…": "Verificando…",
