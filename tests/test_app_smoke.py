@@ -135,6 +135,44 @@ class TestAppStarts(unittest.TestCase):
     def test_the_window_carries_the_product_icon(self):
         self.assertIsNotNone(getattr(self.app, "_window_icon_photo", None))
 
+    def test_the_mouse_wheel_scrolls_lists_on_every_platform(self):
+        """Linux (X11) sends no <MouseWheel>: a wheel notch is a press of
+        button 4 or 5. Only <MouseWheel> was bound, so on Linux the Addons,
+        Mods and MPQ lists did not scroll with the wheel (tester, CachyOS)."""
+        from types import SimpleNamespace
+        app, m = self.app, self.app_mod
+        for sequence in ("<MouseWheel>", "<Button-4>", "<Button-5>"):
+            self.assertTrue(app.bind_all(sequence), sequence)
+
+        self.assertEqual(m.wheel_steps(SimpleNamespace(num=5, delta=0)), 1)
+        self.assertEqual(m.wheel_steps(SimpleNamespace(num=4, delta=0)), -1)
+        self.assertEqual(m.wheel_steps(SimpleNamespace(num="??", delta=-240)), 2)
+        self.assertEqual(m.wheel_steps(SimpleNamespace(num="??", delta=120)), -1)
+        self.assertEqual(m.wheel_steps(SimpleNamespace(num="??", delta=-30)), 1)
+        self.assertEqual(m.wheel_steps(SimpleNamespace(num="??", delta=0)), 0)
+
+        cv = m.tk.Canvas(app._active_panel, width=200, height=100,
+                         yscrollincrement=10)
+        cv.place(x=0, y=0)
+        cv.create_rectangle(0, 0, 10, 2000)
+        cv.configure(scrollregion=(0, 0, 200, 2000))
+        app._wheel_canvases.append(cv)
+        try:
+            app.update()
+            inside = dict(x_root=cv.winfo_rootx() + 50,
+                          y_root=cv.winfo_rooty() + 50)
+            app._on_mousewheel(SimpleNamespace(num=5, delta=0, **inside))
+            app._on_mousewheel(SimpleNamespace(num=5, delta=0, **inside))
+            after_linux = cv.yview()[0]
+            self.assertGreater(after_linux, 0.0)          # button 5: down
+            app._on_mousewheel(SimpleNamespace(num=4, delta=0, **inside))
+            self.assertLess(cv.yview()[0], after_linux)   # button 4: up
+            app._on_mousewheel(SimpleNamespace(num="??", delta=-120, **inside))
+            self.assertAlmostEqual(cv.yview()[0], after_linux)  # Windows wheel
+        finally:
+            app._wheel_canvases.remove(cv)
+            cv.destroy()
+
     def test_update_all_starts_faded(self):
         """Nothing is installed in a throwaway folder, so there is nothing to
         update and the button must not invite a click."""

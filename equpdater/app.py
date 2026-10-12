@@ -2677,6 +2677,29 @@ def _log_addon_dir_state(state) -> None:
                 f"you choose which to keep.", "err")
 
 
+#: How a mouse wheel reaches Tk. Windows (and macOS) send <MouseWheel> with a
+#: delta; X11 -- Linux -- sends no <MouseWheel> at all, but a press of button
+#: 4 (up) or 5 (down) per notch. Binding only the first left every list
+#: unscrollable by wheel on Linux.
+WHEEL_EVENTS = ("<MouseWheel>", "<Button-4>", "<Button-5>")
+
+
+def wheel_steps(event) -> int:
+    """Units to scroll for one wheel event: negative is up."""
+    num = getattr(event, "num", None)
+    if num == 4:
+        return -1
+    if num == 5:
+        return 1
+    delta = getattr(event, "delta", 0) or 0
+    if not delta:
+        return 0
+    steps = int(-delta / 120)
+    # A fine-grained wheel or touchpad sends less than one 120 notch at a
+    # time; that is still a scroll, not nothing.
+    return steps or (-1 if delta > 0 else 1)
+
+
 def addons_path(client_dir: str) -> str:
     """Interface/AddOns of ``client_dir``, the one place the addons folder is
     named. On a case-sensitive filesystem an existing Interface/Addons (or
@@ -3885,7 +3908,8 @@ class EqUpdaterApp(tk.Tk):
         # Scrollable list canvases that respond to the mouse wheel whenever
         # the pointer is anywhere over them (not just over the scrollbar).
         self._wheel_canvases: list = []
-        self.bind_all("<MouseWheel>", self._on_mousewheel)
+        for sequence in WHEEL_EVENTS:
+            self.bind_all(sequence, self._on_mousewheel)
 
         self.title(branding.APP_TITLE)
         self.resizable(False, False)
@@ -4017,7 +4041,8 @@ class EqUpdaterApp(tk.Tk):
         self._stop_bg_animation(restore_static=False, wait=2.0)
         self._cancel_pending_after_callbacks()
         try:
-            self.unbind_all("<MouseWheel>")
+            for sequence in WHEEL_EVENTS:
+                self.unbind_all(sequence)
         except (tk.TclError, RuntimeError):
             pass
         try:
@@ -4122,8 +4147,9 @@ class EqUpdaterApp(tk.Tk):
                     # When the content fits entirely in view, Tk would still
                     # happily shift it around — ignore the wheel instead.
                     first, last = cv.yview()
-                    if last - first < 1.0:
-                        cv.yview_scroll(int(-event.delta / 120), "units")
+                    steps = wheel_steps(event)
+                    if last - first < 1.0 and steps:
+                        cv.yview_scroll(steps, "units")
                     return
             except tk.TclError:
                 self._wheel_canvases.remove(cv)
