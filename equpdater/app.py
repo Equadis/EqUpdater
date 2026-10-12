@@ -4097,8 +4097,10 @@ class EqUpdaterApp(tk.Tk):
             tw = tk.Toplevel(self)
             tw.wm_overrideredirect(True)
             tw.wm_geometry(f"+{x}+{y}")
+            # Wrapped: a long description in one line ran off the window.
             tk.Label(tw, text=text, font=self._font(9),
-                     fg=C_TEXT, bg="#0f0b16",
+                     fg=C_TEXT, bg="#0f0b16", justify="left",
+                     wraplength=self._px(420),
                      highlightthickness=1, highlightbackground=C_PANEL_BDR,
                      padx=self._px(6), pady=self._px(2)).pack()
             state["win"] = tw
@@ -8628,7 +8630,7 @@ class EqUpdaterApp(tk.Tk):
                  font=self._font(10, bold=True),
                  fg=C_GOLD, bg=P_BG).pack(anchor="w", pady=(self._px(22), 0))
 
-        def _titem(icon, text, cmd, icon_color=C_GOLD):
+        def _titem(icon, text, cmd, icon_color=C_GOLD, tip=None):
             r = tk.Frame(lcol, bg=P_BG, cursor="hand2")
             r.pack(anchor="w", pady=(self._px(12), 0))
             # Monochrome glyphs in a fixed-width slot so all icons line up
@@ -8643,9 +8645,13 @@ class EqUpdaterApp(tk.Tk):
                 w.bind("<Button-1>", lambda e: cmd())
                 w.bind("<Enter>", lambda e: tl.configure(fg=C_GOLD))
                 w.bind("<Leave>", lambda e: tl.configure(fg=C_TEXT))
+            if tip:
+                for w in (ic, tl):
+                    self._add_tooltip(w, tip)
 
         _titem("✓", tr("Verify game files"), self._settings_verify)
-        _titem("✚", tr("Login Doctor…"), self._open_login_doctor)
+        _titem("✚", tr("Login Doctor"), self._open_login_doctor,
+               tip=tr("Checks this computer for common login problems: the game client, its login settings, OctoLogin and the connection to OctoWoW. It can repair the login settings."))
         _titem("☰", tr("Show logs"), self._show_logs)
         if platforms.WINDOWS:
             _titem("⛊", tr("Add game folder to Defender exclusions"),
@@ -8994,6 +9000,9 @@ class EqUpdaterApp(tk.Tk):
         realm = [c for c in local if c.group in ("realmlist", "config")]
         if realm:
             section(N_("Login configuration"), realm)
+        octologin = [c for c in local if c.group == "octologin"]
+        if octologin:
+            section(N_("OctoLogin"), octologin)
         net = st["network"]
         if net is None:
             txt.insert("end", tr("Checking the connection…") + "\n", "dim")

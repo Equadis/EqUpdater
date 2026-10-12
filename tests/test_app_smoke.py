@@ -1473,7 +1473,7 @@ class TestLoginDoctorWindow(unittest.TestCase):
                 if hit is not None:
                     return hit
         find(self.app._settings_overlay,
-             self.m.tr("Login Doctor…")).event_generate("<Button-1>")
+             self.m.tr("Login Doctor")).event_generate("<Button-1>")
         self.wait()
 
     def wait(self):

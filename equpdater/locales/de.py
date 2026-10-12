@@ -324,6 +324,32 @@ STRINGS = {
         "Soundkanäle",
     "How many sounds can play at once. More keeps sounds from cutting out in busy fights. [12 - 64]":
         "Wie viele Sounds gleichzeitig abgespielt werden können. Mehr verhindert, dass Sounds in hektischen Kämpfen abbrechen. [12 - 64]",
+    "OctoLogin":
+        "OctoLogin",
+    "dlls.txt lists {entry}, but the file is missing":
+        "dlls.txt führt {entry} auf, aber die Datei fehlt",
+    "OctoLogin is installed":
+        "OctoLogin ist installiert",
+    "OctoLogin is listed in dlls.txt":
+        "OctoLogin steht in dlls.txt",
+    "OctoLogin is not listed in dlls.txt, so the game does not load it":
+        "OctoLogin steht nicht in dlls.txt, daher lädt das Spiel es nicht",
+    "VanillaFixes.exe is missing, so OctoLogin cannot load":
+        "VanillaFixes.exe fehlt, daher kann OctoLogin nicht laden",
+    "OctoLogin has not recorded a login yet. If you have logged in since installing it, it is not loading.":
+        "OctoLogin hat noch keine Anmeldung protokolliert. Wenn du dich seit der Installation angemeldet hast, wird es nicht geladen.",
+    "At the last start, OctoLogin {version} did nothing: {reason}":
+        "Beim letzten Start hat OctoLogin {version} nichts getan: {reason}",
+    "At the last login, {address} answered first in {ms} ms":
+        "Bei der letzten Anmeldung hat {address} nach {ms} ms als Erstes geantwortet",
+    "At the last login, no login service answered in {ms} ms; OctoLogin used {address}":
+        "Bei der letzten Anmeldung hat in {ms} ms kein Anmeldedienst geantwortet; OctoLogin hat {address} verwendet",
+    "At the last login, no OctoWoW login server answered in {ms} ms":
+        "Bei der letzten Anmeldung hat in {ms} ms kein OctoWoW-Anmeldeserver geantwortet",
+    "At the last login, the realmlist pointed at {address}, which OctoLogin does not know, so it stood aside":
+        "Bei der letzten Anmeldung zeigte die realmlist auf {address}, das OctoLogin nicht kennt, daher hat es nicht eingegriffen",
+    "At the last login, the game used a local proxy ({address}); OctoLogin stood aside":
+        "Bei der letzten Anmeldung hat das Spiel einen lokalen Proxy ({address}) verwendet; OctoLogin hat nicht eingegriffen",
     "Verify game files": "Spieldateien überprüfen",
     "Verifying game files…": "Spieldateien werden überprüft…",
     "Verifying…": "Prüfe…",
@@ -433,8 +459,10 @@ STRINGS = {
         'Spiel-Client',
     'LOGIN DOCTOR':
         'LOGIN-DOKTOR',
-    'Login Doctor…':
-        'Login-Doktor…',
+    'Login Doctor':
+        'Login-Doktor',
+    "Checks this computer for common login problems: the game client, its login settings, OctoLogin and the connection to OctoWoW. It can repair the login settings.":
+        "Prüft diesen Computer auf häufige Anmeldeprobleme: den Spielclient, seine Anmeldeeinstellungen, OctoLogin und die Verbindung zu OctoWoW. Die Anmeldeeinstellungen kann er reparieren.",
     'Login configuration':
         'Login-Konfiguration',
     'Login server did not answer a test connection ({host}:{port}, timed out). This alone does not mean login will fail: the server may ignore probes or be busy':

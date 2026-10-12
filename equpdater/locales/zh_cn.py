@@ -325,6 +325,32 @@ STRINGS = {
         "声音通道",
     "How many sounds can play at once. More keeps sounds from cutting out in busy fights. [12 - 64]":
         "可同时播放的声音数量。数值越大，激烈战斗中声音越不容易中断。[12 - 64]",
+    "OctoLogin":
+        "OctoLogin",
+    "dlls.txt lists {entry}, but the file is missing":
+        "dlls.txt 中列出了 {entry}，但文件不存在",
+    "OctoLogin is installed":
+        "已安装 OctoLogin",
+    "OctoLogin is listed in dlls.txt":
+        "OctoLogin 已列在 dlls.txt 中",
+    "OctoLogin is not listed in dlls.txt, so the game does not load it":
+        "OctoLogin 未列在 dlls.txt 中，因此游戏不会加载它",
+    "VanillaFixes.exe is missing, so OctoLogin cannot load":
+        "缺少 VanillaFixes.exe，因此 OctoLogin 无法加载",
+    "OctoLogin has not recorded a login yet. If you have logged in since installing it, it is not loading.":
+        "OctoLogin 尚未记录任何登录。如果安装后你已登录过，说明它没有被加载。",
+    "At the last start, OctoLogin {version} did nothing: {reason}":
+        "上次启动时，OctoLogin {version} 未执行任何操作：{reason}",
+    "At the last login, {address} answered first in {ms} ms":
+        "上次登录时，{address} 在 {ms} 毫秒内最先响应",
+    "At the last login, no login service answered in {ms} ms; OctoLogin used {address}":
+        "上次登录时，{ms} 毫秒内没有登录服务响应；OctoLogin 使用了 {address}",
+    "At the last login, no OctoWoW login server answered in {ms} ms":
+        "上次登录时，{ms} 毫秒内没有 OctoWoW 登录服务器响应",
+    "At the last login, the realmlist pointed at {address}, which OctoLogin does not know, so it stood aside":
+        "上次登录时，realmlist 指向 OctoLogin 不认识的 {address}，因此它没有介入",
+    "At the last login, the game used a local proxy ({address}); OctoLogin stood aside":
+        "上次登录时，游戏使用了本地代理（{address}）；OctoLogin 没有介入",
     "Verify game files": "校验游戏文件",
     "Verifying game files…": "正在校验游戏文件…",
     "Verifying…": "正在校验…",
@@ -434,8 +460,10 @@ STRINGS = {
         '游戏客户端',
     'LOGIN DOCTOR':
         '登录诊断',
-    'Login Doctor…':
-        '登录诊断…',
+    'Login Doctor':
+        '登录诊断',
+    "Checks this computer for common login problems: the game client, its login settings, OctoLogin and the connection to OctoWoW. It can repair the login settings.":
+        "检查这台电脑上常见的登录问题：游戏客户端、其登录设置、OctoLogin 以及与 OctoWoW 的连接。可以修复登录设置。",
     'Login configuration':
         '登录配置',
     'Login server did not answer a test connection ({host}:{port}, timed out). This alone does not mean login will fail: the server may ignore probes or be busy':

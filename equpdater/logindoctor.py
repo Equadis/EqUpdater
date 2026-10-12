@@ -299,7 +299,141 @@ def config_checks(client_dir: str, realm_host: str | None) -> list:
 def local_checks(client_dir: str, version: str, running: bool) -> list:
     out = client_checks(client_dir, version, running)
     realm, root_host = realmlist_checks(client_dir)
-    return out + realm + config_checks(client_dir, root_host)
+    return (out + realm + config_checks(client_dir, root_host)
+            + octologin_checks(client_dir))
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  OctoLogin
+# ──────────────────────────────────────────────────────────────────────────────
+
+#: OctoLogin (github.com/fmustafayaman/OctoLogin) races OctoWoW's login
+#: addresses inside the game. Where its installer -- and EqUpdater -- put it,
+#: and the line VanillaFixes loads it by.
+OCTOLOGIN_DIR = "mods"
+OCTOLOGIN_DLL = "OctoLogin.dll"
+OCTOLOGIN_LOG = "OctoLogin.log"
+OCTOLOGIN_ENTRY = "mods/OctoLogin.dll"
+#: Only the end of the log is read: it is appended to at every login.
+LOG_TAIL_BYTES = 64 * 1024
+
+_LOG_LINE = re.compile(r"^\d\d:\d\d:\d\d (.*)$")
+_LOGIN_OK = re.compile(r"^login: (\S+) answered first in (\d+) ms")
+_LOGIN_TCP = re.compile(r"^login: no login service answered in (\d+) ms; using (\S+)")
+_LOGIN_NONE = re.compile(r"^login: nothing answered in (\d+) ms")
+_LOGIN_FOREIGN = re.compile(r"^login (\S+): not an OctoWoW address")
+_LOGIN_PROXY = re.compile(r"^login (\S+): local proxy")
+_START_OK = re.compile(r"^OctoLogin (\S+): ready")
+_START_IDLE = re.compile(r"^OctoLogin (\S+): (.*); doing nothing")
+
+
+def _dll_key(entry: str) -> str:
+    return entry.strip().replace("\\", "/").lower()
+
+
+def _log_lines(path: str) -> list | None:
+    """The messages (time stamp removed) at the end of OctoLogin's log, or
+    None when there is no log."""
+    try:
+        with open(path, "rb") as f:
+            f.seek(0, os.SEEK_END)
+            size = f.tell()
+            f.seek(max(0, size - LOG_TAIL_BYTES))
+            text = f.read().decode("latin-1")
+    except OSError:
+        return None
+    out = []
+    for line in text.splitlines():
+        m = _LOG_LINE.match(line)
+        if m:
+            out.append(m.group(1))
+    return out
+
+
+def octologin_checks(client_dir: str) -> list:
+    """Is OctoLogin installed, registered and loadable, and what did it do
+    at the last login? Empty when it is neither installed nor listed: it is
+    optional, and its absence is not a problem."""
+    mods = gamepaths.game_path(client_dir, OCTOLOGIN_DIR)
+    dll = gamepaths.game_path(mods, OCTOLOGIN_DLL)
+    dlls_txt = _read(gamepaths.game_path(client_dir, "dlls.txt")) or ""
+    listed = any(_dll_key(line) == _dll_key(OCTOLOGIN_ENTRY)
+                 for line in dlls_txt.splitlines())
+    present = os.path.isfile(dll)
+    if not present and not listed:
+        return []
+    g, out = "octologin", []
+    if not present:
+        return [Check(WARN, N_("dlls.txt lists {entry}, but the file is missing"),
+                      {"entry": OCTOLOGIN_ENTRY}, g)]
+    out.append(Check(PASS, N_("OctoLogin is installed"), {}, g))
+    if listed:
+        out.append(Check(PASS, N_("OctoLogin is listed in dlls.txt"), {}, g))
+    else:
+        out.append(Check(WARN, N_("OctoLogin is not listed in dlls.txt, so the "
+                                  "game does not load it"), {}, g))
+    if not os.path.isfile(gamepaths.game_path(client_dir, "VanillaFixes.exe")):
+        out.append(Check(WARN, N_("VanillaFixes.exe is missing, so OctoLogin "
+                                  "cannot load"), {}, g))
+    return out + octologin_log_checks(gamepaths.game_path(mods, OCTOLOGIN_LOG))
+
+
+def octologin_log_checks(path: str) -> list:
+    """What OctoLogin's log says about its last start and its last login.
+    Informational: it describes what happened then, and a server that did
+    not answer is not a fault on this computer."""
+    g = "octologin"
+    lines = _log_lines(path)
+    if not lines:
+        return [Check(WARN, N_("OctoLogin has not recorded a login yet. If you "
+                               "have logged in since installing it, it is not "
+                               "loading."), {}, g, informational=True)]
+    out = []
+    for line in reversed(lines):
+        m = _START_IDLE.match(line)
+        if m:
+            out.append(Check(WARN, N_("At the last start, OctoLogin {version} "
+                                      "did nothing: {reason}"),
+                             {"version": m.group(1), "reason": m.group(2)}, g))
+            break
+        if _START_OK.match(line):
+            break
+    for line in reversed(lines):
+        m = _LOGIN_OK.match(line)
+        if m:
+            out.append(Check(PASS, N_("At the last login, {address} answered "
+                                      "first in {ms} ms"),
+                             {"address": m.group(1), "ms": m.group(2)}, g,
+                             informational=True))
+            break
+        m = _LOGIN_TCP.match(line)
+        if m:
+            out.append(Check(WARN, N_("At the last login, no login service "
+                                      "answered in {ms} ms; OctoLogin used "
+                                      "{address}"),
+                             {"ms": m.group(1), "address": m.group(2)}, g,
+                             informational=True))
+            break
+        m = _LOGIN_NONE.match(line)
+        if m:
+            out.append(Check(WARN, N_("At the last login, no OctoWoW login "
+                                      "server answered in {ms} ms"),
+                             {"ms": m.group(1)}, g, informational=True))
+            break
+        m = _LOGIN_FOREIGN.match(line)
+        if m:
+            out.append(Check(WARN, N_("At the last login, the realmlist pointed "
+                                      "at {address}, which OctoLogin does not "
+                                      "know, so it stood aside"),
+                             {"address": m.group(1)}, g, informational=True))
+            break
+        m = _LOGIN_PROXY.match(line)
+        if m:
+            out.append(Check(PASS, N_("At the last login, the game used a local "
+                                      "proxy ({address}); OctoLogin stood aside"),
+                             {"address": m.group(1)}, g, informational=True))
+            break
+    return out
 
 
 # ──────────────────────────────────────────────────────────────────────────────

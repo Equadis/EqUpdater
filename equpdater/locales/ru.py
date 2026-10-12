@@ -324,6 +324,32 @@ STRINGS = {
         "Звуковые каналы",
     "How many sounds can play at once. More keeps sounds from cutting out in busy fights. [12 - 64]":
         "Сколько звуков может звучать одновременно. Больше — звуки не обрываются в напряжённых боях. [12 - 64]",
+    "OctoLogin":
+        "OctoLogin",
+    "dlls.txt lists {entry}, but the file is missing":
+        "В dlls.txt указан {entry}, но файла нет",
+    "OctoLogin is installed":
+        "OctoLogin установлен",
+    "OctoLogin is listed in dlls.txt":
+        "OctoLogin указан в dlls.txt",
+    "OctoLogin is not listed in dlls.txt, so the game does not load it":
+        "OctoLogin не указан в dlls.txt, поэтому игра его не загружает",
+    "VanillaFixes.exe is missing, so OctoLogin cannot load":
+        "VanillaFixes.exe отсутствует, поэтому OctoLogin не может загрузиться",
+    "OctoLogin has not recorded a login yet. If you have logged in since installing it, it is not loading.":
+        "OctoLogin ещё не записал ни одного входа. Если вы входили в игру после его установки, он не загружается.",
+    "At the last start, OctoLogin {version} did nothing: {reason}":
+        "При последнем запуске OctoLogin {version} ничего не сделал: {reason}",
+    "At the last login, {address} answered first in {ms} ms":
+        "При последнем входе первым ответил {address} за {ms} мс",
+    "At the last login, no login service answered in {ms} ms; OctoLogin used {address}":
+        "При последнем входе ни одна служба входа не ответила за {ms} мс; OctoLogin использовал {address}",
+    "At the last login, no OctoWoW login server answered in {ms} ms":
+        "При последнем входе ни один сервер входа OctoWoW не ответил за {ms} мс",
+    "At the last login, the realmlist pointed at {address}, which OctoLogin does not know, so it stood aside":
+        "При последнем входе realmlist указывал на {address}, который OctoLogin не знает, поэтому он не вмешивался",
+    "At the last login, the game used a local proxy ({address}); OctoLogin stood aside":
+        "При последнем входе игра использовала локальный прокси ({address}); OctoLogin не вмешивался",
     "Verify game files": "Проверить файлы игры",
     "Verifying game files…": "Проверка файлов игры…",
     "Verifying…": "Проверка…",
@@ -433,8 +459,10 @@ STRINGS = {
         'Игровой клиент',
     'LOGIN DOCTOR':
         'ДОКТОР ВХОДА',
-    'Login Doctor…':
-        'Доктор входа…',
+    'Login Doctor':
+        'Доктор входа',
+    "Checks this computer for common login problems: the game client, its login settings, OctoLogin and the connection to OctoWoW. It can repair the login settings.":
+        "Проверяет этот компьютер на частые проблемы со входом: игровой клиент, его настройки входа, OctoLogin и соединение с OctoWoW. Может исправить настройки входа.",
     'Login configuration':
         'Настройки входа',
     'Login server did not answer a test connection ({host}:{port}, timed out). This alone does not mean login will fail: the server may ignore probes or be busy':

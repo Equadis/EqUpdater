@@ -342,6 +342,117 @@ class TestNetwork(unittest.TestCase):
         self.assertFalse(any(c.state == ld.FAIL for c in checks))
 
 
+class TestOctoLogin(DoctorCase):
+    """OctoLogin: installed, listed in dlls.txt, loadable, and what its log
+    says about the last start and the last login."""
+
+    def octo(self, dll=True, listed=True, loader=True, log=None, entry=None):
+        c = self.client()
+        if dll:
+            c.write(os.path.join("mods", "OctoLogin.dll"), b"MZ")
+        if listed:
+            c.write("dlls.txt", ("SuperWoWhook.dll\r\n%s\r\n"
+                                 % (entry or "mods/OctoLogin.dll")).encode())
+        if loader:
+            c.write("VanillaFixes.exe", b"MZ")
+        if log is not None:
+            c.write(os.path.join("mods", "OctoLogin.log"), log.encode())
+        return c
+
+    def octologin(self, c):
+        return [x for x in c.checks() if x.group == "octologin"]
+
+    def test_not_installed_says_nothing(self):
+        c = self.client()
+        self.assertEqual(self.octologin(c), [])
+        self.assertEqual(ld.octologin_checks(c.dir), [])
+
+    def test_installed_listed_and_loadable(self):
+        c = self.octo(log="20:01:02 OctoLogin 1.1.0: ready\n"
+                          "20:01:09 login: 92.114.107.48:3724 answered first in "
+                          "112 ms (dns, 4 tried)\n")
+        found = self.octologin(c)
+        self.assertTrue(has(found, ld.PASS, "OctoLogin is installed"))
+        self.assertTrue(has(found, ld.PASS, "listed in dlls.txt"))
+        last = [x for x in found if "answered first" in x.message]
+        self.assertEqual(last[0].values, {"address": "92.114.107.48:3724",
+                                          "ms": "112"})
+        self.assertTrue(last[0].informational)
+        self.assertFalse(any(x.state != ld.PASS for x in found))
+
+    def test_a_backslash_entry_counts_as_listed(self):
+        c = self.octo(entry="MODS\\OctoLogin.dll", log="")
+        self.assertTrue(has(self.octologin(c), ld.PASS, "listed in dlls.txt"))
+
+    def test_not_listed(self):
+        found = self.octologin(self.octo(listed=False, log=""))
+        self.assertTrue(has(found, ld.WARN, "not listed in dlls.txt"))
+
+    def test_listed_but_missing(self):
+        found = self.octologin(self.octo(dll=False))
+        self.assertEqual(len(found), 1)
+        self.assertTrue(has(found, ld.WARN, "but the file is missing"))
+
+    def test_no_loader(self):
+        found = self.octologin(self.octo(loader=False, log=""))
+        self.assertTrue(has(found, ld.WARN, "VanillaFixes.exe is missing"))
+
+    def test_no_log_yet(self):
+        found = self.octologin(self.octo())
+        msg = [x for x in found if "not recorded a login" in x.message]
+        self.assertEqual(len(msg), 1)
+        self.assertTrue(msg[0].informational)
+
+    def test_the_last_login_is_the_one_reported(self):
+        log = ("10:00:00 login: 1.2.3.4:3724 answered first in 90 ms (dns, 3 tried)\n"
+               "11:00:00 login: nothing answered in 3500 ms (4 tried); using "
+               "the realmlist address\n")
+        found = self.octologin(self.octo(log=log))
+        self.assertTrue(has(found, ld.WARN, "no OctoWoW login server answered"))
+        self.assertFalse(any("answered first" in x.message for x in found))
+
+    def test_every_kind_of_login_line(self):
+        cases = {
+            "login: no login service answered in 3500 ms; using 1.2.3.4:3724 "
+            "(TCP open, dns)": ("no login service answered",
+                                {"ms": "3500", "address": "1.2.3.4:3724"}),
+            "login 10.0.0.9:3724: not an OctoWoW address, left alone":
+                ("which OctoLogin does not know", {"address": "10.0.0.9:3724"}),
+            "login 127.0.0.1:3724: local proxy, left alone":
+                ("local proxy", {"address": "127.0.0.1:3724"}),
+        }
+        for line, (fragment, values) in cases.items():
+            with self.subTest(line=line):
+                found = ld.octologin_log_checks(self.write_log("12:00:00 " + line))
+                hit = [x for x in found if fragment in x.message]
+                self.assertEqual(hit[0].values, values)
+                self.assertTrue(hit[0].informational)
+
+    def test_a_start_that_did_nothing_is_a_warning(self):
+        found = ld.octologin_log_checks(self.write_log(
+            "09:00:00 OctoLogin 1.1.0: connect import already changed by "
+            "another mod; doing nothing"))
+        hit = [x for x in found if "did nothing" in x.message]
+        self.assertEqual(hit[0].values,
+                         {"version": "1.1.0",
+                          "reason": "connect import already changed by another mod"})
+        self.assertFalse(hit[0].informational)
+        ready = ld.octologin_log_checks(self.write_log(
+            "08:00:00 OctoLogin 1.1.0: x; doing nothing\n"
+            "09:00:00 OctoLogin 1.1.0: ready"))
+        self.assertFalse(any("did nothing" in x.message for x in ready))
+
+    def test_informational_lines_keep_the_summary(self):
+        c = self.octo(log="11:00:00 login: nothing answered in 3500 ms (4 tried); "
+                          "using the realmlist address\n")
+        self.assertEqual(ld.summary(c.checks()), ld.NO_LOCAL_PROBLEM)
+
+    def write_log(self, text):
+        c = self.client()
+        c.write(os.path.join("mods", "OctoLogin.log"), (text + "\n").encode())
+        return c.path("mods", "OctoLogin.log")
+
+
 class TestSummary(unittest.TestCase):
     def test_no_local_problem_wording(self):
         ok = [ld.Check(ld.PASS, "x", {})]
