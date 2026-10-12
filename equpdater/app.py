@@ -1750,7 +1750,7 @@ MODS_REGISTRY = [
     },
     {
         "id":          "OctoLogin",
-        "essential": False,
+        "essential": True,
         "name":        "OctoLogin",
         "description": N_("Picks the OctoWoW login server that answers first and the world server with the lowest ping. Its settings and log are in the mods folder."),
         "repo_url":    "https://github.com/fmustafayaman/OctoLogin",

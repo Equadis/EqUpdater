@@ -57,7 +57,7 @@ class TestOctoLogin(unittest.TestCase):
 
     def test_the_entry(self):
         src = self.mod["source"]
-        self.assertFalse(self.mod["essential"])         # opt-in, never automatic
+        self.assertTrue(self.mod["essential"])          # recommended: the star
         self.assertEqual(src["kind"], "github_release")
         self.assertEqual((src["owner"], src["repo"]),
                          ("fmustafayaman", "OctoLogin"))
