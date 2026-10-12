@@ -319,6 +319,8 @@ STRINGS = {
     "Fix the environment variables in Settings → Game launcher:\n\n{problems}":
         "请在 设置 → 游戏启动方式 中修正环境变量：\n\n{problems}",
     "Game launcher…": "游戏启动方式…",
+    "Picks the OctoWoW login server that answers first and the world server with the lowest ping. Its settings and log are in the mods folder.":
+        "选择最先响应的 OctoWoW 登录服务器和延迟最低的世界服务器。其设置和日志位于 mods 文件夹中。",
     "Verify game files": "校验游戏文件",
     "Verifying game files…": "正在校验游戏文件…",
     "Verifying…": "正在校验…",

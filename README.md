@@ -134,8 +134,8 @@ confirmed, and skips the rest.
 - Optional: keep a custom `speech.mpq` (MPQ tab → **Ignore speech.mpq**).
 
 ### DLL mods
-- VanillaFixes, ClassicAPI, Nampower, SuperWoW, UnitXP_SP3, DXVK and more,
-  each with its description and latest version.
+- VanillaFixes, ClassicAPI, Nampower, SuperWoW, UnitXP_SP3, DXVK,
+  OctoLogin and more, each with its description and latest version.
 - **Essential mods are opt-in** — you are asked once, on first run.
 - DLLs already in your client are never replaced just because EqUpdater
   recognises them.

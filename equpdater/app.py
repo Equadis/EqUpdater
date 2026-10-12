@@ -1748,6 +1748,28 @@ MODS_REGISTRY = [
         "register_dll":    "no1600x1200.dll",
         "installed_files": ["no1600x1200.dll"],
     },
+    {
+        "id":          "OctoLogin",
+        "essential": False,
+        "name":        "OctoLogin",
+        "description": N_("Picks the OctoWoW login server that answers first and the world server with the lowest ping. Its settings and log are in the mods folder."),
+        "repo_url":    "https://github.com/fmustafayaman/OctoLogin",
+        "source": {
+            "kind":          "github_release",
+            "owner":         "fmustafayaman",
+            "repo":          "OctoLogin",
+            # The bare DLL, not the zip: the zip nests it under a folder
+            # named after the version, which changes every release.
+            "asset_pattern": "OctoLogin.dll",
+            "prefer_no":     None,
+            "extract_map":   None,
+            # Where its own installer puts it; it reads OctoLogin.ini and
+            # writes OctoLogin.log beside the DLL.
+            "dest":          "mods/OctoLogin.dll",
+        },
+        "register_dll":    "mods/OctoLogin.dll",
+        "installed_files": ["mods/OctoLogin.dll"],
+    },
 ]
 
 GITHUB_API = "https://api.github.com"
@@ -2019,7 +2041,7 @@ def install_mod(mod: dict, client_dir: str, release: dict | None = None) -> list
             data = r.read()
 
         if src.get("extract_map") is None:
-            dest_rel = asset["name"]
+            dest_rel = src.get("dest") or asset["name"]
             dest     = os.path.join(client_dir, dest_rel)
             os.makedirs(os.path.dirname(dest) or client_dir, exist_ok=True)
             with open(dest, "wb") as f:
@@ -2207,16 +2229,25 @@ DLL_LOAD_ORDER = [
     "ClassicAPI.dll",
     "AuctionQueryThrottle.dll",
     "UnitXP_SP3.dll",
+    # Hooks only the client's connect import, and leaves it alone if anything
+    # else got there first: last, so it never displaces another mod's hook.
+    "mods/OctoLogin.dll",
 ]
+
+
+def _dll_key(entry: str) -> str:
+    """What a dlls.txt entry names, for comparing: case and the direction of
+    the slash do not matter (``mods/OctoLogin.dll`` is ``MODS\\OctoLogin.dll``)."""
+    return entry.strip().replace("\\", "/").lower()
 
 
 def _sorted_dll_lines(lines: list) -> list:
     """dlls.txt entries in load order. Entries we do not know about (added by
     hand by the player) keep their relative order and go last - sorted is
     stable."""
-    rank = {n.lower(): i for i, n in enumerate(DLL_LOAD_ORDER)}
+    rank = {_dll_key(n): i for i, n in enumerate(DLL_LOAD_ORDER)}
     return sorted((l for l in lines if l.strip()),
-                  key=lambda l: rank.get(l.strip().lower(), len(rank)))
+                  key=lambda l: rank.get(_dll_key(l), len(rank)))
 
 
 def _invalidate_dll_cache(client_dir: str):
@@ -2242,7 +2273,7 @@ def _write_dlls_txt(client_dir: str, lines: list):
 def add_dll(client_dir: str, name: str):
     path  = _dlls_txt_path(client_dir)
     lines = _read_lines(path) if os.path.exists(path) else []
-    if not any(l.strip().lower() == name.lower() for l in lines):
+    if not any(_dll_key(l) == _dll_key(name) for l in lines):
         lines = [l for l in lines if l.strip()] + [name]
     # Rewrite even when the entry was already present: a dlls.txt left behind
     # by an older build can still be in the wrong order.
@@ -2257,7 +2288,7 @@ def ensure_dll(client_dir: str, name: str) -> bool:
     to confirm it. Returns True when something was actually repaired."""
     path  = _dlls_txt_path(client_dir)
     lines = _read_lines(path) if os.path.exists(path) else []
-    if any(l.strip().lower() == name.lower() for l in lines):
+    if any(_dll_key(l) == _dll_key(name) for l in lines):
         return False
     add_dll(client_dir, name)
     return True
@@ -2298,7 +2329,7 @@ def remove_dll(client_dir: str, name: str):
     if not os.path.exists(path):
         return
     lines = [l for l in _read_lines(path)
-             if l.strip() and l.strip().lower() != name.lower()]
+             if l.strip() and _dll_key(l) != _dll_key(name)]
     if not lines:
         os.remove(path)
         _invalidate_dll_cache(client_dir)

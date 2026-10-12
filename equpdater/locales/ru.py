@@ -318,6 +318,8 @@ STRINGS = {
     "Fix the environment variables in Settings → Game launcher:\n\n{problems}":
         "Исправьте переменные окружения в Настройки → Запуск игры:\n\n{problems}",
     "Game launcher…": "Запуск игры…",
+    "Picks the OctoWoW login server that answers first and the world server with the lowest ping. Its settings and log are in the mods folder.":
+        "Выбирает сервер входа OctoWoW, который отвечает первым, и игровой сервер с самым низким пингом. Настройки и журнал лежат в папке mods.",
     "Verify game files": "Проверить файлы игры",
     "Verifying game files…": "Проверка файлов игры…",
     "Verifying…": "Проверка…",
