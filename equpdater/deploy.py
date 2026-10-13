@@ -229,16 +229,28 @@ $s.Save()
 """
 
 
+#: PowerShell writes in the console's code page unless told otherwise, and
+#: Python's text mode decodes with the ANSI one: a shortcut whose path holds
+#: a character outside it (a Cyrillic user name, an accented Start menu
+#: folder) killed the decoding thread, the output came back as None, and the
+#: installer stopped with "'NoneType' object has no attribute 'splitlines'".
+#: So the script is told to write UTF-8 and the bytes are decoded here.
+_PS_UTF8 = "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8\n"
+
+
 def _powershell(script: str, **env) -> str:
     full_env = dict(os.environ)
     full_env.update({"EQU_" + k.upper(): v for k, v in env.items()})
     out = subprocess.run(
-        ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
-        env=full_env, capture_output=True, text=True, timeout=120,
+        ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+         _PS_UTF8 + script],
+        env=full_env, capture_output=True, timeout=120,
         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    stdout = (out.stdout or b"").decode("utf-8", "replace")
     if out.returncode != 0:
-        raise OSError(out.stderr.strip() or "PowerShell failed")
-    return out.stdout
+        stderr = (out.stderr or b"").decode("utf-8", "replace")
+        raise OSError(stderr.strip() or "PowerShell failed")
+    return stdout
 
 
 def read_shortcuts(lnks: list) -> dict:

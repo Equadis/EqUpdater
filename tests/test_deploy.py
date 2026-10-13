@@ -256,6 +256,19 @@ class TestShortcuts(Sandbox):
         deploy.fix_shortcuts(self.exe, [self.desktop])
         self.assertEqual(deploy.read_shortcut(other)[0], other_exe)
 
+    def test_names_outside_the_ansi_code_page(self):
+        """A Cyrillic, CJK or accented shortcut used to stop the installer
+        with "'NoneType' object has no attribute 'splitlines'"."""
+        for name in ("Игры", "游戏", "Jeux vidéo ü"):
+            folder = os.path.join(self.start, name)
+            os.makedirs(folder)
+            lnk = os.path.join(folder, name + ".lnk")
+            deploy.write_shortcut(lnk, self.old_exe)
+            self.assertEqual(deploy.read_shortcut(lnk)[0], self.old_exe)
+            self.assertEqual(deploy.fix_shortcuts(self.exe, [folder]),
+                             [(lnk, self.old_exe)])
+            self.assertEqual(deploy.read_shortcut(lnk)[0], self.exe)
+
     def test_fixing_twice_changes_nothing_the_second_time(self):
         deploy.fix_shortcuts(self.exe, [self.desktop])
         self.assertEqual(deploy.fix_shortcuts(self.exe, [self.desktop]), [])
@@ -289,3 +302,31 @@ class TestShortcuts(Sandbox):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestPowerShellOutput(unittest.TestCase):
+    """PowerShell's output is read as UTF-8 bytes, whatever the code page."""
+
+    def run_with(self, stdout, returncode=0, stderr=b""):
+        done = mock.Mock(stdout=stdout, stderr=stderr, returncode=returncode)
+        with mock.patch.object(deploy.subprocess, "run",
+                               return_value=done) as run:
+            return deploy._powershell("Write-Output 1"), run
+
+    def test_utf8_is_asked_for_and_decoded(self):
+        line = "C:\\Users\\Олег\\Игры.lnk\tC:\\EqUpdater.exe\tC:\\\n"
+        out, run = self.run_with(line.encode("utf-8"))
+        self.assertEqual(out, line)
+        script = run.call_args.args[0][-1]
+        self.assertIn("OutputEncoding", script)
+        self.assertNotIn("text", run.call_args.kwargs)
+
+    def test_undecodable_or_missing_output_is_not_a_crash(self):
+        self.assertIn("\ufffd", self.run_with(b"\xff\xfe bad")[0])
+        self.assertEqual(self.run_with(None)[0], "")
+        with mock.patch.object(deploy, "_powershell", return_value=""):
+            self.assertEqual(deploy.read_shortcuts(["a.lnk"]), {})
+
+    def test_a_failure_still_raises_with_its_message(self):
+        with self.assertRaisesRegex(OSError, "Zugriff verweigert"):
+            self.run_with(b"", 1, "Zugriff verweigert".encode("utf-8"))
