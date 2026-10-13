@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 import sys
 import threading
 import zipfile
@@ -77,16 +78,25 @@ def install(payload: str, install_dir: str | None = None,
     changed = deploy.fix_shortcuts(exe, folders)
     created = []
     start = folders[1] if len(folders) > 1 else None
+    # EqUpdater is installed by now; a shortcut that cannot be written is
+    # not a reason to report the install as failed.
     if start and os.path.isdir(start):
         lnk = os.path.join(start, deploy.APP + ".lnk")
-        if not os.path.exists(lnk):
-            deploy.write_shortcut(lnk, exe)
+        if not os.path.exists(lnk) and _shortcut(lnk, exe):
             created.append(lnk)
     desktop = os.path.join(folders[0], deploy.APP + ".lnk") if folders else None
-    if desktop and not os.path.exists(desktop) and want_desktop():
-        deploy.write_shortcut(desktop, exe)
+    if (desktop and not os.path.exists(desktop) and want_desktop()
+            and _shortcut(desktop, exe)):
         created.append(desktop)
     return exe, changed, created
+
+
+def _shortcut(lnk: str, exe: str) -> bool:
+    try:
+        deploy.write_shortcut(lnk, exe)
+        return True
+    except (OSError, subprocess.SubprocessError):
+        return False
 
 
 def main() -> int:

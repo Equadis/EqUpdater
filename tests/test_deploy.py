@@ -330,3 +330,25 @@ class TestPowerShellOutput(unittest.TestCase):
     def test_a_failure_still_raises_with_its_message(self):
         with self.assertRaisesRegex(OSError, "Zugriff verweigert"):
             self.run_with(b"", 1, "Zugriff verweigert".encode("utf-8"))
+
+
+class TestShortcutFailureIsNotAFailedInstall(unittest.TestCase):
+
+    def test_a_shortcut_that_cannot_be_written_is_skipped(self):
+        from equpdater import installer
+        with mock.patch.object(installer.deploy, "write_shortcut",
+                               side_effect=OSError("Unable to save shortcut")):
+            self.assertFalse(installer._shortcut("x.lnk", "EqUpdater.exe"))
+        with mock.patch.object(installer.deploy, "write_shortcut"):
+            self.assertTrue(installer._shortcut("x.lnk", "EqUpdater.exe"))
+
+    def test_the_native_shell_link_is_sent_to_powershell(self):
+        done = mock.Mock(stdout=b"", stderr=b"", returncode=0)
+        with mock.patch.object(deploy.subprocess, "run",
+                               return_value=done) as run:
+            deploy.write_shortcut("C:\\Игры\\EqUpdater.lnk", "C:\\EqUpdater.exe")
+        env = run.call_args.kwargs["env"]
+        # IShellLinkW, the shell's Unicode shortcut interface.
+        self.assertIn("000214F9-0000-0000-C000-000000000046", env["EQU_CS"])
+        self.assertEqual(env["EQU_LNK"], "C:\\Игры\\EqUpdater.lnk")
+        self.assertIn("[EquLnk]::Write", run.call_args.args[0][-1])

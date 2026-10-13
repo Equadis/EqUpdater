@@ -208,24 +208,102 @@ def _known_desktop() -> str | None:
 # Shortcuts are COM objects; PowerShell speaks COM and ships with Windows.
 # Paths travel in environment variables, never inside the script text, so no
 # path can break the quoting.
-_PS_READ = """
-$shell = New-Object -ComObject WScript.Shell
+#
+# They are read and written through the shell's own IShellLinkW, which is
+# Unicode throughout. WScript.Shell's shortcut object, used before, passes
+# paths through the ANSI code page: a shortcut under C:\Users\Олег\Desktop
+# could not be saved ("Unable to save shortcut ...\????\????.lnk") nor read
+# back. WScript.Shell remains the fallback where Add-Type is not allowed
+# (PowerShell's constrained language mode).
+_SHELL_LINK_CS = r"""
+using System;
+using System.Text;
+using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
+
+[ComImport, Guid("000214F9-0000-0000-C000-000000000046"),
+ InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+public interface IEquShellLinkW {
+    void GetPath([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszFile,
+                 int cch, IntPtr pfd, uint fFlags);
+    void GetIDList(out IntPtr ppidl);
+    void SetIDList(IntPtr pidl);
+    void GetDescription([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszName, int cch);
+    void SetDescription([MarshalAs(UnmanagedType.LPWStr)] string pszName);
+    void GetWorkingDirectory([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszDir, int cch);
+    void SetWorkingDirectory([MarshalAs(UnmanagedType.LPWStr)] string pszDir);
+    void GetArguments([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszArgs, int cch);
+    void SetArguments([MarshalAs(UnmanagedType.LPWStr)] string pszArgs);
+    void GetHotkey(out short pwHotkey);
+    void SetHotkey(short wHotkey);
+    void GetShowCmd(out int piShowCmd);
+    void SetShowCmd(int iShowCmd);
+    void GetIconLocation([Out, MarshalAs(UnmanagedType.LPWStr)] StringBuilder pszIconPath,
+                         int cch, out int piIcon);
+    void SetIconLocation([MarshalAs(UnmanagedType.LPWStr)] string pszIconPath, int iIcon);
+    void SetRelativePath([MarshalAs(UnmanagedType.LPWStr)] string pszPathRel, uint dwReserved);
+    void Resolve(IntPtr hwnd, uint fFlags);
+    void SetPath([MarshalAs(UnmanagedType.LPWStr)] string pszFile);
+}
+
+[ComImport, Guid("00021401-0000-0000-C000-000000000046")]
+public class EquShellLink { }
+
+public static class EquLnk {
+    public static string Read(string lnk) {
+        IEquShellLinkW link = (IEquShellLinkW)new EquShellLink();
+        ((IPersistFile)link).Load(lnk, 0);
+        StringBuilder target = new StringBuilder(32768);
+        link.GetPath(target, target.Capacity, IntPtr.Zero, 0);
+        StringBuilder dir = new StringBuilder(32768);
+        link.GetWorkingDirectory(dir, dir.Capacity);
+        return lnk + "\t" + target.ToString() + "\t" + dir.ToString();
+    }
+
+    public static void Write(string lnk, string target, string dir, string desc) {
+        IEquShellLinkW link = (IEquShellLinkW)new EquShellLink();
+        link.SetPath(target);
+        link.SetWorkingDirectory(dir);
+        link.SetIconLocation(target, 0);
+        link.SetDescription(desc);
+        ((IPersistFile)link).Save(lnk, true);
+    }
+}
+"""
+
+_PS_NATIVE = """
+$native = $false
+try { Add-Type -TypeDefinition $env:EQU_CS -ErrorAction Stop; $native = $true } catch { }
+"""
+
+_PS_READ = _PS_NATIVE + """
+$shell = $null
 foreach ($lnk in ($env:EQU_LNKS -split [char]10)) {
     if (-not $lnk) { continue }
     try {
-        $s = $shell.CreateShortcut($lnk)
-        Write-Output ($lnk + [char]9 + $s.TargetPath + [char]9 + $s.WorkingDirectory)
+        if ($native) {
+            Write-Output ([EquLnk]::Read($lnk))
+        } else {
+            if (-not $shell) { $shell = New-Object -ComObject WScript.Shell }
+            $s = $shell.CreateShortcut($lnk)
+            Write-Output ($lnk + [char]9 + $s.TargetPath + [char]9 + $s.WorkingDirectory)
+        }
     } catch { }
 }
 """
 
-_PS_WRITE = """
-$s = (New-Object -ComObject WScript.Shell).CreateShortcut($env:EQU_LNK)
-$s.TargetPath = $env:EQU_TARGET
-$s.WorkingDirectory = $env:EQU_WORKDIR
-$s.IconLocation = $env:EQU_TARGET + ",0"
-$s.Description = "EqUpdater - OctoWoW client, mods and addons"
-$s.Save()
+_PS_WRITE = _PS_NATIVE + """
+$desc = "EqUpdater - OctoWoW client, mods and addons"
+if ($native) {
+    [EquLnk]::Write($env:EQU_LNK, $env:EQU_TARGET, $env:EQU_WORKDIR, $desc)
+} else {
+    $s = (New-Object -ComObject WScript.Shell).CreateShortcut($env:EQU_LNK)
+    $s.TargetPath = $env:EQU_TARGET
+    $s.WorkingDirectory = $env:EQU_WORKDIR
+    $s.IconLocation = $env:EQU_TARGET + ",0"
+    $s.Description = $desc
+    $s.Save()
+}
 """
 
 
@@ -241,6 +319,7 @@ _PS_UTF8 = "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8\n"
 def _powershell(script: str, **env) -> str:
     full_env = dict(os.environ)
     full_env.update({"EQU_" + k.upper(): v for k, v in env.items()})
+    full_env["EQU_CS"] = _SHELL_LINK_CS
     out = subprocess.run(
         ["powershell", "-NoProfile", "-NonInteractive", "-Command",
          _PS_UTF8 + script],
