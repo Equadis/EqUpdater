@@ -18,6 +18,7 @@ import socket
 import ssl
 import sys
 import tempfile
+import time
 import unittest
 import urllib.error
 import zipfile
@@ -393,6 +394,37 @@ class TestFailuresReachTheUI(unittest.TestCase):
         self.assertNotIn("Http", managed)
         self.assertTrue(os.path.isdir(os.path.join(self.addons, "Good")))
         self.assert_not_stuck()
+
+    def finish_render(self):
+        deadline = time.monotonic() + 30
+        while self.app._addons_build_queue and time.monotonic() < deadline:
+            self.app.update()
+            time.sleep(0.002)
+        self.app.update()
+
+    def test_installing_keeps_the_list_where_it_was(self):
+        """Issue #1: each install sent the list back to the top."""
+        a = self.app
+        a._switch_tab("ADDONS")
+        a._addons_status["available"] = [
+            self.rec("Addon%03d" % i) for i in range(80)]
+        a._render_addons()
+        self.finish_render()
+        cv = a._addons_canvas
+        cv.yview_moveto(0.5)
+        a.update()
+        before = cv.yview()[0]
+        self.assertGreater(before, 0.3)
+        rec = a._addons_status["available"][40]
+        with mock.patch.object(self.m, "addon_remote_sha",
+                               return_value="e" * 40), \
+                mock.patch.object(self.m, "_download_archive",
+                                  return_value=_zip({"x.toc": "x"})):
+            a._addon_apply([rec])
+            self.pump()
+            self.finish_render()
+        self.assertEqual(self.asked, [])
+        self.assertAlmostEqual(cv.yview()[0], before, delta=0.05)
 
     def test_success_shows_no_dialog(self):
         with mock.patch.object(self.m, "addon_remote_sha",

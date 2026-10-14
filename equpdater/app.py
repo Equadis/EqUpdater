@@ -7404,7 +7404,7 @@ class EqUpdaterApp(tk.Tk):
                 self._addons_busy = False
                 self._refresh_addons_badge()
                 if changed:
-                    self._render_addons()
+                    self._render_addons(keep_scroll=True)
                 else:
                     self._refresh_addons_footer()
             self.after(0, done)
@@ -7461,7 +7461,7 @@ class EqUpdaterApp(tk.Tk):
                 rec["folder"] in self._addons_status["addons"])
             rec["status"] = "downloading"
             self._addons_status["addons"].setdefault(rec["folder"], rec)
-        self._render_addons()
+        self._render_addons(keep_scroll=True)
         # PLAY is inactive while addons download/install, same as for mods.
         self._set_btn_busy(tr("Installing…"))
         self._status_var.set(tr("Downloading addons…"))
@@ -7543,7 +7543,7 @@ class EqUpdaterApp(tk.Tk):
                 # cached the shas — no further API requests are needed.
                 self._addons_verify(remote_checks=False)
                 if not self._addons_busy:        # the verify did not start
-                    self._render_addons()
+                    self._render_addons(keep_scroll=True)
                 if failures:
                     self._report_addon_failures(failures, len(recs))
             self.after(0, done)
@@ -7612,7 +7612,7 @@ class EqUpdaterApp(tk.Tk):
         self._addons_status["addons"].pop(folder, None)
         self._addon_errors.pop(folder, None)
         self._refresh_addons_badge()
-        self._render_addons()
+        self._render_addons(keep_scroll=True)
 
     def _open_custom_addon_dialog(self):
         if self._settings_overlay is not None:
@@ -7765,8 +7765,10 @@ class EqUpdaterApp(tk.Tk):
         """Rebuild the addons list. Rows are created in small batches on the
         Tk event loop so a large catalog doesn't freeze the UI; the finished
         list replaces the shown one in one step (see _reset_addons_inner).
-        ``keep_scroll`` keeps the scroll position (expanding/collapsing a
-        section) instead of returning to the top."""
+        ``keep_scroll`` keeps the scroll position instead of returning to the
+        top: expanding or collapsing a section, and the redraws during and
+        after an install, update or removal -- installing several addons from
+        a long list must not send the player back to its start each time."""
         if not hasattr(self, "_addons_inner"):
             return
         self._addons_keep_scroll = keep_scroll
