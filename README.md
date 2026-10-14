@@ -5,21 +5,32 @@
 <h1 align="center">EqUpdater</h1>
 
 <p align="center">
-  A desktop updater and mod manager for <b>OctoWoW</b>.<br>
+  A desktop updater and mod manager for <b>OctoWoW</b>, on <b>Windows and Linux</b>.<br>
   Game client, DLL mods, addons, texture packs, client tweaks and server news, in one place.
 </p>
 
 <p align="center">
-  <img src="docs/screenshot.png" alt="EqUpdater's MODS tab" width="720">
+  <img src="docs/screenshot.png" alt="EqUpdater's NEWS tab" width="720">
 </p>
 
 ---
 
-## Install
+## Download
 
-Download the latest release from the
-[**Releases page**](https://github.com/eqomdx/EqUpdater/releases/latest).
+- [**Windows**](https://github.com/eqomdx/EqUpdater/releases/download/v2.1.0/EqUpdater-v2.1.0-Windows.exe) — `EqUpdater-v2.1.0-Windows.exe`
+- [**Linux x86_64**](https://github.com/eqomdx/EqUpdater/releases/download/v2.1.0/EqUpdater-v2.1.0-Linux-x86_64.AppImage) — `EqUpdater-v2.1.0-Linux-x86_64.AppImage`
+- [**Release page**](https://github.com/eqomdx/EqUpdater/releases/latest) — release notes and every version
+
 Nothing else is needed: no Python, no build tools.
+
+> **Windows Defender may wrongly flag the unsigned installer as
+> `Trojan:Win32/Wacatac.B!ml`.** That is a known false positive for new,
+> unsigned apps. If the download is blocked: **Windows Security → Virus &
+> threat protection → Protection history**, open the entry, **Actions →
+> Allow on device**, and download it again. If Windows says "Windows
+> protected your PC", choose **More info → Run anyway**.
+
+## Install
 
 ### Windows
 
@@ -28,7 +39,8 @@ Nothing else is needed: no Python, no build tools.
    `%LOCALAPPDATA%\Programs\EqUpdater`, adds it to the Start menu (and,
    if you like, the desktop), and starts it.
 
-No administrator rights are needed, and it never touches your game folder.
+No administrator rights are needed, it never touches your game folder, and
+it works with non-English user names and folder names.
 
 **Updating:** download the newer `EqUpdater-vX.Y.Z-Windows.exe` and run it
 (close EqUpdater first). It replaces the app in that same place and points
@@ -123,17 +135,33 @@ confirmed, and skips the rest.
 ## Features
 
 ### Game client
-- Downloads and verifies the OctoWoW client, repairing only what is wrong.
+- Downloads, verifies and repairs the OctoWoW client, repairing only the
+  files that are actually wrong.
 - Will not update or patch while the game is running.
 - Optional: keep a custom `speech.mpq` (MPQ tab → **Ignore speech.mpq**).
+- A new install suggests `Games\OctoWoW` in your user folder, outside
+  EqUpdater's own folder, so an EqUpdater update can never touch the game.
+- Downloads always use verified HTTPS, under Wine too; certificate checks
+  are never switched off.
 
 ### DLL mods
-- VanillaFixes, ClassicAPI, Nampower, SuperWoW, UnitXP_SP3, DXVK,
-  OctoLogin and more, each with its description and latest version.
-- **Essential mods are opt-in** — you are asked once, on first run.
+- VanillaFixes, ClassicAPI, Nampower, SuperWoW, UnitXP_SP3, VanillaHelpers,
+  DXVK, TransmogFix, AuctionQueryThrottle, OctoLogin and more, each with its
+  description and latest version.
+- **OctoLogin** ([fmustafayaman](https://github.com/fmustafayaman/OctoLogin))
+  connects the game to whichever OctoWoW login server answers first and
+  picks the world server with the lowest ping.
+- **Recommended mods are opt-in** — you are asked once, on first run.
 - DLLs already in your client are never replaced just because EqUpdater
   recognises them.
-- `dlls.txt` is kept in step, so an enabled mod always actually loads.
+- `dlls.txt` is kept in step and in the right load order, so an enabled mod
+  always actually loads.
+- **Custom git mods** (Mods → **+ Add custom git mod**): paste a GitHub,
+  Codeberg or OctoWoW Git repository or release link, pick the `.dll` from
+  its latest release, and EqUpdater installs it to `mods/`, registers it in
+  `dlls.txt`, keeps it updated from that release, and removes it cleanly
+  with ✕. A mod runs code inside the game, so nothing is installed until you
+  confirm a warning saying so — only add mods you trust.
 
 ### Addons
 - ★ **Recommended** addons, a wider list of maintained community versions,
@@ -144,7 +172,12 @@ confirmed, and skips the rest.
   read as that same canonical link; no other address is rewritten.
 - Knows the difference between newer, older and modified — a different
   commit is not assumed to be an update.
-- Switch an addon to another fork, ignore updates for one, or stop managing it.
+- Switch an addon to another fork, ignore updates for one, or stop managing
+  it. One-click **Update All**.
+- A failed install or update says why (for example the host's DDoS check,
+  a timeout or a bad download), and the installed copy stays untouched until
+  its replacement is in place.
+- Installing, updating or removing an addon keeps your place in the list.
 
 ### Texture packs (MPQ)
 - Install packs such as **Octo Raid Visuals** by Rook.
@@ -154,17 +187,19 @@ confirmed, and skips the rest.
 - **Replace** keeps your old file beside the new one.
 
 ### Tweaks
-- Client tweaks patched into `WoW.exe`.
+- Patched into `WoW.exe`: Auto Loot, Nameplate Range, Field of View, Far
+  Clip, Frill Distance, Camera Distance, Sound in Background, **Sound
+  Channels** (12–64) and the game's language.
 - **Reset** asks before putting everything back to defaults.
 
 ### Login Doctor
-- **Settings → Login Doctor** checks what on your computer could stop the
-  game logging in: `WoW.exe` and its build (1.18.1, 7272), the realmlist
-  files (`realmlist.wtf`, and `Data/<locale>/realmlist.wtf` where there is
-  one), the login lines in `WTF/Config.wtf`, name lookups for
-  play.octowow.st, octowow.st and dl.octowow.st, the login server's port
-  (3724) and the HTTPS servers EqUpdater uses. It never tries to log in and
-  never reads accounts, launcher sign-ins or tokens.
+- **Settings → Troubleshooting → Login Doctor** checks what on your computer
+  could stop the game logging in: `WoW.exe` and its build (1.18.1, 7272),
+  the realmlist files (`realmlist.wtf`, and `Data/<locale>/realmlist.wtf`
+  where there is one), the login lines in `WTF/Config.wtf`, OctoLogin, name
+  lookups for play.octowow.st, octowow.st and dl.octowow.st, the login
+  server's port (3724) and the HTTPS servers EqUpdater uses. It never tries
+  to log in and never reads accounts, launcher sign-ins or tokens.
 - **Repair login configuration** sets the realmlist to `play.octowow.st` and
   removes a stale `SET realmList` from `Config.wtf`. It lists the files
   first, refuses while the game is running, changes only those lines, and
@@ -181,7 +216,8 @@ confirmed, and skips the rest.
   ([t=2848](https://octowow.st/forum/viewtopic.php?t=2848)); while the forum
   is unreadable, OctoWoW's public news feed (`news.json`) instead.
 - Changelog: the newest posts in the patch notes thread
-  ([t=2816](https://octowow.st/forum/viewtopic.php?t=2816)).
+  ([t=2816](https://octowow.st/forum/viewtopic.php?t=2816)), each with its
+  own date and a link to the post.
 - Both are read once at launch, and again when you press refresh.
 - If the forum cannot be read, the News tab says why and keeps the last news
   it received.
@@ -196,6 +232,17 @@ confirmed, and skips the rest.
   Português (BR). The first launch asks; after that it is **Tweaks →
   Language**, which sets both the game's language and EqUpdater's.
   Changing it offers a restart.
+
+---
+
+## Known issues
+
+- **OctoWoW's DDoS protection sometimes blocks apps** from parts of the
+  website. News then shows the public news feed or the last news received,
+  and changed OctoWoW Git addons show **Unable to verify** with
+  **Replace…** (installing them still works).
+- **Priority Sign In** from the official OctoLauncher cannot be used through
+  EqUpdater. Login Doctor explains when it may help.
 
 ---
 
