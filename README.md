@@ -13,12 +13,6 @@
   <img src="docs/screenshot.png" alt="EqUpdater's MODS tab" width="720">
 </p>
 
-> EqUpdater is derived from **[Octo Updater](https://github.com/rebasedkon/octo-updater)**
-> by **rebasedkon**. Support the original author on
-> [Ko-fi](https://ko-fi.com/rebased) or
-> [Buy Me a Coffee](https://buymeacoffee.com/rebased).
-> See [Credits](#credits).
-
 ---
 
 ## Install
