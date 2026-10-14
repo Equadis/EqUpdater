@@ -3,7 +3,7 @@
 > **Players and testers: you do not need this folder.** Download
 > `EqUpdater-vX.Y.Z-Windows.exe` (Windows installer) or
 > `EqUpdater-vX.Y.Z-Linux-x86_64.AppImage` from the
-> [Releases page](https://github.com/eqomdx/EqUpdater/releases/latest) -
+> [Releases page](https://github.com/Equadis/EqUpdater/releases/latest) -
 > or, to test a pull request, from its **Release** workflow run's
 > artifacts on GitHub Actions - and run it. Those are built and
 > self-tested by CI and are what users get. Everything below builds

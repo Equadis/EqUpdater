@@ -235,7 +235,7 @@ if (-not (Test-Path (Join-Path $projectDir "equpdater\app.py"))) {
     throw ("This installer builds EqUpdater, but the project is not next to " +
            "it.`nLooked in: $projectDir`n`n" +
            "Download the whole repository from " +
-           "https://github.com/eqomdx/EqUpdater (Code -> Download ZIP), " +
+           "https://github.com/Equadis/EqUpdater (Code -> Download ZIP), " +
            "unpack it, and run install\install.ps1 from inside it.")
 }
 Write-Ok "project: $projectDir"

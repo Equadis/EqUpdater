@@ -67,7 +67,7 @@ class TestOpening(unittest.TestCase):
         with On("linux") as platforms, \
                 mock.patch.object(platforms.shutil, "which", lambda n: "/usr/bin/" + n), \
                 mock.patch.object(platforms, "spawn_detached") as spawn:
-            platforms.open_url("https://github.com/eqomdx/EqUpdater")
+            platforms.open_url("https://github.com/Equadis/EqUpdater")
         self.assertEqual(spawn.call_args[0][0][0], "xdg-open")
 
 

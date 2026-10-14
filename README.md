@@ -17,9 +17,9 @@
 
 ## Download
 
-- [**Windows**](https://github.com/eqomdx/EqUpdater/releases/download/v2.1.0/EqUpdater-v2.1.0-Windows.exe) — `EqUpdater-v2.1.0-Windows.exe`
-- [**Linux x86_64**](https://github.com/eqomdx/EqUpdater/releases/download/v2.1.0/EqUpdater-v2.1.0-Linux-x86_64.AppImage) — `EqUpdater-v2.1.0-Linux-x86_64.AppImage`
-- [**Release page**](https://github.com/eqomdx/EqUpdater/releases/latest) — release notes and every version
+- [**Windows**](https://github.com/Equadis/EqUpdater/releases/download/v2.1.0/EqUpdater-v2.1.0-Windows.exe) — `EqUpdater-v2.1.0-Windows.exe`
+- [**Linux x86_64**](https://github.com/Equadis/EqUpdater/releases/download/v2.1.0/EqUpdater-v2.1.0-Linux-x86_64.AppImage) — `EqUpdater-v2.1.0-Linux-x86_64.AppImage`
+- [**Release page**](https://github.com/Equadis/EqUpdater/releases/latest) — release notes and every version
 
 Nothing else is needed: no Python, no build tools.
 

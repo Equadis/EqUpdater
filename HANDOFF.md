@@ -3,7 +3,7 @@
 **Version:** 2.0.6  
 **Date:** 2026-09-24  
 **Project:** EqUpdater, derived from rebasedkon/octo-updater  
-**Repository:** https://github.com/eqomdx/EqUpdater
+**Repository:** https://github.com/Equadis/EqUpdater
 
 ## Current product direction
 
@@ -298,7 +298,7 @@ anti-bot protection.
 *named* User-Agent allowlist entry for OctoBot. Same client (urllib) from the
 same PC: `User-Agent: OctoBot/1.0 (+OctoWoW Discord bot)` gets the forum;
 `EqUpdater/2.0.1`, a Chrome UA, and honest variants such as
-`EqUpdater/2.0.1 (+https://github.com/eqomdx/EqUpdater)` all get the
+`EqUpdater/2.0.1 (+https://github.com/Equadis/EqUpdater)` all get the
 challenge. EqUpdater must not send OctoBot's UA: that is borrowing another
 client's exemption. The fix is asking OctoWoW to add `EqUpdater/` to the
 same allowlist; no code change is needed after that.
@@ -410,4 +410,4 @@ Do not reintroduce these:
 4. Confirm Friz, Arial and OpenDyslexic all switch live and persist after restart.
 5. Confirm OpenDyslexic fits the fixed 1000×700 design at Windows 100%, 125% and 150% scaling.
 6. Verify Announcements and Changelog against the live OctoWoW service and capture the session log if either still fails.
-7. Only after those checks, push the packaged changes to `eqomdx/EqUpdater`.
+7. Only after those checks, push the packaged changes to `Equadis/EqUpdater`.

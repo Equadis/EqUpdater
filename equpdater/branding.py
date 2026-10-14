@@ -31,7 +31,7 @@ APP_VERSION = "2.1.0"
 #: EqUpdater is a substantially reworked derivative of Octo Updater; see
 #: NOTICE.
 UPSTREAM_NAME = "Octo Updater"
-PROJECT_REPO = "eqomdx/EqUpdater"
+PROJECT_REPO = "Equadis/EqUpdater"
 PROJECT_URL = f"https://github.com/{PROJECT_REPO}"
 
 USER_AGENT = f"{APP_NAME}/{APP_VERSION}"
