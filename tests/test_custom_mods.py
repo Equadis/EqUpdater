@@ -234,12 +234,16 @@ class TestInstall(CustomModBase):
 from tests.test_app_smoke import HAVE_TK, _close_app  # noqa: E402
 
 
-class _InlineThread:
-    def __init__(self, target=None, args=(), daemon=None, **_kw):
-        self.target, self.args = target, args
+_REAL_THREAD = __import__("threading").Thread
 
-    def start(self):
-        self.target(*self.args)
+
+def _thread(target=None, args=(), **kw):
+    """The dialog's release lookup runs inline (Tk's after() needs a running
+    mainloop from another thread); every other thread is a real one -- an
+    inline animation or news worker would never return."""
+    if "_open_custom_mod_dialog" in getattr(target, "__qualname__", ""):
+        return type("T", (), {"start": lambda self: target(*args)})()
+    return _REAL_THREAD(target=target, args=args, **kw)
 
 
 @unittest.skipUnless(HAVE_TK, "no display")
@@ -275,7 +279,11 @@ class TestDialog(unittest.TestCase):
         self.app._switch_tab("MODS")
         self.updates, self.asked = [], []
         self.patches = [
-            mock.patch.object(self.m.threading, "Thread", _InlineThread),
+            mock.patch.object(self.m.threading, "Thread", _thread),
+            # Closing a dialog is "confirm": never let it reach a Windows
+            # prompt or a reconcile here.
+            mock.patch.object(self.app, "_prompt_av_exclusion", lambda: None),
+            mock.patch.object(self.app, "_offer_reconcile", lambda *a, **k: None),
             mock.patch.object(self.m, "_release_latest",
                               lambda src, **k: release("CoolMod.dll", "Other.dll")),
             mock.patch.object(self.app, "_update_mod", self.updates.append),
@@ -286,10 +294,10 @@ class TestDialog(unittest.TestCase):
             p.start()
 
     def tearDown(self):
-        for p in reversed(self.patches):
-            p.stop()
         if self.app._settings_overlay is not None:
             self.app._close_settings()
+        for p in reversed(self.patches):
+            p.stop()
         for mid in [m["id"] for m in self.m.MODS_REGISTRY if m.get("custom")]:
             self.m.forget_custom_mod(mid)
 
