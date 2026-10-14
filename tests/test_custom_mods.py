@@ -276,6 +276,10 @@ class TestDialog(unittest.TestCase):
         # not a folder change with its reconcile prompt.
         self.app._cfg["out_dir"] = self.client
         self.app._first_run = False
+        # The first-run mods question is answered: it opens an overlay of its
+        # own when a game folder appears, at a moment no test controls.
+        self.m.update_config(lambda c: c.update(essential_mods_asked=True,
+                                                auto_install_mods=False))
         self.app._switch_tab("MODS")
         self.updates, self.asked = [], []
         self.patches = [
@@ -308,6 +312,7 @@ class TestDialog(unittest.TestCase):
     def test_find_choose_warn_install_remove(self):
         a = self.app
         a._open_custom_mod_dialog()
+        dialog = a._settings_overlay
         ui = a._custom_mod_ui
         ui["url"].set("https://example.com/a/b")
         ui["find"]()
@@ -326,7 +331,7 @@ class TestDialog(unittest.TestCase):
         self.assertIn("Other.dll", title)
         self.assertIn("Only install mods you trust", body)
         self.assertIn("github.com/someone/CoolMod", body)
-        self.assertIsNone(a._settings_overlay)
+        self.assertFalse(dialog.winfo_exists())            # the dialog closed
         self.assertEqual(self.updates, ["custom:other.dll"])
         self.assertIn("custom:other.dll", a._mod_row_vars)
         self.assertEqual(self.m.load_config()["custom_mods"][0]["dll"],
@@ -347,6 +352,7 @@ class TestDialog(unittest.TestCase):
     def test_declining_the_warning_installs_nothing(self):
         a = self.app
         a._open_custom_mod_dialog()
+        dialog = a._settings_overlay
         ui = a._custom_mod_ui
         ui["url"].set("https://github.com/someone/CoolMod/releases/download/"
                       "v2.0/CoolMod.dll")
@@ -357,7 +363,7 @@ class TestDialog(unittest.TestCase):
             ui["install"]()
         self.assertEqual(self.updates, [])
         self.assertFalse(self.m.load_config().get("custom_mods"))
-        self.assertIsNotNone(a._settings_overlay)
+        self.assertTrue(dialog.winfo_exists())             # still open
 
 
 if __name__ == "__main__":
