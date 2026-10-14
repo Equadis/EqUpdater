@@ -49,7 +49,7 @@ from .config import (APP_DATA_DIR, BACKUP_DIR, CONFIG_FILE, bootstrap_config,
                      new_mod_record, update_config)
 from .gitcompare import (GIT_HOSTS, Ancestry, ancestry, canonical_repo_url,
                          forge_named, repo_ref, same_repo,
-                         short as short_sha)
+                         short as short_sha, split_repo_url)
 from .hashing import files_hash, folder_hash
 from .planner import (Component, plan, skipped_notably,
                       updatable)
@@ -1917,6 +1917,28 @@ def _pick_asset(assets: list, pattern: str, prefer_no) -> dict | None:
     return candidates[0] if candidates else None
 
 
+#: Release-based mod sources, by kind.
+RELEASE_KINDS = ("github_release", "codeberg_release", "gitea_release")
+
+
+def _release_latest(src: dict, raise_errors: bool = False) -> dict | None:
+    """The newest release a release-based mod source publishes."""
+    kind = src["kind"]
+    if kind == "github_release":
+        return _github_latest(src["owner"], src["repo"], raise_errors)
+    if kind == "codeberg_release":
+        return _codeberg_latest(src["owner"], src["repo"], raise_errors)
+    if kind == "gitea_release":
+        forge = forge_named(src.get("forge") or "")
+        if forge is None or forge.kind != "gitea":
+            if raise_errors:
+                raise RuntimeError("unknown git host %r" % src.get("forge"))
+            return None
+        return _gitea_latest(forge.api, src["owner"], src["repo"],
+                             raise_errors=raise_errors)
+    return None
+
+
 def _release_version(mod: dict, rel: dict) -> str | None:
     """Version string for a github/codeberg release. Normally the tag name —
     but some mods (e.g. SuperWoW) keep a static tag and edit the release in
@@ -1954,7 +1976,7 @@ def _fetch_release_cached(mod: dict, force: bool = False) -> dict | None:
     so restarts within the TTL don't re-hit the GitHub/Codeberg APIs."""
     src  = mod["source"]
     kind = src["kind"]
-    if kind not in ("github_release", "codeberg_release"):
+    if kind not in RELEASE_KINDS:
         return None
     mid = mod["id"]
     now = time.time()
@@ -1962,10 +1984,7 @@ def _fetch_release_cached(mod: dict, force: bool = False) -> dict | None:
         entry = load_config().get("mod_release_cache", {}).get(mid)
         if entry and (now - entry.get("timestamp", 0)) < _MOD_VERSION_CACHE_TTL:
             return entry.get("release")
-    if kind == "github_release":
-        rel = _github_latest(src["owner"], src["repo"])
-    else:
-        rel = _codeberg_latest(src["owner"], src["repo"])
+    rel = _release_latest(src)
     if rel is None:
         return None
     rel = _slim_release(rel)
@@ -1989,11 +2008,13 @@ def install_mod(mod: dict, client_dir: str, release: dict | None = None) -> list
     src     = mod["source"]
     written = []
 
-    if src["kind"] == "codeberg_release":
+    if src["kind"] in ("codeberg_release", "gitea_release"):
         rel = release if release is not None else \
-            _codeberg_latest(src["owner"], src["repo"], raise_errors=True)
+            _release_latest(src, raise_errors=True)
         if not rel:
-            raise RuntimeError(N_("no release found on Codeberg"))
+            raise RuntimeError(N_("no release found on Codeberg")
+                               if src["kind"] == "codeberg_release"
+                               else N_("no release found on OctoWoW Git"))
         import fnmatch
         assets = rel.get("assets", [])
         asset  = next(
@@ -2011,7 +2032,7 @@ def install_mod(mod: dict, client_dir: str, release: dict | None = None) -> list
                             allowed_hosts=ALLOWED_DOWNLOAD_HOSTS) as r:
             data = r.read()
         if src.get("extract_map") is None:
-            dest_rel = asset["name"]
+            dest_rel = src.get("dest") or asset["name"]
             dest     = os.path.join(client_dir, dest_rel)
             os.makedirs(os.path.dirname(dest) or client_dir, exist_ok=True)
             with open(dest, "wb") as f:
@@ -2339,6 +2360,157 @@ def reconcile_dlls_txt(client_dir: str, mods_cfg: dict) -> list:
         if ensure_dll(client_dir, name):
             repaired.append(name)
     return repaired
+
+
+# ── Custom mods ─────────────────────────────────────────────────────────────
+#
+# A player may add a mod EqUpdater does not list: one .dll from the releases
+# of a GitHub, Codeberg or OctoWoW Git repository. It is installed the way
+# OctoLogin is -- to mods/<file>.dll, registered in dlls.txt -- and from then
+# on it is an ordinary entry in MODS_REGISTRY: the same install, update,
+# disable and removal code, the same planner. The records live in the
+# config ("custom_mods"); load_custom_mods() puts them into the registry.
+#
+# A mod is code that runs inside the game, so nothing is installed without
+# the player confirming a warning that says so.
+
+CUSTOM_MOD_HOSTS = {"github.com": "github_release",
+                    "codeberg.org": "codeberg_release",
+                    "octowow.st/git": "gitea_release"}
+CUSTOM_MOD_DIR = "mods"
+
+
+def parse_mod_release_link(text: str) -> dict:
+    """A custom mod's source from a pasted link, or ValueError with a
+    sentence the player can act on (an N_ message).
+
+    Accepted: a repository, its /releases page, or one of its release
+    downloads (which also names the .dll), on GitHub, Codeberg or OctoWoW Git.
+    """
+    url = (text or "").strip()
+    if not url:
+        raise ValueError(N_("Paste a link to the mod's repository or release."))
+    if not url.lower().startswith("https://"):
+        raise ValueError(N_("The link must start with https://"))
+    split = split_repo_url(url)
+    if split is None or split[0].label not in CUSTOM_MOD_HOSTS:
+        raise ValueError(N_("Mods can be added from GitHub, Codeberg or "
+                            "OctoWoW Git releases."))
+    forge, owner, repo, rest = split
+    asset = None
+    if len(rest) >= 4 and rest[0] == "releases" and rest[1] == "download":
+        from urllib.parse import unquote
+        asset = unquote(rest[-1])
+        if not asset.lower().endswith(".dll"):
+            raise ValueError(N_("That download is not a .dll file."))
+    elif rest and rest[0] != "releases":
+        raise ValueError(N_("Link the repository or one of its release "
+                            "downloads, not a page inside it."))
+    src = {"kind": CUSTOM_MOD_HOSTS[forge.label], "owner": owner,
+           "repo": repo, "asset": asset}
+    if src["kind"] == "gitea_release":
+        src["forge"] = forge.label
+    return src
+
+
+def _custom_mod_host(src: dict) -> str:
+    return {"github_release": "github.com",
+            "codeberg_release": "codeberg.org"}.get(src["kind"]) \
+        or src.get("forge") or ""
+
+
+def release_dlls(release: dict | None) -> list:
+    """The .dll files a release offers, by name."""
+    return sorted((a.get("name") for a in (release or {}).get("assets") or []
+                   if (a.get("name") or "").lower().endswith(".dll")),
+                  key=str.lower)
+
+
+def _custom_mod_id(dll: str) -> str:
+    return "custom:" + dll.lower()
+
+
+def custom_mod_conflict(dll: str) -> str | None:
+    """Why ``dll`` cannot be added (an N_ message), or None. Its name must
+    be a plain .dll file name that no listed or custom mod already uses."""
+    if (not dll or not dll.lower().endswith(".dll")
+            or os.path.basename(dll) != dll or dll.startswith(".")
+            or any(c in dll for c in '\\/:*?"<>|')):
+        return N_("That is not a .dll file name EqUpdater can use.")
+    taken = {os.path.basename(f).lower()
+             for m in MODS_REGISTRY for f in m.get("installed_files", [])}
+    if dll.lower() in taken:
+        return N_("A mod with that file name is already in the Mods list.")
+    return None
+
+
+def custom_mod_entry(rec: dict) -> dict:
+    """A MODS_REGISTRY entry for a custom-mod record."""
+    import glob
+    dll = rec["dll"]
+    dest = f"{CUSTOM_MOD_DIR}/{dll}"
+    src = {"kind": rec["kind"], "owner": rec["owner"], "repo": rec["repo"],
+           # An exact file name, matched with fnmatch: escape its wildcards.
+           "asset_pattern": glob.escape(dll), "prefer_no": None,
+           "extract_map": None, "dest": dest}
+    if rec.get("forge"):
+        src["forge"] = rec["forge"]
+    host = _custom_mod_host(rec)
+    return {
+        "id": _custom_mod_id(dll),
+        "custom": True,
+        "essential": False,
+        "name": os.path.splitext(dll)[0],
+        "description": tr("Custom mod from {source}.",
+                          source=f"{host}/{rec['owner']}/{rec['repo']}"),
+        "repo_url": f"https://{host}/{rec['owner']}/{rec['repo']}",
+        "source": src,
+        "register_dll": dest,
+        "installed_files": [dest],
+    }
+
+
+def load_custom_mods(cfg: dict | None = None) -> list:
+    """Put the configured custom mods into MODS_REGISTRY (in place, so every
+    reader sees them), replacing any put there before. Returns their ids."""
+    recs = (cfg if cfg is not None else load_config()).get("custom_mods") or []
+    MODS_REGISTRY[:] = [m for m in MODS_REGISTRY if not m.get("custom")]
+    ids = []
+    for rec in recs:
+        try:
+            entry = custom_mod_entry(rec)
+        except (KeyError, TypeError):
+            continue
+        if entry["id"] in ids or custom_mod_conflict(rec["dll"]):
+            continue
+        MODS_REGISTRY.append(entry)
+        ids.append(entry["id"])
+    return ids
+
+
+def add_custom_mod(src: dict, dll: str) -> str:
+    """Record a custom mod and add it to the registry; returns its id."""
+    problem = custom_mod_conflict(dll)
+    if problem:
+        raise ValueError(problem)
+    rec = {"kind": src["kind"], "owner": src["owner"], "repo": src["repo"],
+           "dll": dll}
+    if src.get("forge"):
+        rec["forge"] = src["forge"]
+    cfg = update_config(lambda c: c.setdefault("custom_mods", []).append(rec))
+    load_custom_mods(cfg)
+    return _custom_mod_id(dll)
+
+
+def forget_custom_mod(mod_id: str) -> None:
+    """Drop a custom mod's record, its mods entry and its release cache, and
+    take it out of the registry. Its files are the caller's to remove."""
+    def _drop(c):
+        c["custom_mods"] = [r for r in c.get("custom_mods") or []
+                            if _custom_mod_id(r.get("dll") or "") != mod_id]
+        c.get("mods", {}).pop(mod_id, None)
+        c.get("mod_release_cache", {}).pop(mod_id, None)
+    load_custom_mods(update_config(_drop))
 
 
 def remove_dll(client_dir: str, name: str):
@@ -5466,6 +5638,7 @@ class EqUpdaterApp(tk.Tk):
     # ── mods panel ───────────────────────────────────────────────────────────────
 
     def _build_mods_panel(self):
+        load_custom_mods()
         outer = tk.Frame(self, bg=C_PANEL,
                          highlightthickness=1,
                          highlightbackground=C_PANEL_BDR)
@@ -5524,6 +5697,14 @@ class EqUpdaterApp(tk.Tk):
         self._apply_btn.bind("<Button-1>", lambda e: self._apply_mods())
         self._apply_btn.bind("<Enter>",    lambda e: self._apply_btn.configure(bg=C_GOLD, fg="#000"))
         self._apply_btn.bind("<Leave>",    lambda e: self._apply_btn.configure(bg=C_PANEL_BDR, fg=C_TEXT))
+
+        add = tk.Label(foot, text="+  " + tr("Add custom git mod"),
+                       font=self._font(10, bold=True), fg="#d76f9e",
+                       bg=C_PANEL, cursor="hand2")
+        add.pack(side="right")
+        add.bind("<Button-1>", lambda e: self._open_custom_mod_dialog())
+        add.bind("<Enter>", lambda e: add.configure(fg="#eb96ba"))
+        add.bind("<Leave>", lambda e: add.configure(fg="#d76f9e"))
 
         self._mod_row_vars:     dict = {}
         self._mods_state:       list = []
@@ -5670,6 +5851,15 @@ class EqUpdaterApp(tk.Tk):
             link.bind("<Button-1>", lambda e, u=mod["repo_url"]: self._open_url(u))
             link.bind("<Enter>",    lambda e, l=link: l.configure(fg=C_GOLD))
             link.bind("<Leave>",    lambda e, l=link: l.configure(fg=C_TEXT_DIM))
+
+            if mod.get("custom"):
+                rm = tk.Label(row, text="✕", font=self._font(11),
+                              fg=C_TEXT_DIM, bg=C_PANEL, cursor="hand2")
+                rm.pack(side="right", padx=self._px(4))
+                rm.bind("<Button-1>", lambda e, m=mid: self._remove_custom_mod(m))
+                rm.bind("<Enter>", lambda e, l=rm: l.configure(fg=C_ERR))
+                rm.bind("<Leave>", lambda e, l=rm: l.configure(fg=C_TEXT_DIM))
+                self._add_tooltip(rm, tr("Remove this custom mod"))
 
             update_label = tk.Label(row, text=tr("update"),
                                     font=self._font(10, bold=True),
@@ -6275,7 +6465,7 @@ class EqUpdaterApp(tk.Tk):
             mod_release = None
             if needs_version_lookup:
                 try:
-                    if mod["source"]["kind"] in ("github_release", "codeberg_release"):
+                    if mod["source"]["kind"] in RELEASE_KINDS:
                         mod_release = _fetch_release_cached(mod)
                         latest_ver  = _release_version(mod, mod_release) if mod_release else None
                     else:
@@ -7613,6 +7803,207 @@ class EqUpdaterApp(tk.Tk):
         self._addon_errors.pop(folder, None)
         self._refresh_addons_badge()
         self._render_addons(keep_scroll=True)
+
+    # ── custom mods ──────────────────────────────────────────────────────────
+
+    def _rebuild_mod_rows(self):
+        """Rows from scratch: a mod was added to or taken out of the list."""
+        self._mod_row_vars = {}
+        self._render_mod_rows()
+        self._refresh_mods_badge()
+        self._refresh_apply_btn_visibility()
+
+    def _open_custom_mod_dialog(self):
+        """Add a mod EqUpdater does not list: one .dll from a repository's
+        releases. The link is checked, the release's .dll files are offered,
+        and nothing is installed until the player confirms the warning."""
+        if self._settings_overlay is not None:
+            return
+        ov = tk.Frame(self, bg="#0a0a0e")
+        ov.place(x=0, y=0, width=WIN_W, height=WIN_H)
+        ov.bind("<Button-1>", lambda e: self._close_settings())
+        self._settings_overlay = ov
+        self.bind("<Escape>", lambda e: self._close_settings())
+
+        P_BG, P_HDR, P_BDR, P_INP = C_PANEL, C_HDR, C_PANEL_BDR, "#0f0b16"
+        MW, MH = self._px(580), self._px(380)
+        panel = tk.Frame(ov, bg=P_BG, highlightthickness=1,
+                         highlightbackground=P_BDR, highlightcolor=P_BDR)
+        panel.place(x=(WIN_W - MW) // 2, y=(WIN_H - MH) // 2 - self._px(20),
+                    width=MW, height=MH)
+        panel.bind("<Button-1>", lambda e: "break")
+
+        hdr = tk.Frame(panel, bg=P_HDR, height=self._px(46))
+        hdr.pack(fill="x")
+        hdr.pack_propagate(False)
+        tk.Label(hdr, text=tr("ADD CUSTOM GIT MOD"),
+                 font=self._font(13, bold=True),
+                 fg=C_PURPLE, bg=P_HDR).pack(side="left", padx=self._px(18))
+        x_btn = tk.Label(hdr, text="✕", font=self._font(12),
+                         fg=C_TEXT_DIM, bg=P_HDR, cursor="hand2")
+        x_btn.pack(side="right", padx=self._px(16))
+        x_btn.bind("<Button-1>", lambda e: self._close_settings())
+        tk.Frame(panel, bg=P_BDR, height=self._px(1)).pack(fill="x")
+
+        body = tk.Frame(panel, bg=P_BG)
+        body.pack(fill="both", expand=True, padx=self._px(22),
+                  pady=(self._px(14), self._px(12)))
+        tk.Label(body, text=tr("RELEASE LINK"), font=self._font(10, bold=True),
+                 fg=C_GOLD, bg=P_BG).pack(anchor="w")
+        url_var = tk.StringVar()
+        url_entry = tk.Entry(body, textvariable=url_var, bg=P_INP, fg=C_TEXT,
+                             insertbackground=C_GOLD, relief="flat",
+                             font=FONT_MONO, highlightthickness=1,
+                             highlightbackground=P_BDR, highlightcolor=C_GOLD)
+        url_entry.pack(fill="x", ipady=self._px(7), pady=(self._px(6), self._px(4)))
+        tk.Label(body, text=tr("A GitHub, Codeberg or OctoWoW Git repository, "
+                               "or one of its release downloads."),
+                 font=self._font(9), fg=C_TEXT_DIM, bg=P_BG,
+                 wraplength=MW - self._px(44), justify="left").pack(anchor="w")
+        tk.Label(body, text="⚠  " + tr("A mod runs code inside the game. "
+                                       "Only add mods you trust."),
+                 font=self._font(9, bold=True), fg=C_GOLD, bg=P_BG,
+                 wraplength=MW - self._px(44), justify="left"
+                 ).pack(anchor="w", pady=(self._px(6), 0))
+        status = tk.Label(body, text="", font=self._font(9), fg=C_ERR, bg=P_BG,
+                          wraplength=MW - self._px(44), justify="left")
+        status.pack(anchor="w", pady=(self._px(4), 0))
+        choices = tk.Frame(body, bg=P_BG)
+        choices.pack(fill="x", anchor="w")
+        btn = tk.Label(body, text=tr("Find .dll files"),
+                       font=self._font(11, bold=True), fg=C_TEXT, bg=P_BDR,
+                       cursor="hand2", padx=self._px(16), pady=self._px(7))
+        btn.pack(side="bottom", anchor="e")
+        btn.bind("<Enter>", lambda e: btn.configure(bg=C_GOLD, fg="#000"))
+        btn.bind("<Leave>", lambda e: btn.configure(bg=P_BDR, fg=C_TEXT))
+
+        st = {"src": None, "dlls": [], "busy": False}
+        choice = tk.StringVar()
+        self._custom_mod_ui = {"url": url_var, "status": status,
+                               "choice": choice, "state": st,
+                               "find": lambda: find(), "install": lambda: install()}
+
+        def reset(*_a):
+            st["src"], st["dlls"] = None, []
+            choice.set("")
+            for w in choices.winfo_children():
+                w.destroy()
+            btn.configure(text=tr("Find .dll files"))
+            status.configure(text="")
+        url_var.trace_add("write", reset)
+
+        def show(src, release, error):
+            st["busy"] = False
+            if not ov.winfo_exists():
+                return
+            if error:
+                status.configure(text=tr("Could not read the releases: {error}",
+                                         error=tr(error)), fg=C_ERR)
+                return
+            dlls = release_dlls(release)
+            if src.get("asset"):
+                dlls = [d for d in dlls if d.lower() == src["asset"].lower()]
+            if not dlls:
+                status.configure(text=tr("The latest release has no .dll "
+                                         "file to install."), fg=C_ERR)
+                return
+            st["src"], st["dlls"] = src, dlls
+            choice.set(dlls[0])
+            status.configure(text=tr("Latest release: {tag}. Choose the "
+                                     "file to install:",
+                                     tag=(release or {}).get("tag_name") or "?"),
+                             fg=C_OK)
+            for d in dlls:
+                tk.Radiobutton(choices, text=d, value=d, variable=choice,
+                               font=self._font(10), fg=C_TEXT, bg=P_BG,
+                               activebackground=P_BG, activeforeground=C_TEXT,
+                               selectcolor=P_INP, highlightthickness=0,
+                               anchor="w").pack(anchor="w")
+            btn.configure(text=tr("Install"))
+
+        def find():
+            if st["busy"]:
+                return
+            try:
+                src = parse_mod_release_link(url_var.get())
+            except ValueError as e:
+                status.configure(text=tr(str(e)), fg=C_ERR)
+                return
+            st["busy"] = True
+            status.configure(text=tr("Looking up the latest release…"),
+                             fg=C_TEXT_DIM)
+
+            def worker():
+                try:
+                    rel, err = _release_latest(src, raise_errors=True), None
+                except Exception as e:
+                    rel, err = None, str(e)
+                self.after(0, lambda: show(src, rel, err))
+            threading.Thread(target=worker, daemon=True).start()
+
+        def install():
+            dll = choice.get()
+            if not st["src"] or not dll:
+                return find()
+            problem = custom_mod_conflict(dll)
+            if problem:
+                status.configure(text=tr(problem), fg=C_ERR)
+                return
+            if not self._confirm_custom_mod(st["src"], dll):
+                return
+            mid = add_custom_mod(st["src"], dll)
+            self._close_settings()
+            self._log_line(f"\nAdded custom mod {dll} from "
+                           f"{_custom_mod_host(st['src'])}/{st['src']['owner']}/"
+                           f"{st['src']['repo']}.\n", "acct")
+            self._rebuild_mod_rows()
+            if self._game_path.get().strip():
+                self._update_mod(mid)
+
+        def click():
+            install() if st["src"] else find()
+        btn.bind("<Button-1>", lambda e: click())
+        url_entry.bind("<Return>", lambda e: click())
+        url_entry.focus_set()
+
+    def _confirm_custom_mod(self, src: dict, dll: str) -> bool:
+        from tkinter import messagebox
+        where = f"{_custom_mod_host(src)}/{src['owner']}/{src['repo']}"
+        return messagebox.askyesno(
+            tr("Install {name}?", name=dll),
+            tr("{dll} from {source} will be installed to the mods folder and "
+               "loaded into the game every time it starts.\n\n"
+               "A mod runs code inside the game, with the same access to "
+               "this computer as the game itself. {app} does not check what "
+               "it does. Only install mods you trust.\n\n"
+               "Install it?", dll=dll, source=where, app=branding.APP_NAME),
+            icon="warning", parent=self)
+
+    def _remove_custom_mod(self, mod_id: str):
+        """Take a custom mod out of the list: its file is deleted, its
+        dlls.txt line removed, and its record forgotten."""
+        from tkinter import messagebox
+        mod = next((m for m in MODS_REGISTRY if m["id"] == mod_id), None)
+        if mod is None or not mod.get("custom"):
+            return
+        if not messagebox.askyesno(
+                tr("Remove {name}?", name=mod["name"]),
+                tr("{name} is deleted from the mods folder, taken out of "
+                   "dlls.txt and removed from this list.", name=mod["name"]),
+                parent=self):
+            return
+        client = self._game_path.get().strip()
+        if client:
+            try:
+                uninstall_mod(mod, client)
+                remove_dll(client, mod["register_dll"])
+            except OSError as e:
+                self._log_line(f"Could not remove {mod['name']}: {e}\n", "err")
+                return
+        forget_custom_mod(mod_id)
+        self._mod_pending_state.pop(mod_id, None)
+        self._log_line(f"\nRemoved custom mod {mod['name']}.\n", "dim")
+        self._rebuild_mod_rows()
 
     def _open_custom_addon_dialog(self):
         if self._settings_overlay is not None:

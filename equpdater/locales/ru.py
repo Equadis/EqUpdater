@@ -596,4 +596,48 @@ STRINGS = {
         '{name} (обновление)',
     '…and {n} more':
         '…и ещё {n}',
+    'A GitHub, Codeberg or OctoWoW Git repository, or one of its release downloads.':
+        'Репозиторий GitHub, Codeberg или OctoWoW Git либо одна из его загрузок релиза.',
+    'A mod runs code inside the game. Only add mods you trust.':
+        'Мод выполняет код внутри игры. Добавляйте только моды, которым доверяете.',
+    'A mod with that file name is already in the Mods list.':
+        'Мод с таким именем файла уже есть в списке модов.',
+    'ADD CUSTOM GIT MOD':
+        'ДОБАВИТЬ СВОЙ GIT-МОД',
+    'Add custom git mod':
+        'Добавить свой git-мод',
+    'Could not read the releases: {error}':
+        'Не удалось прочитать релизы: {error}',
+    'Custom mod from {source}.':
+        'Свой мод из {source}.',
+    'Find .dll files':
+        'Найти файлы .dll',
+    'Install {name}?':
+        'Установить {name}?',
+    'Latest release: {tag}. Choose the file to install:':
+        'Последний релиз: {tag}. Выберите файл для установки:',
+    'Looking up the latest release…':
+        'Поиск последнего релиза…',
+    'Mods can be added from GitHub, Codeberg or OctoWoW Git releases.':
+        'Моды можно добавлять из релизов GitHub, Codeberg или OctoWoW Git.',
+    "Paste a link to the mod's repository or release.":
+        'Вставьте ссылку на репозиторий или релиз мода.',
+    'RELEASE LINK':
+        'ССЫЛКА НА РЕЛИЗ',
+    'Remove this custom mod':
+        'Удалить этот свой мод',
+    'Remove {name}?':
+        'Удалить {name}?',
+    'That download is not a .dll file.':
+        'Эта загрузка не является файлом .dll.',
+    'That is not a .dll file name EqUpdater can use.':
+        'EqUpdater не может использовать такое имя файла .dll.',
+    'The latest release has no .dll file to install.':
+        'В последнем релизе нет файла .dll для установки.',
+    'no release found on OctoWoW Git':
+        'релиз на OctoWoW Git не найден',
+    '{dll} from {source} will be installed to the mods folder and loaded into the game every time it starts.\n\nA mod runs code inside the game, with the same access to this computer as the game itself. {app} does not check what it does. Only install mods you trust.\n\nInstall it?':
+        '{dll} из {source} будет установлен в папку mods и будет загружаться в игру при каждом запуске.\n\nМод выполняет код внутри игры с тем же доступом к этому компьютеру, что и сама игра. {app} не проверяет, что он делает. Устанавливайте только моды, которым доверяете.\n\nУстановить?',
+    '{name} is deleted from the mods folder, taken out of dlls.txt and removed from this list.':
+        '{name} будет удалён из папки mods и из dlls.txt и убран из этого списка.',
 }

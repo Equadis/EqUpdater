@@ -597,4 +597,48 @@ STRINGS = {
         '{name}（更新）',
     '…and {n} more':
         '……还有 {n} 个',
+    'A GitHub, Codeberg or OctoWoW Git repository, or one of its release downloads.':
+        'GitHub、Codeberg 或 OctoWoW Git 仓库，或其中某个发行版下载链接。',
+    'A mod runs code inside the game. Only add mods you trust.':
+        '模组会在游戏内运行代码。只添加你信任的模组。',
+    'A mod with that file name is already in the Mods list.':
+        '模组列表中已有同名文件的模组。',
+    'ADD CUSTOM GIT MOD':
+        '添加自定义 GIT 模组',
+    'Add custom git mod':
+        '添加自定义 git 模组',
+    'Could not read the releases: {error}':
+        '无法读取发行版：{error}',
+    'Custom mod from {source}.':
+        '来自 {source} 的自定义模组。',
+    'Find .dll files':
+        '查找 .dll 文件',
+    'Install {name}?':
+        '安装 {name}？',
+    'Latest release: {tag}. Choose the file to install:':
+        '最新发行版：{tag}。请选择要安装的文件：',
+    'Looking up the latest release…':
+        '正在查找最新发行版……',
+    'Mods can be added from GitHub, Codeberg or OctoWoW Git releases.':
+        '可以从 GitHub、Codeberg 或 OctoWoW Git 的发行版添加模组。',
+    "Paste a link to the mod's repository or release.":
+        '粘贴该模组仓库或发行版的链接。',
+    'RELEASE LINK':
+        '发行版链接',
+    'Remove this custom mod':
+        '移除此自定义模组',
+    'Remove {name}?':
+        '移除 {name}？',
+    'That download is not a .dll file.':
+        '该下载不是 .dll 文件。',
+    'That is not a .dll file name EqUpdater can use.':
+        '这不是 EqUpdater 可以使用的 .dll 文件名。',
+    'The latest release has no .dll file to install.':
+        '最新发行版中没有可安装的 .dll 文件。',
+    'no release found on OctoWoW Git':
+        '在 OctoWoW Git 上未找到发行版',
+    '{dll} from {source} will be installed to the mods folder and loaded into the game every time it starts.\n\nA mod runs code inside the game, with the same access to this computer as the game itself. {app} does not check what it does. Only install mods you trust.\n\nInstall it?':
+        '来自 {source} 的 {dll} 将被安装到 mods 文件夹，并在每次启动游戏时加载。\n\n模组在游戏内运行代码，对这台电脑拥有与游戏本身相同的访问权限。{app} 不会检查它做了什么。只安装你信任的模组。\n\n要安装吗？',
+    '{name} is deleted from the mods folder, taken out of dlls.txt and removed from this list.':
+        '{name} 将从 mods 文件夹中删除、从 dlls.txt 中移除，并从此列表中移除。',
 }

@@ -596,4 +596,48 @@ STRINGS = {
         '{name} (actualización)',
     '…and {n} more':
         '…y {n} más',
+    'A GitHub, Codeberg or OctoWoW Git repository, or one of its release downloads.':
+        'Un repositorio de GitHub, Codeberg u OctoWoW Git, o una de sus descargas de release.',
+    'A mod runs code inside the game. Only add mods you trust.':
+        'Un mod ejecuta código dentro del juego. Añade solo mods en los que confíes.',
+    'A mod with that file name is already in the Mods list.':
+        'Ya hay un mod con ese nombre de archivo en la lista de mods.',
+    'ADD CUSTOM GIT MOD':
+        'AÑADIR MOD GIT PERSONALIZADO',
+    'Add custom git mod':
+        'Añadir mod git personalizado',
+    'Could not read the releases: {error}':
+        'No se pudieron leer los releases: {error}',
+    'Custom mod from {source}.':
+        'Mod personalizado de {source}.',
+    'Find .dll files':
+        'Buscar archivos .dll',
+    'Install {name}?':
+        '¿Instalar {name}?',
+    'Latest release: {tag}. Choose the file to install:':
+        'Último release: {tag}. Elige el archivo que quieres instalar:',
+    'Looking up the latest release…':
+        'Buscando el último release…',
+    'Mods can be added from GitHub, Codeberg or OctoWoW Git releases.':
+        'Los mods se pueden añadir desde releases de GitHub, Codeberg u OctoWoW Git.',
+    "Paste a link to the mod's repository or release.":
+        'Pega un enlace al repositorio o al release del mod.',
+    'RELEASE LINK':
+        'ENLACE DEL RELEASE',
+    'Remove this custom mod':
+        'Quitar este mod personalizado',
+    'Remove {name}?':
+        '¿Quitar {name}?',
+    'That download is not a .dll file.':
+        'Esa descarga no es un archivo .dll.',
+    'That is not a .dll file name EqUpdater can use.':
+        'Ese no es un nombre de archivo .dll que EqUpdater pueda usar.',
+    'The latest release has no .dll file to install.':
+        'El último release no tiene ningún archivo .dll para instalar.',
+    'no release found on OctoWoW Git':
+        'no se encontró ningún release en OctoWoW Git',
+    '{dll} from {source} will be installed to the mods folder and loaded into the game every time it starts.\n\nA mod runs code inside the game, with the same access to this computer as the game itself. {app} does not check what it does. Only install mods you trust.\n\nInstall it?':
+        '{dll} de {source} se instalará en la carpeta mods y se cargará en el juego cada vez que se inicie.\n\nUn mod ejecuta código dentro del juego, con el mismo acceso a este equipo que el propio juego. {app} no comprueba lo que hace. Instala solo mods en los que confíes.\n\n¿Instalarlo?',
+    '{name} is deleted from the mods folder, taken out of dlls.txt and removed from this list.':
+        '{name} se borrará de la carpeta mods, se quitará de dlls.txt y desaparecerá de esta lista.',
 }
