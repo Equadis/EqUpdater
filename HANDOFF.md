@@ -27,9 +27,9 @@
   pending edit: the top note still says the false positive "has been
   reported to Microsoft"; change it to just "a known false positive for new,
   unsigned apps" (owner decided not to submit to Microsoft).
-- **Open GitHub issues:** #1 (addon list jumping to the top) is fixed in the
-  re-released 2.1.0 - close it. #3 "Vanilla Autologin Mod" (papafru) is
-  undecided; see Backlog.
+- **GitHub issues:** none open. #1 (addon list jumping to the top, fixed in
+  the re-released 2.1.0) and #3 "Vanilla Autologin Mod" were closed on
+  2026-10-15.
 - **Branches:** only `main` (plus `claude/equpdater-linux-crash-h9g644`,
   the assistant's work branch, identical to `main`; safe to delete).
 - **Sent to OctoWoW (2026-10-14):** a request to exempt EqUpdater's
@@ -628,20 +628,19 @@ Do not reintroduce these:
 
 ## Backlog / next steps
 
-1. **Close issue #1** (fixed in the re-released 2.1.0).
-2. **Issue #3 "Vanilla Autologin Mod"** - not OctoLogin. Ask the reporter
-   for the project link; it stores credentials, so decide whether to list
-   it at all. Players can already add it themselves as a custom git mod.
-3. **Release-notes line** about Microsoft (see State at handoff).
-4. **Wait for OctoWoW's reply** on the DDoS exemption; act per "OctoWoW
+1. **Vanilla Autologin** (closed issue #3) is not OctoLogin; it stores
+   credentials. Not listed; players can add it themselves as a custom git
+   mod if they want it.
+2. **Release-notes line** about Microsoft (see State at handoff).
+3. **Wait for OctoWoW's reply** on the DDoS exemption; act per "OctoWoW
    DDoS protection".
-5. **Defender**: consider building PyInstaller's bootloader from source in
+4. **Defender**: consider building PyInstaller's bootloader from source in
    `release.yml`, or code signing.
-6. **Tag rule**: relax it, or release fixes as 2.1.1 instead of
+5. **Tag rule**: relax it, or release fixes as 2.1.1 instead of
    re-releasing 2.1.0.
-7. **crash.log** for start-up errors: an early Linux fix (commit
+6. **crash.log** for start-up errors: an early Linux fix (commit
    `d74ee16`, now only reachable by hash) wrote uncaught start-up errors
    to a log file; it never reached `main`. Worth redoing for 2.1.1 so
    testers have something to send after a crash.
-8. Translations were written by the assistant; have native speakers check
+7. Translations were written by the assistant; have native speakers check
    de/es/pt_br/ru/zh_cn.
