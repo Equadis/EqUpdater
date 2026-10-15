@@ -1,19 +1,238 @@
 # EqUpdater development handoff
 
-**Version:** 2.0.6  
-**Date:** 2026-09-24  
-**Project:** EqUpdater, derived from rebasedkon/octo-updater  
-**Repository:** https://github.com/Equadis/EqUpdater
+**Version:** 2.1.0 (released 2026-10-12, re-released with fixes 2026-10-14)
+**Date:** 2026-10-15
+**Project:** EqUpdater, derived from rebasedkon/octo-updater
+**Repository:** https://github.com/Equadis/EqUpdater (renamed from
+`eqomdx/EqUpdater` on 2026-10-14; GitHub redirects the old name)
+**Owner:** Equadis (Oliver)
 
-## Current product direction
+---
 
-EqUpdater is no longer just an Octo Updater skin. The current branch has the safer updater model plus the blue underwater visual overhaul. Preserve these principles when making further changes:
+## State at handoff
 
-- never automatically downgrade a known local version;
-- only Update All components that EqUpdater manages and can safely prove are newer;
-- unmanaged/manual addons stay unmanaged until explicitly adopted;
-- locally modified, divergent, local-newer, ignored, unknown, or source-changed components are held back;
-- `dlls.txt` registration repair is allowed without replacing the DLL itself.
+- **2.1.0 is live** on the release page with both files, built from `main`
+  at `7b47dd6` (custom git mods, addon scroll fix, installer Unicode fix):
+  - `EqUpdater-v2.1.0-Windows.exe` (61,176,725 bytes)
+  - `EqUpdater-v2.1.0-Linux-x86_64.AppImage` (51,096,056 bytes)
+  Uploaded by hand on 2026-10-14 14:05 (see "Releasing" for why).
+- **`main` is at `7124366`**, green on Windows and Linux. The only commits
+  after the released build are README/handoff, the repo rename and a test
+  fix; no app behaviour changed. `branding.APP_VERSION` = `"2.1.0"`.
+- **The `v2.1.0` tag still points at `2ebb983`** (the PR #2 merge), not at
+  the code the release files were built from. The tag could not be moved:
+  a tag rule blocks it (403). Only the source-code zips on the release are
+  affected; players use the two files.
+- **Release notes** are current (custom mods, fixes, Defender note). One
+  pending edit: the top note still says the false positive "has been
+  reported to Microsoft"; change it to just "a known false positive for new,
+  unsigned apps" (owner decided not to submit to Microsoft).
+- **Open GitHub issues:** #1 (addon list jumping to the top) is fixed in the
+  re-released 2.1.0 - close it. #3 "Vanilla Autologin Mod" (papafru) is
+  undecided; see Backlog.
+- **Branches:** only `main` (plus `claude/equpdater-linux-crash-h9g644`,
+  the assistant's work branch, identical to `main`; safe to delete).
+- **Sent to OctoWoW (2026-10-14):** a request to exempt EqUpdater's
+  read-only requests from the BlazingFast challenge (see "OctoWoW DDoS
+  protection"), and to change the site's Discord link to
+  https://discord.gg/QtdNpKnU72. No reply yet.
+
+---
+
+## Product rules (do not break)
+
+- Never automatically downgrade a known local version.
+- Only Update All components that EqUpdater manages and can prove are newer.
+- Unmanaged/manual addons and mods stay unmanaged until explicitly adopted.
+- Locally modified, divergent, local-newer, ignored, unknown or
+  source-changed components are held back, and the reason is shown.
+- `dlls.txt` registration repair is allowed without replacing the DLL.
+- Replacing or downgrading asks first and keeps a backup.
+- DLL mods are opt-in (asked once). Custom mods need an explicit warning
+  confirmation.
+- **Never circumvent OctoWoW's DDoS protection** (no challenge solving, no
+  borrowing another client's User-Agent).
+- **Priority Sign In is out of scope:** do not read OctoLauncher's
+  `auth.json` or tokens, call `/api/launcher/session` or `/api/launcher/
+  address`, spoof `x-launcher-version`, or reverse-engineer launcher
+  authentication. Login Doctor may only *recommend* the official
+  OctoLauncher's Priority Sign In, and must not suggest EqUpdater's PLAY
+  can use it.
+- Every user-facing string in all six languages (`tests/test_i18n.py`).
+
+---
+
+## How to work on this repo
+
+- **Run the suite:** `python tools/check.py` (Windows) or
+  `xvfb-run -a python3.12 -m unittest discover -s tests -t .` (Linux).
+  521 tests. "main thread is not in main loop" tracebacks printed by
+  background threads during the run are pre-existing noise, not failures.
+- **CI:** `.github/workflows/tests.yml` runs on every push (Windows +
+  Linux/xvfb, 20 min timeout). `.github/workflows/release.yml` runs on
+  pull requests, on `workflow_dispatch`, and on a published release (only
+  then does it attach files to the release).
+- **Tests that build an app** must not replace `threading.Thread` for the
+  whole process (an inline animation/news worker never returns - it hung
+  Windows CI); run only the worker under test inline. Close dialogs by
+  destroying them or stub `_prompt_av_exclusion`/`_offer_reconcile`:
+  `_close_settings` is "confirm" and can reach a Windows-only prompt. Do not
+  assert "no overlay is open" - a first-run prompt may open its own; assert
+  the dialog you opened is gone.
+- **Test builds** use a fourth version number: `2.0.6.1`, `2.0.6.2`, ...
+  so testers can tell builds apart. Bump `APP_VERSION` for every build sent
+  to testers; bump to the release version only when releasing.
+- **Commits** end with the attribution lines the session asks for; no model
+  names in commits, code or docs.
+
+## Releasing (as it actually works today)
+
+The intended path: publish a GitHub release for tag `vX.Y.Z` -> the release
+workflow builds, self-tests and attaches both files from that commit.
+
+What happened with 2.1.0 and how to re-release a fixed build under the same
+version:
+
+1. Merge the fix to `main` and wait for `tests` to pass.
+2. Run the **release** workflow on `main` (Actions -> release -> Run
+   workflow). It builds and self-tests both files as workflow artifacts
+   (it does not attach them).
+3. Download both artifacts (each is a zip; unzip it), then on the release
+   page: Edit -> delete the two old files -> drag in the `.exe` and the
+   `.AppImage` (not the zips) -> Update release.
+4. Check the release lists exactly the two files with new sizes.
+
+Moving the tag (`git push --force origin vX.Y.Z`) and deleting tags are
+refused by a tag rule (Settings -> Rules). Either relax it, or ship fixes
+as `X.Y.Z+1` - simpler and keeps tag, source zip and files in step.
+
+**Windows Defender** flags new builds as `Trojan:Win32/Wacatac.B!ml`, an ML
+false positive common to unsigned PyInstaller apps; Chrome shows "Failed -
+Virus detected". Players allow it in Windows Security -> Protection history
+-> Allow on device. It fades as the file gains reputation; each new build
+starts again. Real fixes: code signing; a bootloader built from source in
+the release workflow often helps. Submitting to Microsoft
+(https://www.microsoft.com/wdsi/filesubmission) clears a build in 1-3 days
+but the owner prefers not to.
+
+---
+
+## What 2.1 added (summary)
+
+- Native Linux (AppImage) and a real Windows installer, from one codebase.
+- Login Doctor (Settings -> Troubleshooting) - `equpdater/logindoctor.py`.
+- OctoLogin (★ recommended mod, `mods/OctoLogin.dll`, loads last).
+- Custom git mods (Mods -> + Add custom git mod).
+- Sound Channels tweak (12-64); Tweaks list scrolls.
+- News from forum threads t=2848 / t=2816 with `news.json` fallback.
+- Visible addon failures; addon list keeps its place; case-safe AddOns on
+  Linux; Unicode-safe installer shortcuts; host font stack on Linux.
+- Default game folder `~/Games/OctoWoW`; `Config.wtf` no longer gets a realm.
+
+---
+
+## Custom git mods (2026-10-14)
+
+`app.py`, "Custom mods" block next to `remove_dll`, and
+`_open_custom_mod_dialog` / `_remove_custom_mod` in the app class.
+
+- `parse_mod_release_link` accepts a GitHub, Codeberg or OctoWoW Git
+  repository, its `/releases` page, or a release download of a `.dll`
+  (which preselects it). Anything else is refused with an N_ message.
+- The dialog looks up the latest release (`_release_latest`, worker
+  thread), lists its `.dll` assets (`release_dlls`), and on Install shows a
+  warning (`_confirm_custom_mod`: runs code in the game, not checked, only
+  trusted mods). Declining installs nothing.
+- `add_custom_mod` stores `{kind, owner, repo, dll[, forge]}` in config
+  `custom_mods`; `load_custom_mods` rebuilds the custom entries of
+  `MODS_REGISTRY` **in place** (every reader sees them) - called when the
+  Mods panel is built and after add/remove. Each entry is an ordinary mod:
+  id `custom:<dll lower>`, `dest`/`register_dll` `mods/<dll>`,
+  `asset_pattern` = `glob.escape(dll)`, not essential. So install, update
+  (latest release), enable/disable, the planner and `dlls.txt` sweep all
+  apply unchanged. Unknown `dlls.txt` entries sort after the known mods.
+- `custom_mod_conflict` refuses non-plain names and any name a listed or
+  custom mod already uses. ✕ on a custom row: confirm, delete the file,
+  `remove_dll`, `forget_custom_mod` (record, mods entry, release cache).
+- `install_mod` handles `gitea_release` (OctoWoW Git) and honours `dest`
+  for Codeberg; `RELEASE_KINDS` lists the three release kinds.
+- Tests: `tests/test_custom_mods.py` (16).
+
+## OctoLogin and the mods folder (2026-10-12)
+
+OctoLogin (fmustafayaman/OctoLogin, MIT) is installed from the release's
+bare `OctoLogin.dll` to `mods/OctoLogin.dll`, as its own installer does,
+and registered by that path; it reads `OctoLogin.ini` and writes
+`OctoLogin.log` beside it. It is last in `DLL_LOAD_ORDER` (hooks only the
+connect import and stands aside if another mod got there first).
+`dlls.txt` entries compare without case or slash direction (`_dll_key`).
+Essential: installed only with consent. Tests: `test_mod_octologin.py`.
+
+## Addon failures (2026-10-10)
+
+`addon_failure(e, url)` classifies an install/update failure (walking the
+exception chain) into: challenge (DDoS page), forbidden 403, rate_limit 429,
+not_found 404, server 5xx, http, timeout, dns, tls, connection, network,
+archive (bad zip), lookup, conflict (AddOns case conflict), source,
+no_space, permission, antivirus (Windows only), write, unknown - each an
+`ADDON_FAILURES` template naming the host. `_addon_apply` logs the English
+text and the exception chain, restores each failed row's previous state,
+and `_report_addon_failures` shows one dialog (single addon) or one summary
+(batch), offering the log. Failed updates keep the installed copy and its
+record. `install_addon_files` moves the old copy aside and restores it if
+the final rename fails. Renders during install/update/remove keep the
+scroll position (`_render_addons(keep_scroll=True)`).
+Tests: `tests/test_addon_failures.py`.
+
+## Linux: what testers found (2026-10-06 .. 10-10)
+
+- **Start-up crash** - `PIL._tkinter_finder` missing from the frozen build:
+  added as a hidden import (`tests/test_build_hidden_imports.py`); the
+  AppImage self-test builds the GUI.
+- **AddOns letter case** - `equpdater/gamepaths.py`: every WoW path goes
+  through `game_path()`; `prepare_addons_dir()` renames a lone
+  `Interface/Addons` to `AddOns`, merges duplicates, collapses identical
+  copies and records conflicts; `writable_addons_dir()` raises
+  `AddonDirConflict` until the player chooses which copy to keep
+  (`resolve_conflicts`, the other is moved to `AddOns-conflicts-<time>`).
+  Wine `Z:\` paths map to native ones. Tests: `test_gamepaths.py`.
+- **Fontconfig errors on Fedora** ("invalid attribute 'xsi:nil'") - the
+  build machine's fontconfig 2.13 was bundled. `build.py` strips
+  `platforms.HOST_FONT_STACK` (fontconfig, freetype, expat, libpng16,
+  brotli) from the Linux folder build so the host's matching stack loads;
+  `--self-test --gui` fails if any is bundled or fontconfig loads from the
+  bundle. New host dependency: those libraries (on every desktop distro).
+  Tests: `test_build_font_stack.py`.
+- Mouse wheel scrolls lists; taskbar/launch environment cleaned
+  (`platforms.child_env`).
+
+## Windows installer shortcuts (2026-10-13)
+
+`equpdater/deploy.py` reads/writes `.lnk` files through PowerShell.
+PowerShell is told to write UTF-8 and the bytes are decoded in Python
+(text mode decoded with the ANSI page and returned `None` -> "'NoneType'
+object has no attribute 'splitlines'"). Shortcuts go through the shell's
+Unicode `IShellLinkW` (C# compiled by `Add-Type`, source in `EQU_CS`);
+`WScript.Shell` (ANSI-only) is the fallback where `Add-Type` is blocked.
+`installer._shortcut` skips a shortcut that cannot be written instead of
+failing an install that already succeeded. Tests: `test_deploy.py`
+(real Cyrillic/CJK/accented shortcuts on Windows CI).
+
+## Login Doctor (2026-10-08)
+
+`equpdater/logindoctor.py` (pure checks, injectable network) and
+`_open_login_doctor` in `app.py`. Checks `WoW.exe` and build (1.18.1,
+7272; a mismatch is a warning), `realmlist.wtf` (root and
+`Data/<locale>/`), `SET realmList` in `Config.wtf`, OctoLogin, DNS for
+play/octowow.st/dl.octowow.st, TCP 3724 (informational) and HTTPS.
+**Repair login configuration** sets the realmlist to `play.octowow.st`,
+removes a stale `SET realmList`, refuses while the game runs, and keeps
+`<file>.octobak` (never overwritten). Advice when nothing local is wrong:
+turn off VPN/proxy at "Authenticating"; if it still fails, try the official
+OctoLauncher with Priority Sign In (EqUpdater cannot use it).
+Tests: `test_logindoctor.py`.
+
+---
 
 ## Current UI
 
@@ -216,11 +435,12 @@ release; pull requests build them as workflow artifacts):
   ubuntu-22.04 with deadsnakes Python 3.12 + system Tk: folder build,
   pinned static aria2c (abcfy2 1.37.0 musl), pinned appimagetool 1.9.1
   (static runtime: no libfuse2 needed). Both downloads sha256-pinned.
-- Each runs `EqUpdater.py --self-test=<json> --network` before upload.
+- Each runs `EqUpdater.py --self-test=<json> --network` before upload; the
+  AppImage also runs `--gui` under xvfb (builds the real window, checks the
+  Pillow/Tk bridge, Login Doctor, the fonts and the font stack).
 
-Not tested here (no Linux machine): the AppImage on a real desktop -
-window, fonts, PLAY through Wine/UMU, the client sync. CI proves it builds,
-starts headless and carries everything.
+Tested on real Linux desktops by testers (Fedora, Ubuntu-likes) through
+2.0.6.x test builds; see "Linux: what testers found" below.
 
 ## Git hosts, OctoWoW Git included (2026-10-01)
 
@@ -253,100 +473,94 @@ detection work; ancestry (the compare API) still answers UNKNOWN, so a
 changed addon is "Unable to verify" - never updated automatically - and
 its row offers Replace… (`addon_offers_replace`: unverifiable with a
 different remote commit). Verified live on 2026-10-01 against
-olzon/GuildRecipes_Octo. When OctoWoW allowlists `EqUpdater/` the API
+olzon/GuildRecipes_Octo. When OctoWoW allowlists `EqUpdater/` (requested 2026-10-14) the API
 answers and none of the fallback runs; the full update flow returns by
 itself. Tests: `tests/test_git_hosts.py` (TestArchiveFallback).
 
 ## News / changelog
 
-`equpdater/news.py` owns News fetching/parsing; `app.py` only renders.
+`equpdater/news.py` owns fetching/parsing; `app.py` only renders.
 
-The only source is the phpBB forum, read by the user's PC through
-`secure_urlopen` with the app's User-Agent. No `octonews.php`, no `news.json`
-(OctoBot's fallback, which is stale: two posts from April 2026).
+- **Announcements** = the newest post in forum thread **t=2848**
+  (`fetch_newest_post_in_topic`, one request, `sk=t&sd=d`). If the forum
+  cannot be read (typically the DDoS page), the newest item of
+  **`https://octowow.st/news.json`** (OctoLauncher's public feed, validated
+  against its schema) is shown instead, with a note saying why.
+- **Changelog** = the newest `NEWS_CHANGELOG_COUNT` (8) posts in thread
+  **t=2816** (`fetch_topic_posts`), each with its date, author and link.
+- Read once at launch and on each refresh button; never on tab switch, no
+  timer. The last good content is cached in the config and kept on screen
+  when a refresh fails; the failure is shown and logged.
+- The forum-listing readers (`fetch_forum_topics`, `fetch_latest_post`,
+  `fetch_topic_list`) remain, tested, unused on screen.
+- `news.json` freshness is not a release requirement. Gate wording: "News
+  loads correctly; current forum content is used when reachable, and the
+  public news feed/cache provides a safe fallback when the forum is
+  unavailable."
 
-- `fetch_forum_topics(forum_id)` reads the listing (`sk=tt&sd=d`), takes every
-  `li.row`, and sorts by each topic's **start** date -- never row order, never
-  the last-post column or its hidden mobile copy.
-- `fetch_first_post(topic)` opens the canonical `viewtopic.php?t=<id>` and
-  reads only the first `div.post#p<N>`, dropping quotes and signatures.
-- Announcements = `fetch_latest_post(2)`: listing + one topic (2 requests).
-- Changelog = `fetch_topic_list(4, 8)`: listing only (1 request); entries have
-  title, start date, author and topic link, no body.
+## OctoWoW DDoS protection
 
-Adapted from OctoBot `octotracker/announcements.py` (selectors, verification
-detection, first-post cleanup), except its listing parser, which takes the
-first `<time>`/username in `.list-inner` -- on phpBB 3.3 that is the last
-reply's.
+octowow.st is behind **BlazingFast**: non-browser clients get a JavaScript
+challenge (HTTP 200, `X-BF-Challenge`), detected by `news.is_challenge_page`
+and `_refuse_challenge` -> `DdosCheckError`. OctoBot gets through via a
+named User-Agent allowlist entry; EqUpdater must not borrow it.
 
-**Cadence:** `_load_news()` once at launch (unconditionally), and each
-refresh button calls `_load_featured()` / `_load_patch_notes()`. Switching to
-the NEWS tab does not fetch; there is no TTL and no timer. A refresh while one
-is in flight is ignored. Tested in `TestNewsCadence`.
+Requested from OctoWoW on 2026-10-14 (any one of): exempt the read-only
+paths (`/git/api/v1/*`, `/api/addons.json`, `/news.json`, the two forum
+topics) from the challenge with normal rate limiting; or exempt User-Agent
+prefix `EqUpdater/` on those paths; or issue an app key/header. If they
+allowlist, nothing needs to change - News and OctoWoW Git update checks
+start working for 2.1.0 users. If they issue a key/header, add it to the
+requests to octowow.st in a 2.1.1.
 
-**Why News was blank (diagnosed 2026-09-24):** octowow.st is behind
-BlazingFast DDoS protection, which answers every non-browser client --
-whatever the User-Agent -- with a JavaScript "Just a moment please..."
-interstitial, HTTP 200, header `X-BF-Challenge: pending`. That hits both the
-forum and `octonews.php`. The old code parsed it as JSON (error) and HTML
-(zero topics, reported as "no topics"). It is now detected and reported as
-`ForumBlockedError` naming the stage; the panel keeps cached content. EqUpdater
-does **not** try to solve the challenge -- that is circumventing the site's
-anti-bot protection.
-
-**Why OctoBot gets through (diagnosed 2026-09-24):** BlazingFast has a
-*named* User-Agent allowlist entry for OctoBot. Same client (urllib) from the
-same PC: `User-Agent: OctoBot/1.0 (+OctoWoW Discord bot)` gets the forum;
-`EqUpdater/2.0.1`, a Chrome UA, and honest variants such as
-`EqUpdater/2.0.1 (+https://github.com/Equadis/EqUpdater)` all get the
-challenge. EqUpdater must not send OctoBot's UA: that is borrowing another
-client's exemption. The fix is asking OctoWoW to add `EqUpdater/` to the
-same allowlist; no code change is needed after that.
-
-Every failure is logged to the session log as `<stage> failed: <why> [<url>]`.
+What EqUpdater requests from octowow.st: forum t=2848 and t=2816 (launch,
+refresh), `news.json` (fallback), `/api/addons.json` (daily), Gitea API
+commits/compare/releases (cached 1 h), repository archives (install/update;
+not blocked), `https://octowow.st/` (Login Doctor). User-Agent
+`EqUpdater/<version>`.
 
 ## Important files
 
-- `equpdater/app.py` — Tk app, panels, settings, mods/addons UI, footer/update flows
+- `equpdater/app.py` — Tk app, panels, settings, mods/addons UI, footer/update flows, custom mods, addon failures
 - `equpdater/ui.py` — FontManager, private font loading, background/gradient UI helpers
 - `equpdater/news.py` — announcements/changelog fetching and parsing
+- `equpdater/logindoctor.py` — Login Doctor checks and repair
+- `equpdater/gamepaths.py` — case-safe WoW paths and the AddOns folder
+- `equpdater/platforms.py` — everything that differs by OS; `HOST_FONT_STACK`
+- `equpdater/deploy.py`, `equpdater/installer.py` — Windows install/update, shortcuts
+- `equpdater/mpq.py` — texture-pack sources and judging
 - `equpdater/planner.py` — central safe update planning
 - `equpdater/versions.py` — version comparison
-- `equpdater/gitcompare.py` — source/commit ancestry checks
+- `equpdater/gitcompare.py` — git hosts, source/commit ancestry checks
 - `equpdater/hashing.py` — content fingerprints
 - `equpdater/config.py` — schema/provenance/migration
-- `equpdater/branding.py` — product identity, paths, icon candidates, Windows App ID
-- `build.py` — canonical PyInstaller build
-- `install/install.ps1` — Windows one-click install/build/test/font import
-- `tests/` — safety, migration, news and GUI smoke tests
+- `equpdater/branding.py` — product identity, `APP_VERSION`, `PROJECT_REPO`, Windows App ID
+- `equpdater/locales/` — de, es, pt_br, ru, zh_cn
+- `EqUpdater.py` — entry point and `--self-test[=json] [--network] [--gui]`
+- `build.py` — PyInstaller build (`--setup` Windows installer); `tools/build_appimage.py` — AppImage
+- `.github/workflows/tests.yml`, `release.yml`
+- `tests/` — 521 tests: safety, migration, news, GUI smoke, Linux paths, packaging
+
+The Windows taskbar ID `eqomdx.EqUpdater.2` was deliberately not renamed
+with the repository: changing it would split existing taskbar pins.
 
 ## Current tests
 
-`python tools/check.py` -- 199 tests, ~30 s on Windows. Runs the suite in a
-child process with faulthandler, prints only failures (name, exception,
-traceback) or, if the process crashed, the test that was running and every
-thread's stack. CI: `.github/workflows/tests.yml` (windows-latest, Python
-3.12). `python build.py --release` refuses to build if the suite fails.
+`python tools/check.py` -- 521 tests. Runs the suite in a child process
+with faulthandler, prints only failures (name, exception, traceback) or, if
+the process crashed, the test that was running and every thread's stack.
+`python build.py --release` refuses to build if the suite fails.
 
-**The installer does not run the suite** (since 2026-09-27). It checks the
-source compiles and imports, then builds; `install.ps1 -RunTests` restores the
-suite for developers. Output of every step is logged under
-`%LOCALAPPDATA%\EqUpdater\install-logs`; the console shows only what explains
-a failure.
+**The installer does not run the suite** (since 2026-09-27); see the
+Tk teardown race below for why tests close apps through `_close_app`.
 
-**Why:** a user's install died at "3/4 Tests" with `Tcl_AsyncDelete: async
-handler deleted by the wrong thread` (reported as "FTCI_AsyncDelete"). Cause:
-`AnimatedBackground`'s worker thread target was a method of the Tk-facing
-object, so the `bg-animation` thread held it -- and through it the Tk window
--- until the thread finished. The tests stopped the animation without waiting;
-when teardown let go of the window while the worker was mid-frame, the
-worker's exit dropped the last reference and Tk was deleted on the worker
-thread. Fixed structurally: the worker is `ui._FrameProducer`, which holds no
-Tk object; `AnimatedBackground.stop(wait)` joins it and releases the
+`AnimatedBackground`'s worker is `ui._FrameProducer`, which holds no Tk
+object; `AnimatedBackground.stop(wait)` joins it and releases the
 PhotoImage on the Tk thread; `EqUpdaterApp.after` schedules nothing once
 destroy has begun; tests close apps through `_close_app` (waits for the
 worker, fails on a leak, keeps the app referenced so no worker can free it).
-`TestTkTeardownRace` reproduces the crash in a child process.
+`TestTkTeardownRace` reproduces the old `Tcl_AsyncDelete` crash in a child
+process.
 
 ## Consent and texture-pack sources (2026-09-24, second pass)
 
@@ -397,17 +611,37 @@ Do not reintroduce these:
 - OpenDyslexic overflowing Settings and hiding the FONT choice (no way back).
   FONT is now one row under the game folder, and the panel grows to fit.
 - `__MACOSX/._*.otf` stubs from the OpenDyslexic zip imported as fonts.
+- `install_addon_files` deleting the installed copy before the final rename
+  (a failed rename lost it); it is moved aside and restored on failure.
+- A failed addon update's error dropped as "stale" by the rescan, so the
+  failure never showed.
+- The installer reading PowerShell output in the ANSI code page ("'NoneType'
+  object has no attribute 'splitlines'") and WScript.Shell mangling
+  non-ANSI shortcut paths.
+- A bundled (build machine's) fontconfig reading the host's newer
+  `/etc/fonts` on Linux.
+- Linux creating `Interface/AddOns` beside an existing `Interface/Addons`.
+- Every addon install sending the Addons list back to the top.
+- Tests replacing `threading.Thread` process-wide (a Windows CI hang), and
+  asserting "no overlay open" when a first-run prompt can open its own.
 
-## Next recommended checks
 
-1. Build on Windows with `install\INSTALL.cmd`.
-2. Confirm the new octopus/wrench icon in:
-   - Explorer executable icon
-   - title bar
-   - running taskbar button
-   - newly-created desktop shortcut
-3. Open Settings and confirm `SUPPORT ME`.
-4. Confirm Friz, Arial and OpenDyslexic all switch live and persist after restart.
-5. Confirm OpenDyslexic fits the fixed 1000×700 design at Windows 100%, 125% and 150% scaling.
-6. Verify Announcements and Changelog against the live OctoWoW service and capture the session log if either still fails.
-7. Only after those checks, push the packaged changes to `Equadis/EqUpdater`.
+## Backlog / next steps
+
+1. **Close issue #1** (fixed in the re-released 2.1.0).
+2. **Issue #3 "Vanilla Autologin Mod"** - not OctoLogin. Ask the reporter
+   for the project link; it stores credentials, so decide whether to list
+   it at all. Players can already add it themselves as a custom git mod.
+3. **Release-notes line** about Microsoft (see State at handoff).
+4. **Wait for OctoWoW's reply** on the DDoS exemption; act per "OctoWoW
+   DDoS protection".
+5. **Defender**: consider building PyInstaller's bootloader from source in
+   `release.yml`, or code signing.
+6. **Tag rule**: relax it, or release fixes as 2.1.1 instead of
+   re-releasing 2.1.0.
+7. **crash.log** for start-up errors: an early Linux fix (commit
+   `d74ee16`, now only reachable by hash) wrote uncaught start-up errors
+   to a log file; it never reached `main`. Worth redoing for 2.1.1 so
+   testers have something to send after a crash.
+8. Translations were written by the assistant; have native speakers check
+   de/es/pt_br/ru/zh_cn.
