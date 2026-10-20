@@ -148,9 +148,11 @@ confirmed, and skips the rest.
 - VanillaFixes, ClassicAPI, Nampower, SuperWoW, UnitXP_SP3, VanillaHelpers,
   DXVK, TransmogFix, AuctionQueryThrottle, OctoLogin and more, each with its
   description and latest version.
-- **OctoLogin** ([fmustafayaman](https://github.com/fmustafayaman/OctoLogin))
-  connects the game to whichever OctoWoW login server answers first and
-  picks the world server with the lowest ping.
+- **OctoLogin** by Mustafa Yaman (fmustafayaman, MIT) connects the game to
+  whichever OctoWoW login server answers first and picks the world server
+  with the lowest ping. Its own repository is no longer online, so its last
+  release is hosted unchanged at
+  [Equadis/OctoUpdater](https://github.com/Equadis/OctoUpdater).
 - **Recommended mods are opt-in** — you are asked once, on first run.
 - DLLs already in your client are never replaced just because EqUpdater
   recognises them.

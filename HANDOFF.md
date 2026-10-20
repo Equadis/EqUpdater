@@ -160,13 +160,20 @@ but the owner prefers not to.
 
 ## OctoLogin and the mods folder (2026-10-12)
 
-OctoLogin (fmustafayaman/OctoLogin, MIT) is installed from the release's
+OctoLogin (by fmustafayaman, MIT) is installed from the release's
 bare `OctoLogin.dll` to `mods/OctoLogin.dll`, as its own installer does,
 and registered by that path; it reads `OctoLogin.ini` and writes
 `OctoLogin.log` beside it. It is last in `DLL_LOAD_ORDER` (hooks only the
 connect import and stands aside if another mod got there first).
 `dlls.txt` entries compare without case or slash direction (`_dll_key`).
 Essential: installed only with consent. Tests: `test_mod_octologin.py`.
+
+Its own repository (fmustafayaman/OctoLogin) went 404 in October 2026.
+The last release, v1.1.0, is hosted unchanged at **Equadis/OctoUpdater**
+(DLL and zip as release assets, original LICENSE and README in the repo,
+checksums matching the original release). The mod installs that repo's
+*latest* release, so every release published there must be an OctoLogin
+build. Point the entry back if the author republishes.
 
 ## Addon failures (2026-10-10)
 

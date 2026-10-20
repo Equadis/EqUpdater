@@ -17,7 +17,7 @@ DLL = b"MZ fake OctoLogin"
 def release(*names):
     return {"tag_name": "v1.1.0", "assets": [
         {"name": n, "size": 60928,
-         "browser_download_url": f"https://github.com/fmustafayaman/OctoLogin/"
+         "browser_download_url": f"https://github.com/Equadis/OctoUpdater/"
                                  f"releases/download/v1.1.0/{n}"}
         for n in names]}
 
@@ -60,9 +60,9 @@ class TestOctoLogin(unittest.TestCase):
         self.assertTrue(self.mod["essential"])          # recommended: the star
         self.assertEqual(src["kind"], "github_release")
         self.assertEqual((src["owner"], src["repo"]),
-                         ("fmustafayaman", "OctoLogin"))
+                         ("Equadis", "OctoUpdater"))
         self.assertEqual(self.mod["repo_url"],
-                         "https://github.com/fmustafayaman/OctoLogin")
+                         "https://github.com/Equadis/OctoUpdater")
         self.assertEqual(self.mod["register_dll"], "mods/OctoLogin.dll")
         self.assertEqual(self.mod["installed_files"], ["mods/OctoLogin.dll"])
 
@@ -77,7 +77,7 @@ class TestOctoLogin(unittest.TestCase):
                 self.mod, self.client,
                 release("OctoLogin-v1.1.0.zip", "OctoLogin.dll"))
         self.assertEqual(written, ["mods/OctoLogin.dll"])
-        self.assertEqual(urls, ["https://github.com/fmustafayaman/OctoLogin/"
+        self.assertEqual(urls, ["https://github.com/Equadis/OctoUpdater/"
                                 "releases/download/v1.1.0/OctoLogin.dll"])
         with open(os.path.join(self.client, "mods", "OctoLogin.dll"), "rb") as f:
             self.assertEqual(f.read(), DLL)

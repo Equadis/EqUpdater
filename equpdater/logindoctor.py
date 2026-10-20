@@ -307,9 +307,9 @@ def local_checks(client_dir: str, version: str, running: bool) -> list:
 #  OctoLogin
 # ──────────────────────────────────────────────────────────────────────────────
 
-#: OctoLogin (github.com/fmustafayaman/OctoLogin) races OctoWoW's login
-#: addresses inside the game. Where its installer -- and EqUpdater -- put it,
-#: and the line VanillaFixes loads it by.
+#: OctoLogin (by fmustafayaman, MIT; hosted at Equadis/OctoUpdater) races
+#: OctoWoW's login addresses inside the game. Where its installer -- and
+#: EqUpdater -- put it, and the line VanillaFixes loads it by.
 OCTOLOGIN_DIR = "mods"
 OCTOLOGIN_DLL = "OctoLogin.dll"
 OCTOLOGIN_LOG = "OctoLogin.log"
