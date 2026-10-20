@@ -1956,6 +1956,12 @@ def _release_version(mod: dict, rel: dict) -> str | None:
 
 
 _MOD_VERSION_CACHE_TTL = 3600
+#: How old a cached release may be at launch. Each launch looks again: with
+#: only the hour above, a release published minutes after a check stayed
+#: invisible through every restart in that hour (a tester's ClassicAPI sat
+#: on 1.15.16 after 1.16.0 was out). The floor keeps a burst of restarts
+#: from spending GitHub's 60-requests-an-hour allowance for apps.
+_MOD_VERSION_STARTUP_MAX_AGE = 300
 
 
 def _slim_release(rel: dict) -> dict:
@@ -1970,10 +1976,14 @@ def _slim_release(rel: dict) -> dict:
     }
 
 
-def _fetch_release_cached(mod: dict, force: bool = False) -> dict | None:
+def _fetch_release_cached(mod: dict, force: bool = False,
+                          max_age: float = _MOD_VERSION_CACHE_TTL) -> dict | None:
     """Latest-release lookup backed by a persistent cache in the config file
-    ({"mod_release_cache": {mod_id: {"timestamp": epoch, "release": {…}}}}),
-    so restarts within the TTL don't re-hit the GitHub/Codeberg APIs."""
+    ({"mod_release_cache": {mod_id: {"timestamp": epoch, "release": {…}}}}):
+    an entry younger than ``max_age`` seconds is used as it is.
+
+    A failed lookup returns None, never the old entry, so the row says it
+    could not check rather than presenting a stale release as current."""
     src  = mod["source"]
     kind = src["kind"]
     if kind not in RELEASE_KINDS:
@@ -1982,7 +1992,7 @@ def _fetch_release_cached(mod: dict, force: bool = False) -> dict | None:
     now = time.time()
     if not force:
         entry = load_config().get("mod_release_cache", {}).get(mid)
-        if entry and (now - entry.get("timestamp", 0)) < _MOD_VERSION_CACHE_TTL:
+        if entry and (now - entry.get("timestamp", 0)) < max_age:
             return entry.get("release")
     rel = _release_latest(src)
     if rel is None:
@@ -1993,12 +2003,14 @@ def _fetch_release_cached(mod: dict, force: bool = False) -> dict | None:
     return rel
 
 
-def fetch_mod_latest_version_cached(mod: dict, force: bool = False) -> str | None:
+def fetch_mod_latest_version_cached(mod: dict, force: bool = False,
+                                    max_age: float = _MOD_VERSION_CACHE_TTL
+                                    ) -> str | None:
     src  = mod["source"]
     kind = src["kind"]
     if kind in ("direct_file", "direct_tar"):
         return src.get("pinned_version")
-    rel = _fetch_release_cached(mod, force=force)
+    rel = _fetch_release_cached(mod, force=force, max_age=max_age)
     if rel:
         return _release_version(mod, rel)
     return None
@@ -2430,18 +2442,62 @@ def _custom_mod_id(dll: str) -> str:
     return "custom:" + dll.lower()
 
 
-def custom_mod_conflict(dll: str) -> str | None:
-    """Why ``dll`` cannot be added (an N_ message), or None. Its name must
-    be a plain .dll file name that no listed or custom mod already uses."""
+def _same_source(mod: dict, src: dict) -> bool:
+    """Whether a registry entry installs from the repository ``src`` names."""
+    a = mod.get("source") or {}
+    return (a.get("kind") == src.get("kind")
+            and (a.get("forge") or "") == (src.get("forge") or "")
+            and (a.get("owner") or "").lower() == (src.get("owner") or "").lower()
+            and (a.get("repo") or "").lower() == (src.get("repo") or "").lower())
+
+
+def custom_mod_conflict(dll: str, src: dict | None = None) -> str | None:
+    """Why ``dll`` cannot be added (an N_ message), or None.
+
+    It must be a plain .dll file name, and no listed or custom mod may
+    already install to mods/<dll> -- the same file on disk, which two
+    entries cannot share. A mod elsewhere with the same file name is *not*
+    a conflict: UnitXP_SP3.dll from a GitHub fork goes to mods/ beside the
+    listed Codeberg build in the game folder. Those are two builds of one
+    mod, and mod_twins() keeps them from being loaded together."""
     if (not dll or not dll.lower().endswith(".dll")
             or os.path.basename(dll) != dll or dll.startswith(".")
             or any(c in dll for c in '\\/:*?"<>|')):
         return N_("That is not a .dll file name EqUpdater can use.")
-    taken = {os.path.basename(f).lower()
-             for m in MODS_REGISTRY for f in m.get("installed_files", [])}
-    if dll.lower() in taken:
-        return N_("A mod with that file name is already in the Mods list.")
+    dest = _dll_key(f"{CUSTOM_MOD_DIR}/{dll}")
+    name = dll.lower()
+    for m in MODS_REGISTRY:
+        files = [_dll_key(f) for f in m.get("installed_files", [])]
+        if dest in files:
+            if src is not None and m.get("custom") and _same_source(m, src):
+                return N_("That mod is already in the Mods list.")
+            return N_("A mod with that file name is already in the Mods list.")
+        # The same name elsewhere is only another build of a mod loaded
+        # through dlls.txt. VanillaFixes' VfPatcher.dll or DXVK's d3d9.dll
+        # are not loaded that way, and listing one would break the game.
+        if (any(os.path.basename(f) == name for f in files)
+                and mod_dll_name(m) != name):
+            return N_("A mod with that file name is already in the Mods list.")
     return None
+
+
+def mod_dll_name(mod: dict) -> str:
+    """The file name of the DLL a mod has loaded through dlls.txt
+    (lower case), or "" for one that is not loaded that way."""
+    reg = mod.get("register_dll") or ""
+    return os.path.basename(reg.replace("\\", "/")).lower()
+
+
+def mod_twins(mod_id: str) -> list:
+    """Other mods that load a DLL of the same file name: two builds of one
+    mod (UnitXP_SP3 from Codeberg and from a GitHub fork). The loader would
+    inject both, hooking the same functions twice, so only one may be on."""
+    me = next((m for m in MODS_REGISTRY if m["id"] == mod_id), None)
+    name = mod_dll_name(me) if me else ""
+    if not name:
+        return []
+    return [m["id"] for m in MODS_REGISTRY
+            if m["id"] != mod_id and mod_dll_name(m) == name]
 
 
 def custom_mod_entry(rec: dict) -> dict:
@@ -2490,7 +2546,7 @@ def load_custom_mods(cfg: dict | None = None) -> list:
 
 def add_custom_mod(src: dict, dll: str) -> str:
     """Record a custom mod and add it to the registry; returns its id."""
-    problem = custom_mod_conflict(dll)
+    problem = custom_mod_conflict(dll, src)
     if problem:
         raise ValueError(problem)
     rec = {"kind": src["kind"], "owner": src["owner"], "repo": src["repo"],
@@ -4156,7 +4212,9 @@ class EqUpdaterApp(tk.Tk):
         # check; the MODS tab will do it when opened.
         if self._cfg.get("mod_release_cache"):
             self.after(900, lambda: threading.Thread(
-                target=self._load_mods_state, daemon=True).start())
+                target=self._load_mods_state,
+                kwargs={"max_age": _MOD_VERSION_STARTUP_MAX_AGE},
+                daemon=True).start())
         # Same parity for addons: background verify at launch (feeds the
         # ADDONS tab badge), but only once addons were initialized for this
         # folder — never on a first run / fresh folder.
@@ -5907,11 +5965,11 @@ class EqUpdaterApp(tk.Tk):
                 "update_label": update_label,
             }
 
-    def _load_mods_state(self):
+    def _load_mods_state(self, max_age: float = _MOD_VERSION_CACHE_TTL):
         state = []
         for mod in MODS_REGISTRY:
             try:
-                v = fetch_mod_latest_version_cached(mod)
+                v = fetch_mod_latest_version_cached(mod, max_age=max_age)
             except Exception:
                 v = None
             if v:
@@ -5991,6 +6049,25 @@ class EqUpdaterApp(tk.Tk):
         if var.get() and mod_id in self._RES_FIX_CONFLICTS:
             if not self._confirm_res_fix_toggle(mod_id, var):
                 return   # backed out — var + pending already reset
+        if var.get():
+            twins_on = [m for m in MODS_REGISTRY
+                        if m["id"] in mod_twins(mod_id)
+                        and self._mod_is_on(m["id"])]
+            me = next(m for m in MODS_REGISTRY if m["id"] == mod_id)
+            if twins_on:
+                if not self._confirm_replace_twins(
+                        (me.get("repo_url") or me["name"]).replace("https://", ""),
+                        os.path.basename(me["register_dll"]), twins_on):
+                    var.set(False)
+                    self._mod_pending_state.pop(mod_id, None)
+                    self._refresh_apply_btn_visibility()
+                    return
+                for m in twins_on:
+                    self._mod_pending_state.setdefault(
+                        m["id"], {})["enabled"] = False
+                    twin_var = self._mod_row_vars.get(m["id"], {}).get("enabled")
+                    if twin_var is not None:
+                        twin_var.set(False)
         self._mod_pending_state.setdefault(mod_id, {})["enabled"] = var.get()
         self._refresh_apply_btn_visibility()
 
@@ -6319,8 +6396,11 @@ class EqUpdaterApp(tk.Tk):
         # once, and "Install essential mods" (Settings → General) remembers
         # the answer. VanillaFixes is asked about with the rest: it is the
         # loader that injects them, which makes it the one that matters most.
+        mods_on = cfg.get("mods", {})
         missing = [m for m in MODS_REGISTRY
-                   if m.get("essential", False) and m["id"] not in discovered]
+                   if m.get("essential", False) and m["id"] not in discovered
+                   and not any(mods_on.get(t, {}).get("enabled")
+                               for t in mod_twins(m["id"]))]
         auto_mods = bool(cfg.get("auto_install_mods", False))
         if missing and not auto_mods and not cfg.get("essential_mods_asked"):
             auto_mods = self._ask_essential_mods(missing)
@@ -7945,11 +8025,20 @@ class EqUpdaterApp(tk.Tk):
             dll = choice.get()
             if not st["src"] or not dll:
                 return find()
-            problem = custom_mod_conflict(dll)
+            problem = custom_mod_conflict(dll, st["src"])
             if problem:
                 status.configure(text=tr(problem), fg=C_ERR)
                 return
             if not self._confirm_custom_mod(st["src"], dll):
+                return
+            # Another build of the same DLL that is on: it goes off in the
+            # same Apply that puts this one in, or this one is not added.
+            twins_on = [m for m in MODS_REGISTRY
+                        if mod_dll_name(m) == dll.lower()
+                        and self._mod_is_on(m["id"])]
+            if twins_on and not self._confirm_replace_twins(
+                    f"{_custom_mod_host(st['src'])}/{st['src']['owner']}/"
+                    f"{st['src']['repo']}", dll, twins_on):
                 return
             mid = add_custom_mod(st["src"], dll)
             self._close_settings()
@@ -7957,7 +8046,14 @@ class EqUpdaterApp(tk.Tk):
                            f"{_custom_mod_host(st['src'])}/{st['src']['owner']}/"
                            f"{st['src']['repo']}.\n", "acct")
             self._rebuild_mod_rows()
-            if self._game_path.get().strip():
+            if twins_on:
+                for m in twins_on:
+                    self._mod_pending_state.setdefault(
+                        m["id"], {})["enabled"] = False
+                self._mod_pending_state.setdefault(mid, {})["enabled"] = True
+                if self._game_path.get().strip():
+                    self._apply_mods()
+            elif self._game_path.get().strip():
                 self._update_mod(mid)
 
         def click():
@@ -7965,6 +8061,21 @@ class EqUpdaterApp(tk.Tk):
         btn.bind("<Button-1>", lambda e: click())
         url_entry.bind("<Return>", lambda e: click())
         url_entry.focus_set()
+
+    def _confirm_replace_twins(self, source: str, dll: str,
+                               twins: list) -> bool:
+        """Ask to turn off the other build(s) of ``dll`` that are on."""
+        from tkinter import messagebox
+        others = ", ".join(sorted(
+            (m.get("repo_url") or m["name"]).replace("https://", "")
+            for m in twins))
+        return messagebox.askyesno(
+            tr("Two builds of one mod"),
+            tr("{dll} from {source} and {dll} from {other} are two builds of "
+               "the same mod. Only one can be loaded.\n\n"
+               "Turn off the one from {other} and use {source}?",
+               dll=dll, source=source, other=others),
+            parent=self)
 
     def _confirm_custom_mod(self, src: dict, dll: str) -> bool:
         from tkinter import messagebox
@@ -9771,6 +9882,9 @@ class EqUpdaterApp(tk.Tk):
                 continue  # already installed
             if mod_files_on_disk(mod, out):
                 continue  # somebody else's copy: shown for adoption, not replaced
+            if any(mods_cfg.get(t, {}).get("enabled")
+                   for t in mod_twins(mod["id"])):
+                continue  # another build of it is on (a custom fork)
             self._mod_pending_state.setdefault(mod["id"], {})["enabled"] = True
             pending = True
         if not pending:

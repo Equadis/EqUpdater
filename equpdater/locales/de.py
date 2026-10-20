@@ -350,6 +350,12 @@ STRINGS = {
         "Bei der letzten Anmeldung zeigte die realmlist auf {address}, das OctoLogin nicht kennt, daher hat es nicht eingegriffen",
     "At the last login, the game used a local proxy ({address}); OctoLogin stood aside":
         "Bei der letzten Anmeldung hat das Spiel einen lokalen Proxy ({address}) verwendet; OctoLogin hat nicht eingegriffen",
+    "That mod is already in the Mods list.":
+        "Diese Mod ist bereits in der Mod-Liste.",
+    "Two builds of one mod":
+        "Zwei Versionen einer Mod",
+    "{dll} from {source} and {dll} from {other} are two builds of the same mod. Only one can be loaded.\n\nTurn off the one from {other} and use {source}?":
+        "{dll} von {source} und {dll} von {other} sind zwei Versionen derselben Mod. Es kann nur eine geladen werden.\n\nDie von {other} ausschalten und {source} verwenden?",
     "Verify game files": "Spieldateien überprüfen",
     "Verifying game files…": "Spieldateien werden überprüft…",
     "Verifying…": "Prüfe…",

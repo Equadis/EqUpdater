@@ -136,13 +136,51 @@ class TestRegistry(CustomModBase):
                              if m.get("custom")), 1)
 
     def test_names_already_used_are_refused(self):
-        for dll in ("ClassicAPI.dll", "octologin.dll", "VfPatcher.dll"):
+        # The same file on disk (OctoLogin is mods/OctoLogin.dll), or a
+        # listed file that is not loaded through dlls.txt: VanillaFixes'
+        # loader, DXVK's DirectX proxy.
+        for dll in ("octologin.dll", "VfPatcher.dll", "d3d9.dll"):
             self.assertIsNotNone(self.app.custom_mod_conflict(dll), dll)
         self.app.add_custom_mod(self.src, "CoolMod.dll")
         with self.assertRaises(ValueError):
             self.app.add_custom_mod(self.src, "coolmod.DLL")
         for dll in ("../x.dll", "a/b.dll", "x.exe", "", ".dll"):
             self.assertIsNotNone(self.app.custom_mod_conflict(dll), dll)
+
+    def test_the_same_repository_twice_says_so(self):
+        self.app.add_custom_mod(self.src, "CoolMod.dll")
+        same = dict(self.src, owner="SomeOne", repo="coolmod")   # any case
+        self.assertEqual(self.app.custom_mod_conflict("CoolMod.dll", same),
+                         "That mod is already in the Mods list.")
+        fork = dict(self.src, owner="another")
+        self.assertEqual(self.app.custom_mod_conflict("CoolMod.dll", fork),
+                         "A mod with that file name is already in the "
+                         "Mods list.")    # both would be mods/CoolMod.dll
+
+    def test_a_fork_of_a_listed_mod_can_be_added(self):
+        """A user could not add github.com/brues-code/UnitXP_SP3: its DLL has
+        the listed Codeberg build's file name, and the name alone was the
+        test. The fork goes to mods/UnitXP_SP3.dll, a different file."""
+        fork = {"kind": "github_release", "owner": "brues-code",
+                "repo": "UnitXP_SP3", "asset": None}
+        self.assertIsNone(self.app.custom_mod_conflict("UnitXP_SP3.dll", fork))
+        mid = self.app.add_custom_mod(fork, "UnitXP_SP3.dll")
+        self.assertEqual(mid, "custom:unitxp_sp3.dll")
+        entry = next(m for m in self.app.MODS_REGISTRY if m["id"] == mid)
+        self.assertEqual(entry["installed_files"], ["mods/UnitXP_SP3.dll"])
+        self.assertEqual(entry["repo_url"],
+                         "https://github.com/brues-code/UnitXP_SP3")
+        # The listed build keeps its own identity and file.
+        listed = next(m for m in self.app.MODS_REGISTRY
+                      if m["id"] == "UnitXP_SP3")
+        self.assertEqual(listed["installed_files"], ["UnitXP_SP3.dll"])
+        # Two builds of one mod: each knows the other.
+        self.assertEqual(self.app.mod_twins("UnitXP_SP3"), [mid])
+        self.assertEqual(self.app.mod_twins(mid), ["UnitXP_SP3"])
+        self.assertEqual(self.app.mod_twins("ClassicAPI"), [])
+        self.assertEqual(self.app.mod_twins("dxvk"), [])     # not in dlls.txt
+        # Still there after a restart.
+        self.assertIn(mid, self.app.load_custom_mods(self.cfg))
 
     def test_forget(self):
         mid = self.app.add_custom_mod(self.src, "CoolMod.dll")
@@ -281,6 +319,7 @@ class TestDialog(unittest.TestCase):
         self.m.update_config(lambda c: c.update(essential_mods_asked=True,
                                                 auto_install_mods=False))
         self.app._switch_tab("MODS")
+        self.app._mod_pending_state.clear()     # no toggles left by a test
         self.updates, self.asked = [], []
         self.patches = [
             mock.patch.object(self.m.threading, "Thread", _thread),
@@ -364,6 +403,83 @@ class TestDialog(unittest.TestCase):
         self.assertEqual(self.updates, [])
         self.assertFalse(self.m.load_config().get("custom_mods"))
         self.assertTrue(dialog.winfo_exists())             # still open
+
+    def open_fork(self):
+        """The dialog, found and chosen: brues-code's UnitXP_SP3 fork."""
+        a = self.app
+        a._open_custom_mod_dialog()
+        ui = a._custom_mod_ui
+        with mock.patch.object(self.m, "_release_latest",
+                               lambda src, **k: release("UnitXP_SP3.dll")):
+            ui["url"].set("https://github.com/brues-code/UnitXP_SP3")
+            ui["find"]()
+            self.pump()
+        ui["choice"].set("UnitXP_SP3.dll")
+        return ui
+
+    def test_a_fork_replaces_the_listed_build_that_is_on(self):
+        """The listed UnitXP_SP3 is on. Adding the fork asks, then turns the
+        listed one off in the same Apply that installs the fork: the loader
+        must never inject both."""
+        self.m.update_config(lambda c: c.setdefault("mods", {}).update(
+            UnitXP_SP3={"enabled": True, "installed_version": "v1"}))
+        applied = []
+        ui = self.open_fork()
+        with mock.patch.object(self.app, "_apply_mods",
+                               lambda: applied.append(dict(
+                                   self.app._mod_pending_state))):
+            ui["install"]()
+            self.pump()
+        self.assertEqual([t for t, _ in self.asked],
+                         ["Install UnitXP_SP3.dll?", "Two builds of one mod"])
+        self.assertIn("codeberg.org/konaka/UnitXP_SP3", self.asked[1][1])
+        self.assertIn("github.com/brues-code/UnitXP_SP3", self.asked[1][1])
+        self.assertEqual(self.updates, [])                 # not on its own
+        self.assertEqual(len(applied), 1)
+        self.assertEqual(applied[0]["UnitXP_SP3"], {"enabled": False})
+        self.assertEqual(applied[0]["custom:unitxp_sp3.dll"], {"enabled": True})
+
+    def test_declining_the_swap_adds_nothing(self):
+        self.m.update_config(lambda c: c.setdefault("mods", {}).update(
+            UnitXP_SP3={"enabled": True, "installed_version": "v1"}))
+        ui = self.open_fork()
+        answers = iter([True, False])           # the warning yes, the swap no
+        with mock.patch("tkinter.messagebox.askyesno",
+                        lambda *x, **k: next(answers)):
+            ui["install"]()
+        self.assertEqual(self.updates, [])
+        self.assertFalse(self.m.load_config().get("custom_mods"))
+        self.assertNotIn("UnitXP_SP3", self.app._mod_pending_state)
+
+    def test_no_question_when_the_listed_build_is_off(self):
+        self.m.update_config(lambda c: c.setdefault("mods", {}).pop(
+            "UnitXP_SP3", None))
+        ui = self.open_fork()
+        ui["install"]()
+        self.pump()
+        self.assertEqual(len(self.asked), 1)               # the warning only
+        self.assertEqual(self.updates, ["custom:unitxp_sp3.dll"])
+
+    def test_turning_one_build_on_turns_the_other_off(self):
+        fork = {"kind": "github_release", "owner": "brues-code",
+                "repo": "UnitXP_SP3", "asset": None}
+        mid = self.m.add_custom_mod(fork, "UnitXP_SP3.dll")
+        self.m.update_config(lambda c: c.setdefault("mods", {}).update(
+            {mid: {"enabled": True, "installed_version": "v9"}}))
+        self.app._rebuild_mod_rows()
+        var = self.m.tk.BooleanVar(value=True)
+        self.app._toggle_mod("UnitXP_SP3", var)
+        self.assertEqual(self.asked[-1][0], "Two builds of one mod")
+        self.assertEqual(self.app._mod_pending_state[mid], {"enabled": False})
+        self.assertEqual(self.app._mod_pending_state["UnitXP_SP3"],
+                         {"enabled": True})
+        # Declined: the box goes back off and nothing changes.
+        self.app._mod_pending_state.clear()
+        with mock.patch("tkinter.messagebox.askyesno", lambda *x, **k: False):
+            var.set(True)
+            self.app._toggle_mod("UnitXP_SP3", var)
+        self.assertFalse(var.get())
+        self.assertEqual(self.app._mod_pending_state, {})
 
 
 if __name__ == "__main__":

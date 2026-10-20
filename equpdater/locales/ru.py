@@ -350,6 +350,12 @@ STRINGS = {
         "При последнем входе realmlist указывал на {address}, который OctoLogin не знает, поэтому он не вмешивался",
     "At the last login, the game used a local proxy ({address}); OctoLogin stood aside":
         "При последнем входе игра использовала локальный прокси ({address}); OctoLogin не вмешивался",
+    "That mod is already in the Mods list.":
+        "Этот мод уже есть в списке модов.",
+    "Two builds of one mod":
+        "Две сборки одного мода",
+    "{dll} from {source} and {dll} from {other} are two builds of the same mod. Only one can be loaded.\n\nTurn off the one from {other} and use {source}?":
+        "{dll} из {source} и {dll} из {other} — две сборки одного и того же мода. Загружаться может только одна.\n\nОтключить сборку из {other} и использовать {source}?",
     "Verify game files": "Проверить файлы игры",
     "Verifying game files…": "Проверка файлов игры…",
     "Verifying…": "Проверка…",

@@ -351,6 +351,12 @@ STRINGS = {
         "上次登录时，realmlist 指向 OctoLogin 不认识的 {address}，因此它没有介入",
     "At the last login, the game used a local proxy ({address}); OctoLogin stood aside":
         "上次登录时，游戏使用了本地代理（{address}）；OctoLogin 没有介入",
+    "That mod is already in the Mods list.":
+        "该模组已在模组列表中。",
+    "Two builds of one mod":
+        "同一模组的两个版本",
+    "{dll} from {source} and {dll} from {other} are two builds of the same mod. Only one can be loaded.\n\nTurn off the one from {other} and use {source}?":
+        "来自 {source} 的 {dll} 和来自 {other} 的 {dll} 是同一模组的两个版本，只能加载其中一个。\n\n关闭来自 {other} 的版本并使用 {source}？",
     "Verify game files": "校验游戏文件",
     "Verifying game files…": "正在校验游戏文件…",
     "Verifying…": "正在校验…",
