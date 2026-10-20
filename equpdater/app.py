@@ -1772,13 +1772,13 @@ MODS_REGISTRY = [
         "description": N_("Picks the OctoWoW login server that answers first and the world server with the lowest ping. Its settings and log are in the mods folder."),
         # By Mustafa Yaman (fmustafayaman), MIT. Its own repository is gone
         # (404 since October 2026), so its last release, v1.1.0, is hosted
-        # unchanged at Equadis/OctoUpdater; same tag, so an installed copy
+        # unchanged at Equadis/OctoLogin; same tag, so an installed copy
         # reads as up to date. Point this back if the author republishes.
-        "repo_url":    "https://github.com/Equadis/OctoUpdater",
+        "repo_url":    "https://github.com/Equadis/OctoLogin",
         "source": {
             "kind":          "github_release",
             "owner":         "Equadis",
-            "repo":          "OctoUpdater",
+            "repo":          "OctoLogin",
             # The bare DLL, not the zip: the zip nests it under a folder
             # named after the version, which changes every release.
             "asset_pattern": "OctoLogin.dll",

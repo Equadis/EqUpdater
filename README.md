@@ -152,7 +152,7 @@ confirmed, and skips the rest.
   whichever OctoWoW login server answers first and picks the world server
   with the lowest ping. Its own repository is no longer online, so its last
   release is hosted unchanged at
-  [Equadis/OctoUpdater](https://github.com/Equadis/OctoUpdater).
+  [Equadis/OctoLogin](https://github.com/Equadis/OctoLogin).
 - **Recommended mods are opt-in** — you are asked once, on first run.
 - DLLs already in your client are never replaced just because EqUpdater
   recognises them.

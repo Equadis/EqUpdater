@@ -169,7 +169,7 @@ connect import and stands aside if another mod got there first).
 Essential: installed only with consent. Tests: `test_mod_octologin.py`.
 
 Its own repository (fmustafayaman/OctoLogin) went 404 in October 2026.
-The last release, v1.1.0, is hosted unchanged at **Equadis/OctoUpdater**
+The last release, v1.1.0, is hosted unchanged at **Equadis/OctoLogin**
 (DLL and zip as release assets, original LICENSE and README in the repo,
 checksums matching the original release). The mod installs that repo's
 *latest* release, so every release published there must be an OctoLogin
