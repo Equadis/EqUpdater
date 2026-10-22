@@ -78,7 +78,12 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" "dist/EqUpdater-v${{ steps.version.outputs.version }}-Windows.exe" --clobber
+        # A copy without the version too: the README links to
+        # releases/latest/download/EqUpdater-Windows.exe, which GitHub
+        # serves from whichever release is the latest.
+        run: |
+          cp "dist/EqUpdater-v${{ steps.version.outputs.version }}-Windows.exe" dist/EqUpdater-Windows.exe
+          gh release upload "${{ github.event.release.tag_name }}" "dist/EqUpdater-v${{ steps.version.outputs.version }}-Windows.exe" dist/EqUpdater-Windows.exe --clobber
 
   linux:
     runs-on: ubuntu-22.04
@@ -140,4 +145,7 @@ jobs:
         if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" "dist/EqUpdater-v${{ steps.version.outputs.version }}-Linux-x86_64.AppImage" --clobber
+        # And without the version: releases/latest/download/... in the README.
+        run: |
+          cp "dist/EqUpdater-v${{ steps.version.outputs.version }}-Linux-x86_64.AppImage" dist/EqUpdater-Linux-x86_64.AppImage
+          gh release upload "${{ github.event.release.tag_name }}" "dist/EqUpdater-v${{ steps.version.outputs.version }}-Linux-x86_64.AppImage" dist/EqUpdater-Linux-x86_64.AppImage --clobber

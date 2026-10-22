@@ -17,9 +17,13 @@
 
 ## Download
 
-- [**Windows**](https://github.com/Equadis/EqUpdater/releases/download/v2.1.0/EqUpdater-v2.1.0-Windows.exe) — `EqUpdater-v2.1.0-Windows.exe`
-- [**Linux x86_64**](https://github.com/Equadis/EqUpdater/releases/download/v2.1.0/EqUpdater-v2.1.0-Linux-x86_64.AppImage) — `EqUpdater-v2.1.0-Linux-x86_64.AppImage`
+- [**Windows**](https://github.com/Equadis/EqUpdater/releases/latest/download/EqUpdater-Windows.exe) — `EqUpdater-Windows.exe`
+- [**Linux x86_64**](https://github.com/Equadis/EqUpdater/releases/latest/download/EqUpdater-Linux-x86_64.AppImage) — `EqUpdater-Linux-x86_64.AppImage`
 - [**Release page**](https://github.com/Equadis/EqUpdater/releases/latest) — release notes and every version
+
+These links always download the newest release. The release page has the
+same files with the version in their names (`EqUpdater-vX.Y.Z-Windows.exe`,
+`EqUpdater-vX.Y.Z-Linux-x86_64.AppImage`).
 
 Nothing else is needed: no Python, no build tools.
 
@@ -34,7 +38,7 @@ Nothing else is needed: no Python, no build tools.
 
 ### Windows
 
-1. Download **`EqUpdater-vX.Y.Z-Windows.exe`**.
+1. Download **`EqUpdater-Windows.exe`** (link above).
 2. Run it. It installs EqUpdater to
    `%LOCALAPPDATA%\Programs\EqUpdater`, adds it to the Start menu (and,
    if you like, the desktop), and starts it.
@@ -42,7 +46,7 @@ Nothing else is needed: no Python, no build tools.
 No administrator rights are needed, it never touches your game folder, and
 it works with non-English user names and folder names.
 
-**Updating:** download the newer `EqUpdater-vX.Y.Z-Windows.exe` and run it
+**Updating:** download `EqUpdater-Windows.exe` again and run it
 (close EqUpdater first). It replaces the app in that same place and points
 every EqUpdater shortcut there. Your settings, managed mods and addons, and
 backups live separately in `%LOCALAPPDATA%\EqUpdater` and are kept. If
@@ -50,12 +54,12 @@ anything goes wrong part-way, the version you had stays in place.
 
 ### Linux
 
-1. Download **`EqUpdater-vX.Y.Z-Linux-x86_64.AppImage`**.
+1. Download **`EqUpdater-Linux-x86_64.AppImage`** (link above).
 2. Make it executable and run it:
 
    ```sh
-   chmod +x EqUpdater-vX.Y.Z-Linux-x86_64.AppImage
-   ./EqUpdater-vX.Y.Z-Linux-x86_64.AppImage
+   chmod +x EqUpdater-Linux-x86_64.AppImage
+   ./EqUpdater-Linux-x86_64.AppImage
    ```
 
 EqUpdater runs natively on Linux (x86_64; Ubuntu 22.04 and newer, Mint,
