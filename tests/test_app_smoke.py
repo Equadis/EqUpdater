@@ -102,9 +102,15 @@ class TestAppStarts(unittest.TestCase):
         os.environ["XDG_DATA_HOME"] = cls.tmp
         for mod in [m for m in list(sys.modules) if m.startswith("equpdater")]:
             del sys.modules[mod]
+        from unittest import mock
         from equpdater import app, branding
         cls.app_mod = app
         cls.branding = branding
+        # No read of the real forum: it lands at an unknown moment and draws
+        # the News lists again under whichever test is running.
+        cls.no_launch_news = mock.patch.object(app.EqUpdaterApp, "_load_news",
+                                               lambda self: None)
+        cls.no_launch_news.start()
         cls.app = app.EqUpdaterApp()
         for _ in range(12):
             cls.app.update()
@@ -112,6 +118,7 @@ class TestAppStarts(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         _close_app(cls.app)
+        cls.no_launch_news.stop()
         shutil.rmtree(cls.tmp, ignore_errors=True)
 
     def test_product_identity(self):
@@ -202,6 +209,62 @@ class TestAppStarts(unittest.TestCase):
             app.update()
         self.assertFalse(app._panels_hidden)
         self.assertTrue(app._news_panel.winfo_ismapped())
+
+    def test_a_drag_defers_the_costly_parts(self):
+        """While the window is dragged: the picture is hidden and lists keep
+        their rows' width; when it settles, both catch up. A tab not shown
+        keeps a fixed size, so a drag does not lay it out."""
+        app, m = self.app, self.app_mod
+        designed = (m.WIN_W, m.WIN_H)
+        app._patch_open = None
+        app._render_patch_notes([{"id": "1", "title": "2026-10-24",
+                                  "author": "Archer",
+                                  "date": "2026-10-24T08:00:00+00:00",
+                                  "body": "Notes.", "html": "", "url": ""}])
+        app.update()
+        app._switch_tab("MODS")
+        app.update()
+        app._switch_tab("NEWS")
+        app.update()
+        mods_size = (app._mods_panel_frame.winfo_width(),
+                     app._mods_panel_frame.winfo_height())
+        # The real drag's settle timer must not finish the drag mid-test.
+        app.RESIZE_SETTLE_MS = 10 ** 7
+        try:
+            app._begin_resize()
+            self.assertTrue(app._resizing)
+            self.assertEqual(app._bg_canvas.itemcget("bg_image", "state"), "hidden")
+            app.geometry(f"{designed[0] + 200}x{designed[1] + 100}")
+            app.update()
+            app._live_resize()
+            app.update()
+            self.assertEqual(m.WIN_W, designed[0] + 200)          # live layout
+            self.assertIn(app._acc_canvas["patch"], app._stretch_pending)  # rows wait
+            self.assertEqual((app._mods_panel_frame.winfo_width(),
+                              app._mods_panel_frame.winfo_height()), mods_size)
+            app._apply_resize()
+            app.update()
+            self.assertFalse(app._resizing)
+            self.assertEqual(app._stretch_pending, {})
+            self.assertNotEqual(app._bg_canvas.itemcget("bg_image", "state"), "hidden")
+            self.assertEqual(app._bg_size, (m.WIN_W, m.WIN_H))
+            canvas = app._acc_canvas["patch"]
+            item = canvas.find_all()[0]
+            self.assertEqual(int(float(canvas.itemcget(item, "width"))),
+                             canvas.winfo_width())                 # rows caught up
+            self.assertIsNotNone(app._bg_current)
+        finally:
+            del app.RESIZE_SETTLE_MS
+            app.geometry(f"{designed[0]}x{designed[1]}")
+            app.update()
+            app._apply_resize()
+            app.update()
+        # The tab comes back at the window's size when it is opened.
+        app._switch_tab("MODS")
+        app.update()
+        self.assertEqual(app._mods_panel_frame.winfo_width(),
+                         app._news_panel.winfo_width())
+        app._switch_tab("NEWS")
 
     def test_the_window_carries_the_product_icon(self):
         self.assertIsNotNone(getattr(self.app, "_window_icon_photo", None))

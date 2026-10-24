@@ -4297,6 +4297,9 @@ class EqUpdaterApp(tk.Tk):
         y  = max(0, (sh - WIN_H) // 2)
         self.geometry(f"{WIN_W}x{WIN_H}+{x}+{y}")
         self._resize_job = None
+        self._live_job = None
+        self._resizing = False
+        self._stretch_pending = {}
         self.bind("<Configure>", self._on_window_configure, add="+")
 
         self._build()
@@ -4595,8 +4598,16 @@ class EqUpdaterApp(tk.Tk):
                   "MODS":   self._mods_panel_frame,
                   "MPQ":    self._mpq_panel_frame}
         target = panels.get(tab, self._news_panel)
-        if not target.winfo_ismapped() and not self._panels_hidden:
-            self._place_panel(target)
+        # The panel left behind keeps the size it has now, fixed: a hidden
+        # panel that followed the window would be laid out again at every
+        # step of a resize (the Addons list alone is hundreds of widgets).
+        old = self._active_panel
+        if old is not target and old.winfo_ismapped():
+            old.place_configure(relwidth=0, relheight=0,
+                                width=old.winfo_width(),
+                                height=old.winfo_height())
+        if not self._panels_hidden:
+            self._place_panel(target)     # follows the window again
         target.tkraise()
         self._active_panel = target
 
@@ -4676,16 +4687,18 @@ class EqUpdaterApp(tk.Tk):
         self._bg_current = self._bg_photo
         if self._bg_photo is not None:
             self._bg_item = c.create_image(0, 0, image=self._bg_photo,
-                                           anchor="nw", tags="bg")
+                                           anchor="nw", tags=("bg", "bg_image"))
         else:
             c.create_rectangle(0, 0, WIN_W, WIN_H, fill=C_BG, outline="",
                                tags="bg")
         # A tiny dark veil keeps the bright bubble highlights from fighting
         # with edge text while leaving the supplied artwork clearly visible.
-        c.create_rectangle(0, 0, WIN_W, WIN_H, fill="", outline=C_PANEL_BDR,
-                           tags="bg")
+        self._bg_frame = c.create_rectangle(0, 0, WIN_W - 1, WIN_H - 1, fill="",
+                                            outline=C_PANEL_BDR, tags="bg")
         c.tag_lower("bg")
-        if self._cfg.get("animated_background", True):
+        self._bg_size = (WIN_W, WIN_H)
+        if self._cfg.get("animated_background", True) \
+                and not getattr(self, "_resizing", False):
             self._start_bg_animation()
 
     def _start_bg_animation(self):
@@ -4700,7 +4713,7 @@ class EqUpdaterApp(tk.Tk):
             return
         if self._bg_item is None:
             self._bg_item = self._bg_canvas.create_image(
-                0, 0, anchor="nw", tags="bg")
+                0, 0, anchor="nw", tags=("bg", "bg_image"))
             self._bg_canvas.tag_lower("bg")
         self._bg_anim = AnimatedBackground(
             self, self._bg_canvas, self._bg_item, path, WIN_W, WIN_H,
@@ -5109,50 +5122,151 @@ class EqUpdaterApp(tk.Tk):
 
     # ── window size ──────────────────────────────────────────────────────────
 
+    #: While a drag goes on, the live layout runs at most this often (ms).
+    RESIZE_LIVE_MS = 16
+    #: The size has settled when no resize came for this long (ms).
+    RESIZE_SETTLE_MS = 180
+
     def _on_window_configure(self, event):
-        """The window was moved or resized. Re-laid out once the size settles
-        (a drag sends dozens of these), and only if the size changed."""
+        """The window was moved or resized. A resize is laid out in two
+        parts: what is cheap follows the drag live (_live_resize: the
+        header, footer, panels and News text, a few milliseconds), and what
+        is costly waits until the size settles (_apply_resize: the
+        background image and its animation). A move changes nothing."""
         if event.widget is not self:
             return
-        if self._resize_job is not None:
+        if (event.width, event.height) == (WIN_W, WIN_H) \
+                and self._resize_job is None:
+            return
+        if self._resize_job is None:
+            self._begin_resize()
+        else:
             try:
                 self.after_cancel(self._resize_job)
             except tk.TclError:
                 pass
-        self._resize_job = self.after(150, self._apply_resize)
+        self._resize_job = self.after(self.RESIZE_SETTLE_MS,
+                                      self._apply_resize)
+        if getattr(self, "_live_job", None) is None:
+            self._live_job = self.after(self.RESIZE_LIVE_MS, self._live_resize)
 
-    def _apply_resize(self):
-        """Lay everything out for the window's current size. Panels follow
-        on their own (they are placed relative to the window); this redoes
-        what is drawn to measure: the background, the header's tabs and gear,
-        the footer, the News columns and their text. The size is remembered
-        for the next start."""
+    def _begin_resize(self):
+        """A drag starts: the animation pauses (its frames are made for one
+        size, and making them competes with the drag); the still image stays
+        on screen until the size settles."""
+        self._resizing = True
+        if not hasattr(self, "_stretch_pending"):
+            self._stretch_pending = {}
+        if getattr(self, "_bg_anim", None) is not None:
+            self._stop_bg_animation()
+        # The picture is not drawn while the window is dragged: repainting a
+        # window-sized image (twice, with the News backdrop) at every step
+        # was most of a step's cost. The plain background colour stands in
+        # until the size settles and the picture is drawn for it.
+        self._bg_canvas.itemconfigure("bg_image", state="hidden")
+        for backdrop in getattr(self, "_bg_backdrops", ()):
+            try:
+                backdrop.set_image(None)
+            except tk.TclError:
+                pass
+
+    def _live_resize(self):
+        """The cheap part of a resize, run while the drag goes on: the
+        window size, the header's tabs and gear, the footer, the News
+        columns and their wrapping. The panels follow on their own (they are
+        placed relative to the window). No image work, no widget rebuilt."""
         global WIN_W, WIN_H
-        self._resize_job = None
+        self._live_job = None
         w, h = self.winfo_width(), self.winfo_height()
-        if w < 2 or h < 2 or (w, h) == (WIN_W, WIN_H):
+        if w < 2 or h < 2:
             return
-        WIN_W, WIN_H = max(w, self._min_w), max(h, self._min_h)
+        w, h = max(w, self._min_w), max(h, self._min_h)
+        if (w, h) == (WIN_W, WIN_H):
+            return
+        WIN_W, WIN_H = w, h
         self._update_panel_visibility()
-
         self._bg_canvas.configure(width=WIN_W, height=WIN_H)
-        self._draw_bg()
-        self._show_bg_image(self._bg_current)
+        self._bg_canvas.coords(self._bg_frame, 0, 0, WIN_W - 1, WIN_H - 1)
         self._layout_nav()
         self._hdr_regions["gear"] = (WIN_W - self._px(36), self._px(2),
                                      WIN_W - self._px(2), self._px(34))
         self._draw_gear()
         self._pb_width = max(self._px(60), WIN_W - self._px(400) - self._px(40))
         self._layout_footer()
-
         self._news_column_widths()
         self._place_news_columns()
-        self._render_featured(*self._feat_render_args)
-        self._render_patch_notes(*self._patch_render_args)
+
+    def _apply_resize(self):
+        """The size has settled: finish the layout, then the costly part --
+        the background drawn for this size (its animation restarted) -- and
+        remember the size for the next start."""
+        if getattr(self, "_live_job", None) is not None:
+            try:
+                self.after_cancel(self._live_job)
+            except tk.TclError:
+                pass
+            self._live_job = None
+        self._resize_job = None
+        self._resizing = False
+        self._live_resize()
+        self._stretch_lists()
+        self._rewrap_news()
+        if getattr(self, "_bg_size", None) != (WIN_W, WIN_H):
+            self._draw_bg()
+        else:
+            self._bg_canvas.itemconfigure("bg_image", state="normal")
+            if self._cfg.get("animated_background", True) \
+                    and getattr(self, "_bg_anim", None) is None:
+                self._start_bg_animation()
+        self._show_bg_image(self._bg_current)
 
         size = {"width": WIN_W, "height": WIN_H}
         if (self._cfg.get("window") or {}) != size:
             self._cfg = update_config(lambda c: c.__setitem__("window", size))
+
+    def _list_stretch(self, canvas, item):
+        """A scrolling list's <Configure> handler: its rows are as wide as
+        the list. While the window is being dragged the rows keep their width
+        -- stretching hundreds of rows at every step of a drag is what made
+        it lag -- and they reflow once when the size settles (_apply_resize).
+        ``item`` returns the canvas window holding the rows, or None."""
+        def on_configure(event):
+            window = item()
+            if window is None:
+                return
+            if getattr(self, "_resizing", False):
+                self._stretch_pending[canvas] = item
+                return
+            canvas.itemconfigure(window, width=event.width)
+        return on_configure
+
+    def _stretch_lists(self):
+        """After a drag: every list that waited takes its final width."""
+        pending, self._stretch_pending = self._stretch_pending, {}
+        for canvas, item in pending.items():
+            try:
+                window = item()
+                if window is not None and canvas.winfo_exists():
+                    canvas.itemconfigure(window, width=canvas.winfo_width())
+            except tk.TclError:
+                pass
+
+    def _rewrap_news(self):
+        """The News text wrapped to the columns' current widths, in place:
+        cheaper than drawing the lists again, and the scroll position stays.
+        (A post's text box wraps by itself and fits its own height.)"""
+        widths = {"ann": self._news_wrap("ann"), "patch": self._news_wrap("patch")}
+        for key, width in widths.items():
+            for label in getattr(self, "_acc_wraps", {}).get(key, ()):
+                try:
+                    label.configure(wraplength=width)
+                except tk.TclError:
+                    pass
+
+    def _news_wrap(self, key) -> int:
+        if key == "ann":
+            return max(self._px(200), self._news_left_w - self._px(70))
+        return max(self._px(160), self._news_right_w - self._px(60))
 
     # ── news panel ───────────────────────────────────────────────────────────
 
@@ -5281,9 +5395,9 @@ class EqUpdaterApp(tk.Tk):
         win = canvas.create_window((0, 0), window=inner, anchor="nw")
         inner.bind("<Configure>",
                    lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.bind("<Configure>",
-                    lambda e: canvas.itemconfigure(win, width=e.width))
+        canvas.bind("<Configure>", self._list_stretch(canvas, lambda: win))
         self._acc_canvas = {**getattr(self, "_acc_canvas", {}), key: canvas}
+        wraps = self._acc_wraps.setdefault(key, [])
 
         for item in entries:
             iid = str(item.get("id", ""))
@@ -5298,6 +5412,7 @@ class EqUpdaterApp(tk.Tk):
                              wraplength=wrap_w, justify="left", anchor="w",
                              cursor="hand2")
             title.pack(fill="x")
+            wraps.append(title)
             meta = []
             if item.get("author"):
                 meta.append(tr("by {author}", author=item["author"]))
@@ -5322,10 +5437,11 @@ class EqUpdaterApp(tk.Tk):
                              fg=C_TEXT_DIM, bg=C_PANEL, anchor="w").pack(
                                  fill="x", pady=(self._px(6), 0))
                 elif item.get("_error"):
-                    tk.Label(entry, text=item["_error"], font=self._font(9),
-                             fg=C_ERR, bg=C_PANEL, wraplength=wrap_w,
-                             justify="left", anchor="w").pack(
-                                 fill="x", pady=(self._px(6), 0))
+                    err = tk.Label(entry, text=item["_error"], font=self._font(9),
+                                   fg=C_ERR, bg=C_PANEL, wraplength=wrap_w,
+                                   justify="left", anchor="w")
+                    err.pack(fill="x", pady=(self._px(6), 0))
+                    wraps.append(err)
                 elif body.strip():
                     self._news_text(entry, body, item.get("links") or [])
                 if item.get("url"):
@@ -5398,12 +5514,14 @@ class EqUpdaterApp(tk.Tk):
             pass
 
     def _news_message(self, f, text, wrap_w, *, error=False, bottom=False):
-        tk.Label(f, text=text, font=self._font(8 if bottom else 10),
-                 fg=C_ERR if error else C_TEXT_DIM, bg=C_PANEL,
-                 wraplength=wrap_w, justify="left", anchor="w").pack(
-                     side="bottom" if bottom else "top", fill="x",
-                     padx=self._px(16),
-                     pady=(0, self._px(4)) if bottom else self._px(16))
+        label = tk.Label(f, text=text, font=self._font(8 if bottom else 10),
+                         fg=C_ERR if error else C_TEXT_DIM, bg=C_PANEL,
+                         wraplength=wrap_w, justify="left", anchor="w")
+        label.pack(side="bottom" if bottom else "top", fill="x",
+                   padx=self._px(16),
+                   pady=(0, self._px(4)) if bottom else self._px(16))
+        key = "ann" if f is self._feat_frame else "patch"
+        self._acc_wraps.setdefault(key, []).append(label)
 
     # ── Announcements ────────────────────────────────────────────────────────
 
@@ -5418,6 +5536,7 @@ class EqUpdaterApp(tk.Tk):
         itself is read, it is shown alone."""
         self._feat_render_args = (post, loading, error, note)
         self._acc_remember("ann")
+        self._acc_wraps = {**getattr(self, "_acc_wraps", {}), "ann": []}
         f = self._feat_frame
         for w in f.winfo_children():
             w.destroy()
@@ -5426,7 +5545,7 @@ class EqUpdaterApp(tk.Tk):
         st = self._ann()
         self._news_header(f, tr("ANNOUNCEMENTS"), self._load_featured,
                           loading=loading or st["loading"])
-        wrap_w = max(self._px(200), self._news_left_w - self._px(70))
+        wrap_w = self._news_wrap("ann")
         if error or note:
             text = (tr("{error} · showing cached content", error=error) if error
                     else tr("{error} · showing the news feed instead",
@@ -5615,6 +5734,7 @@ class EqUpdaterApp(tk.Tk):
         notes; the newest is open by default."""
         self._patch_render_args = (items, loading, error)
         self._acc_remember("patch")
+        self._acc_wraps = {**getattr(self, "_acc_wraps", {}), "patch": []}
         f = self._patch_frame
         for w in f.winfo_children():
             w.destroy()
@@ -5623,7 +5743,7 @@ class EqUpdaterApp(tk.Tk):
         self._news_header(
             f, tr("CHANGELOG"), self._load_patch_notes,
             loading=loading)
-        wrap_w = max(self._px(160), self._news_right_w - self._px(60))
+        wrap_w = self._news_wrap("patch")
         if error:
             self._news_message(f, tr("{error} · showing cached content",
                                      error=error), wrap_w, bottom=True)
@@ -5674,8 +5794,7 @@ class EqUpdaterApp(tk.Tk):
         self._tweaks_inner.bind(
             "<Configure>",
             lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.bind("<Configure>",
-                    lambda e: canvas.itemconfigure(window, width=e.width))
+        canvas.bind("<Configure>", self._list_stretch(canvas, lambda: window))
 
         bar = tk.Frame(outer, bg=C_PANEL)
         bar.place(relx=1.0, x=-self._px(16), y=self._px(3), anchor="ne")
@@ -6190,8 +6309,7 @@ class EqUpdaterApp(tk.Tk):
                                         anchor="nw")
         # Stretch rows to the full canvas width so right-side controls
         # (Ignore updates) sit flush against the scrollbar.
-        canvas.bind("<Configure>",
-                    lambda e: canvas.itemconfigure(mods_win, width=e.width))
+        canvas.bind("<Configure>", self._list_stretch(canvas, lambda: mods_win))
         canvas.configure(yscrollcommand=sb.set)
         sb.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
@@ -7260,8 +7378,7 @@ class EqUpdaterApp(tk.Tk):
         self._addons_canvas = canvas
         self._addons_win    = None
         canvas.bind("<Configure>",
-                    lambda e: self._addons_win is not None
-                    and canvas.itemconfigure(self._addons_win, width=e.width))
+                    self._list_stretch(canvas, lambda: self._addons_win))
         canvas.configure(yscrollcommand=sb.set)
         sb.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
@@ -7341,8 +7458,7 @@ class EqUpdaterApp(tk.Tk):
         self._mpq_canvas = canvas
         self._mpq_win    = None
         canvas.bind("<Configure>",
-                    lambda e: self._mpq_win is not None
-                    and canvas.itemconfigure(self._mpq_win, width=e.width))
+                    self._list_stretch(canvas, lambda: self._mpq_win))
         canvas.configure(yscrollcommand=sb.set)
         sb.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)

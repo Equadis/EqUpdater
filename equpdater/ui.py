@@ -384,21 +384,32 @@ class FontManager:
             self.apply_tree(child)
 
 
+#: The decoded, darkened source of cover_background, by (path, file time,
+#: darken): a resize draws the background again, and reading and darkening
+#: the file was nearly half of that.
+_COVER_SOURCES: dict = {}
+
+
 def cover_background(path: str, width: int, height: int, *, darken: float = 0.92):
     """Return a Pillow image cover-cropped to ``width`` × ``height``."""
     if Image is None or not path or not os.path.exists(path):
         return None
-    with Image.open(path) as src:
-        src = src.convert("RGB")
-        scale = max(width / src.width, height / src.height)
-        size = (max(1, round(src.width * scale)), max(1, round(src.height * scale)))
-        img = src.resize(size, Image.Resampling.LANCZOS)
-        left = max(0, (img.width - width) // 2)
-        top = max(0, (img.height - height) // 2)
-        img = img.crop((left, top, left + width, top + height))
+    key = (path, os.path.getmtime(path), darken)
+    src = _COVER_SOURCES.get(key)
+    if src is None:
+        with Image.open(path) as raw_src:
+            src = raw_src.convert("RGB")
+        # Darkening commutes with scaling, so it is done once, here.
         if darken != 1.0 and ImageEnhance is not None:
-            img = ImageEnhance.Brightness(img).enhance(darken)
-        return img.copy()
+            src = ImageEnhance.Brightness(src).enhance(darken)
+        _COVER_SOURCES.clear()            # one background at a time
+        _COVER_SOURCES[key] = src
+    scale = max(width / src.width, height / src.height)
+    size = (max(1, round(src.width * scale)), max(1, round(src.height * scale)))
+    img = src.resize(size, Image.Resampling.LANCZOS)
+    left = max(0, (img.width - width) // 2)
+    top = max(0, (img.height - height) // 2)
+    return img.crop((left, top, left + width, top + height))
 
 
 def photo_image(image, master=None):
