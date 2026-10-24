@@ -21,9 +21,11 @@
 - [**Linux x86_64**](https://github.com/Equadis/EqUpdater/releases/latest/download/EqUpdater-Linux-x86_64.AppImage) — `EqUpdater-Linux-x86_64.AppImage`
 - [**Release page**](https://github.com/Equadis/EqUpdater/releases/latest) — release notes and every version
 
-These links always download the newest release. The release page has the
-same files with the version in their names (`EqUpdater-vX.Y.Z-Windows.exe`,
-`EqUpdater-vX.Y.Z-Linux-x86_64.AppImage`).
+These links always download the newest release. The current one is
+**v2.1.2**:
+[`EqUpdater-v2.1.2-Windows.exe`](https://github.com/Equadis/EqUpdater/releases/download/v2.1.2/EqUpdater-v2.1.2-Windows.exe) ·
+[`EqUpdater-v2.1.2-Linux-x86_64.AppImage`](https://github.com/Equadis/EqUpdater/releases/download/v2.1.2/EqUpdater-v2.1.2-Linux-x86_64.AppImage).
+The release page has every version.
 
 Nothing else is needed: no Python, no build tools.
 
@@ -218,13 +220,16 @@ confirmed, and skips the rest.
   Sign In itself.
 
 ### News
-- Announcements: the newest topic in OctoWoW's
-  [Announcements forum](https://octowow.st/forum/viewforum.php?f=2), with
-  its opening post; while the forum is unreadable, OctoWoW's public news
-  feed (`news.json`) instead.
+- Announcements: every topic in OctoWoW's
+  [Announcements forum](https://octowow.st/forum/viewforum.php?f=2), newest
+  first, ten at a time with **Load more**. The newest is open; click any
+  title to open or close its post. While the forum is unreadable, OctoWoW's
+  public news feed (`news.json`) stands in.
 - Changelog: the newest topics in the
   [Patch Notes and Changelog forum](https://octowow.st/forum/viewforum.php?f=4),
-  each with its date, a preview of its opening post and a link to it.
+  each opening to its full patch notes; the newest is open.
+- Links in posts can be clicked, and **Open in Browser ↗** opens the topic
+  on the forum.
 - Both are read once at launch, and again when you press refresh.
 - If the forum cannot be read, the News tab says why and keeps the last news
   it received.
@@ -235,6 +240,8 @@ confirmed, and skips the rest.
 - Fonts: **Arial** (default), **Friz Quadrata** or **OpenDyslexic**, switched
   live in Settings. All three come with EqUpdater; nothing to install.
 - Dark title bar to match (Windows).
+- Resizable, and it remembers its size. Bigger shows more news; at its
+  smallest it is just the tabs and the PLAY/UPDATE buttons.
 - In your language: English, Deutsch, Русский, 中文 (简体), Español or
   Português (BR). The first launch asks; after that it is **Tweaks →
   Language**, which sets both the game's language and EqUpdater's.
