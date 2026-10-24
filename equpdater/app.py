@@ -54,9 +54,10 @@ from .hashing import files_hash, folder_hash
 from .planner import (Component, plan, skipped_notably,
                       updatable)
 from .states import Action, Plan, Status
-from .news import (ANNOUNCEMENTS_TOPIC_ID, PATCH_NOTES_TOPIC_ID, ForumError,
-                   fetch_news_feed, fetch_newest_post_in_topic,
-                   fetch_topic_posts, is_challenge_page)
+from .news import (ANNOUNCEMENTS_FORUM_ID, CHANGELOG_FORUM_ID,
+                   ForumBlockedError, ForumError, fetch_first_post,
+                   fetch_latest_post, fetch_news_feed, fetch_topic_list,
+                   is_challenge_page)
 from .ui import (AnimatedBackground, FontManager, GradientButton, prepare_fonts,
                  GradientPalette, apply_edge_fades, cover_background,
                  BackdropCanvas, blend, edge_fade_layers, photo_image,
@@ -3933,25 +3934,72 @@ def _news_open(req, timeout):
                           allowed_hosts={"octowow.st"})
 
 
+#: How long a Changelog topic's opening post is kept before it is read
+#: again (a patch note may be corrected after it is posted).
+NEWS_FIRST_POST_TTL = 24 * 3600
+
+
 def fetch_patch_notes() -> list:
-    """The newest posts of OctoWoW's patch notes thread (topic 2816), newest
-    first, each with its own date, author, text and link. One request.
-    Raises news.ForumError, naming the stage that failed."""
-    return [post.to_item() for post in fetch_topic_posts(
-        PATCH_NOTES_TOPIC_ID, NEWS_CHANGELOG_COUNT,
-        opener=_news_open, user_agent=UA, timeout=NEWS_TIMEOUT)]
+    """The newest topics of OctoWoW's Patch Notes and Changelog forum (f=4),
+    newest-started first: title, start date, author and link from the
+    listing, and each topic's *opening* post as its preview.
+
+    The listing is one request. An opening post is read once and kept for
+    a day (config "news_first_posts", by topic id), so a refresh is normally
+    the listing alone. A topic page that cannot be read leaves that entry
+    with its last known preview, or none; a DDoS check on one stops the
+    rest from being asked. Raises news.ForumError when the listing itself
+    cannot be read."""
+    rows = fetch_topic_list(CHANGELOG_FORUM_ID, NEWS_CHANGELOG_COUNT,
+                            opener=_news_open, user_agent=UA,
+                            timeout=NEWS_TIMEOUT)
+    cache = load_config().get("news_first_posts", {})
+    now = time.time()
+    fresh, items, blocked = {}, [], False
+    for row in rows:
+        key = str(row.topic_id)
+        entry = cache.get(key) or {}
+        body = entry.get("body")
+        if body is None or now - entry.get("timestamp", 0) >= NEWS_FIRST_POST_TTL:
+            if not blocked:
+                try:
+                    body = fetch_first_post(row, opener=_news_open,
+                                            user_agent=UA,
+                                            timeout=NEWS_TIMEOUT).content
+                    fresh[key] = {"body": body, "timestamp": now}
+                except ForumBlockedError as exc:
+                    blocked = True
+                    log(f"Changelog: {exc}", "dim")
+                except ForumError as exc:
+                    log(f"Changelog: {exc}", "dim")
+        item = row.to_item()
+        if body:
+            item["body"] = item["html"] = body
+        items.append(item)
+
+    shown = {str(r.topic_id) for r in rows}
+
+    def remember(c):
+        kept = {k: v for k, v in (c.get("news_first_posts") or {}).items()
+                if k in shown}
+        kept.update(fresh)
+        c["news_first_posts"] = kept
+    if fresh or set(cache) - shown:
+        update_config(remember)
+    return items
 
 
 def fetch_featured_post() -> dict | None:
-    """The newest post in OctoWoW's announcements thread (topic 2848). When
-    the forum cannot be read -- above all while it shows apps its DDoS check
-    -- the first item of the public news.json instead (as OctoLauncher reads
+    """The newest-started topic of OctoWoW's Announcements forum (f=2) with
+    its opening post -- not a pinned topic, and never a reply. When the
+    forum cannot be read -- above all while it shows apps its DDoS check --
+    the newest item of the public news.json instead (as OctoLauncher reads
     it; fetched directly, no launcher needed), or None when that feed is
     validly empty. If both fail, the forum's error is raised: it is the
     reason the panel cannot update."""
     try:
-        return fetch_newest_post_in_topic(
-            ANNOUNCEMENTS_TOPIC_ID, opener=_news_open, user_agent=UA,
+        return fetch_latest_post(
+            ANNOUNCEMENTS_FORUM_ID, opener=_news_open, user_agent=UA,
             timeout=NEWS_TIMEOUT).to_item()
     except ForumError as forum_exc:
         log(f"Announcements: {forum_exc}; trying news.json", "dim")

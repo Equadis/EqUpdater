@@ -1,25 +1,27 @@
 """OctoWoW forum news for the News tab: Announcements and the Changelog.
 
-Both come straight from the public phpBB forum:
+Both come straight from the public phpBB forum, one topic per
+announcement or patch:
 
-    Announcements  topic 2848  https://octowow.st/forum/viewtopic.php?t=2848
-    Changelog      topic 2816  https://octowow.st/forum/viewtopic.php?t=2816
+    Announcements  forum 2  https://octowow.st/forum/viewforum.php?f=2
+    Changelog      forum 4  https://octowow.st/forum/viewforum.php?f=4
 
-Both are threads staff post into, one post per announcement or patch, so
-both are read newest-first: phpBB is asked for the topic sorted by time,
-descending (``sk=t&sd=d``), one request. The Announcements panel shows the
-newest post (``fetch_newest_post_in_topic``); the Changelog lists the newest
-few (``fetch_topic_posts``), each with its own date, author and link.
+The Announcements panel shows the newest-started topic of forum 2 with its
+opening post (``fetch_latest_post``); the Changelog lists the newest topics
+of forum 4 (``fetch_topic_list``), each with its opening post as a preview.
+
+**Never a topic's newest posts.** From 2026-10-09 to 2026-10-24 the panels
+read one topic each (t=2848, t=2816) sorted newest-post-first, taking a
+staff post per announcement for granted. Players reply in those topics, so
+the panels showed replies ("We patiently wait for Thorn Gorge fix...") as
+announcements and patch notes. A topic is read from its first page in
+phpBB's default order, and only its first post is used.
 
 **news.json** (https://octowow.st/news.json, the public feed OctoLauncher
 reads, generated from the forum) is the Announcements' fallback while the
 forum cannot be read -- typically while it shows apps its DDoS check.
 ``parse_news_feed`` validates it against the launcher's NewsFeedSchema; a
 feed that does not match is an error, never content.
-
-The forum-listing readers below (``fetch_forum_topics``, ``fetch_latest_post``,
-``fetch_topic_list``) are what the panels used before the threads; they
-remain, tested, but nothing on screen uses them now.
 
 Two steps, as a person reading the forum would take them:
 
@@ -32,7 +34,9 @@ Two steps, as a person reading the forum would take them:
 2. ``fetch_first_post`` opens a topic and returns its first post -- the
    announcement itself -- never the replies beneath it.
 
-The Changelog list is ``fetch_topic_list(4)``: one listing, nothing else.
+The Changelog list is ``fetch_topic_list(4)``; its previews are each
+topic's ``fetch_first_post`` (the app keeps them a day, so a refresh is
+normally the listing alone).
 
 The approach follows OctoBot's ``octotracker/announcements.py``: ``a.topictitle``
 links, the topic id from ``t=``, the first ``.post``'s ``.content`` with quotes
@@ -68,11 +72,9 @@ from urllib.parse import parse_qs, urljoin, urlparse
 from .i18n import N_
 
 BASE = "https://octowow.st/forum/"
+#: OctoWoW's Announcements forum: one topic per announcement.
 ANNOUNCEMENTS_FORUM_ID = 2
-#: OctoWoW's announcements thread; the panel shows its newest post.
-ANNOUNCEMENTS_TOPIC_ID = 2848
-#: OctoWoW's patch notes thread; the Changelog lists its newest posts.
-PATCH_NOTES_TOPIC_ID = 2816
+#: OctoWoW's Patch Notes and Changelog forum: one topic per patch.
 CHANGELOG_FORUM_ID = 4
 #: The public news feed OctoLauncher reads (generated from the forum; no
 #: sign-in). The Announcements' fallback while the forum is unreadable.
@@ -150,17 +152,6 @@ def topic_url(topic_id: int, base: str = BASE) -> str:
     """The canonical address of a topic: no ``sid``, no forum id, page one,
     so its first post is the topic's opening post."""
     return f"{base}viewtopic.php?t={int(topic_id)}"
-
-
-def newest_first_topic_url(topic_id: int, base: str = BASE) -> str:
-    """A topic's first page with its posts sorted by time, newest first:
-    the first post on it is the topic's latest."""
-    return f"{base}viewtopic.php?t={int(topic_id)}&sk=t&sd=d"
-
-
-def post_url(post_id: int, base: str = BASE) -> str:
-    """The canonical address of one post, wherever it sits in its topic."""
-    return f"{base}viewtopic.php?p={int(post_id)}#p{int(post_id)}"
 
 
 def topic_id_from_href(href: str, base: str = BASE) -> int | None:
@@ -603,64 +594,6 @@ def fetch_topic_list(forum_id: int, limit: int, *, opener, user_agent: str,
     """The ``limit`` newest-started topics of a forum. One request."""
     return fetch_forum_topics(forum_id, opener=opener, user_agent=user_agent,
                               timeout=timeout)[:max(1, int(limit))]
-
-
-def fetch_newest_post_in_topic(topic_id: int, *, opener, user_agent: str,
-                               timeout: int = 8, base: str = BASE) -> ForumPost:
-    """The newest post of a topic -- an announcements thread -- with its
-    own date, author and link (titled as in fetch_topic_posts). One request."""
-    return fetch_topic_posts(topic_id, 1, opener=opener, user_agent=user_agent,
-                             timeout=timeout, base=base)[0]
-
-
-_POST_START = re.compile(r'<div\b[^>]*\bid="p\d+"[^>]*>')
-
-
-def parse_topic_posts(html: str) -> list:
-    """Every post on a topic page, in page order, as (post id, subject,
-    author, created, content, is_reply). Each post is read by the same
-    parser as a topic's opening post, from where it starts."""
-    html = html or ""
-    starts = [m.start() for m in _POST_START.finditer(html)]
-    out = []
-    for i, start in enumerate(starts):
-        end = starts[i + 1] if i + 1 < len(starts) else len(html)
-        p = _FirstPostParser()
-        p.feed(html[start:end])
-        p.close()
-        if not p.found:
-            continue
-        raw = " ".join((p.subject or "").split())
-        reply = bool(re.match(r"^Re:", raw, re.I))
-        subject = re.sub(r"^Re:\s*", "", raw, flags=re.I)
-        author = " ".join((p.author or "").split()) or None
-        out.append((p.post_id, subject, author, parse_forum_date(p.time),
-                    p.content(), reply))
-    return out
-
-
-def fetch_topic_posts(topic_id: int, limit: int, *, opener, user_agent: str,
-                      timeout: int = 8, base: str = BASE) -> list[ForumPost]:
-    """The ``limit`` newest posts of a topic -- a patch notes thread --
-    newest first. One request. A reply's own subject is only "Re: <topic>",
-    so it is titled by its first line instead, and the rest is its body."""
-    url = newest_first_topic_url(topic_id, base)
-    html = _get(url, f"topic {topic_id}", opener=opener,
-                user_agent=user_agent, timeout=timeout)
-    posts = parse_topic_posts(html)
-    if not posts:
-        raise ForumError(f"topic {topic_id} parse", url,
-                         "no post found on the topic page",
-                         short=N_("the forum topic could not be read"))
-    out = []
-    for post_id, subject, author, created, content, reply in posts[:max(1, int(limit))]:
-        title, body = subject, content
-        if reply and content:
-            first, _, rest = content.partition("\n")
-            title, body = first.strip()[:90] or subject, rest.strip()
-        link = post_url(post_id, base) if post_id else topic_url(topic_id, base)
-        out.append(ForumPost(topic_id, title, author, _iso(created), link, body))
-    return out
 
 
 # ──────────────────────────────────────────────────────────────────────────────

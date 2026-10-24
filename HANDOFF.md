@@ -124,7 +124,7 @@ but the owner prefers not to.
 - OctoLogin (★ recommended mod, `mods/OctoLogin.dll`, loads last).
 - Custom git mods (Mods -> + Add custom git mod).
 - Sound Channels tweak (12-64); Tweaks list scrolls.
-- News from forum threads t=2848 / t=2816 with `news.json` fallback.
+- News from forums f=2 / f=4 (opening posts only) with `news.json` fallback.
 - Visible addon failures; addon list keeps its place; case-safe AddOns on
   Linux; Unicode-safe installer shortcuts; host font stack on Linux.
 - Default game folder `~/Games/OctoWoW`; `Config.wtf` no longer gets a realm.
@@ -488,13 +488,22 @@ itself. Tests: `tests/test_git_hosts.py` (TestArchiveFallback).
 
 `equpdater/news.py` owns fetching/parsing; `app.py` only renders.
 
-- **Announcements** = the newest post in forum thread **t=2848**
-  (`fetch_newest_post_in_topic`, one request, `sk=t&sd=d`). If the forum
-  cannot be read (typically the DDoS page), the newest item of
-  **`https://octowow.st/news.json`** (OctoLauncher's public feed, validated
-  against its schema) is shown instead, with a note saying why.
-- **Changelog** = the newest `NEWS_CHANGELOG_COUNT` (8) posts in thread
-  **t=2816** (`fetch_topic_posts`), each with its date, author and link.
+- **Announcements** = the newest-started topic of forum **f=2** with its
+  opening post (`fetch_latest_post`: the listing, then that topic's first
+  page). If the forum cannot be read (typically the DDoS page), the newest
+  item of **`https://octowow.st/news.json`** (OctoLauncher's public feed,
+  validated against its schema) is shown instead, with a note saying why.
+- **Changelog** = the newest `NEWS_CHANGELOG_COUNT` (8) topics of forum
+  **f=4** (`fetch_topic_list`), each with its opening post as a preview
+  (`fetch_first_post`, kept a day in config `news_first_posts`, so a
+  refresh is normally the listing alone; a challenged topic page stops the
+  rest and leaves titles).
+- **Never a topic's newest posts.** 2026-10-09..24 the panels read threads
+  t=2848 / t=2816 newest-post-first and showed players' replies as news.
+  Topic rows come only from `a.topictitle`; last-post, mobile last-post and
+  pagination blocks are skipped (`_ForumListParser._IGNORE`); a topic is
+  read from its first page, first post only. Regression tests:
+  `TestTopicTitlesNotLatestPosts`, `TestNewsPanelsReadTheForums`.
 - Read once at launch and on each refresh button; never on tab switch, no
   timer. The last good content is cached in the config and kept on screen
   when a refresh fails; the failure is shown and logged.
@@ -536,8 +545,8 @@ installed commit, latest commit): a definite answer is kept, and "unknown"
 is retried after an hour or on a forced refresh. Verified live: the old UA
 is challenged on all three kinds of URL, and the new one is not.
 
-What EqUpdater requests from octowow.st: forum t=2848 and t=2816 (launch,
-refresh), `news.json` (fallback), `/api/addons.json` (daily), Gitea API
+What EqUpdater requests from octowow.st: forum listings f=2 and f=4 and
+the newest topics' first pages (launch, refresh), `news.json` (fallback), `/api/addons.json` (daily), Gitea API
 commits/compare/releases (cached 1 h), repository archives (install/update;
 not blocked), `https://octowow.st/` (Login Doctor). User-Agent
 `EqUpdater/<version> Python-urllib/<x.y>` (`branding.USER_AGENT`).

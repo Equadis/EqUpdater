@@ -218,12 +218,13 @@ confirmed, and skips the rest.
   Sign In itself.
 
 ### News
-- Announcements: the newest post in OctoWoW's announcements thread
-  ([t=2848](https://octowow.st/forum/viewtopic.php?t=2848)); while the forum
-  is unreadable, OctoWoW's public news feed (`news.json`) instead.
-- Changelog: the newest posts in the patch notes thread
-  ([t=2816](https://octowow.st/forum/viewtopic.php?t=2816)), each with its
-  own date and a link to the post.
+- Announcements: the newest topic in OctoWoW's
+  [Announcements forum](https://octowow.st/forum/viewforum.php?f=2), with
+  its opening post; while the forum is unreadable, OctoWoW's public news
+  feed (`news.json`) instead.
+- Changelog: the newest topics in the
+  [Patch Notes and Changelog forum](https://octowow.st/forum/viewforum.php?f=4),
+  each with its date, a preview of its opening post and a link to it.
 - Both are read once at launch, and again when you press refresh.
 - If the forum cannot be read, the News tab says why and keeps the last news
   it received.

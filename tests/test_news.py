@@ -7,6 +7,7 @@ whose opening post is followed by replies. Those are the traps the reader has
 to walk around; the fetch tests check that every failure names its stage.
 """
 
+import json
 import os
 import sys
 import unittest
@@ -334,128 +335,6 @@ class TestFetch(unittest.TestCase):
         self.assertFalse(hasattr(news, "OCTONEWS_URL"))
 
 
-def thread_page_newest_first():
-    """Topic 2848 as phpBB serves it with sk=t&sd=d: the newest post first,
-    a reply ("Re: ...") by a staff member, then older posts."""
-    def post(pid, subject, author, when, body):
-        return f'''
-    <div id="p{pid}" class="post has-profile bg1">
-      <div class="inner"><div class="postbody"><div id="post_content{pid}">
-        <h3><a href="./viewtopic.php?p={pid}&amp;{SID}#p{pid}">{subject}</a></h3>
-        <p class="author"><span class="responsive-hide">by <strong>
-          <a href="./memberlist.php?u=2" class="username-coloured">{author}</a></strong>
-          &raquo; </span><time datetime="{when}">x</time></p>
-        <div class="content">{body}</div>
-        <div id="sig{pid}" class="signature">sig</div>
-      </div></div></div>
-    </div>'''
-    return ("<!DOCTYPE html><html><body id=\"phpbb\">"
-            "<h2 class=\"topic-title\"><a href=\"#\">Announcements</a></h2>"
-            + post(31010, "Re: Announcements", "Kestrel",
-                   "2026-10-09T12:00:00+00:00", "Realm restart at 18:00.<br>Thanks!")
-            + post(30500, "Re: Announcements", "Octo",
-                   "2026-10-01T09:00:00+00:00", "Older news.")
-            + post(28480, "Announcements", "Octo",
-                   "2026-06-01T09:00:00+00:00", "Thread opened.")
-            + "</body></html>")
-
-
-class TestAnnouncementsThread(unittest.TestCase):
-    """Announcements are the newest post in topic 2848."""
-
-    def test_newest_post_with_its_own_details(self):
-        site = FakeSite({"viewtopic.php?t=2848": thread_page_newest_first()})
-        item = news.fetch_newest_post_in_topic(2848, **kw(site)).to_item()
-        # A reply's subject is only "Re: Announcements": titled by its
-        # first line, the rest is the body.
-        self.assertEqual(item["title"], "Realm restart at 18:00.")
-        self.assertEqual(item["author"], "Kestrel")
-        self.assertEqual(item["date"], "2026-10-09T12:00:00+00:00")
-        self.assertEqual(item["body"], "Thanks!")
-        self.assertNotIn("sig", item["body"])
-        self.assertEqual(item["url"],
-                         "https://octowow.st/forum/viewtopic.php?p=31010#p31010")
-
-    def test_one_request_sorted_newest_first(self):
-        site = FakeSite({"viewtopic.php?t=2848": thread_page_newest_first()})
-        news.fetch_newest_post_in_topic(2848, **kw(site))
-        self.assertEqual(site.asked, [
-            "https://octowow.st/forum/viewtopic.php?t=2848&sk=t&sd=d"])
-        self.assertEqual(news.ANNOUNCEMENTS_TOPIC_ID, 2848)
-
-    def test_challenge_is_blocked_not_content(self):
-        site = FakeSite({"viewtopic.php?t=2848": CHALLENGE})
-        with self.assertRaises(news.ForumBlockedError) as cm:
-            news.fetch_newest_post_in_topic(2848, **kw(site))
-        self.assertEqual(cm.exception.stage, "topic 2848")
-
-    def test_a_page_with_no_post_is_an_error(self):
-        site = FakeSite({"viewtopic.php?t=2848": "<html><body>gone</body></html>"})
-        with self.assertRaises(news.ForumError) as cm:
-            news.fetch_newest_post_in_topic(2848, **kw(site))
-        self.assertEqual(cm.exception.stage, "topic 2848 parse")
-
-    def test_network_errors_name_the_stage(self):
-        with self.assertRaises(news.ForumError) as cm:
-            news.fetch_newest_post_in_topic(2848, **kw(FakeSite({})))
-        self.assertEqual(cm.exception.stage, "topic 2848")
-
-    def test_a_topic_page_still_yields_its_opening_post(self):
-        """parse_first_post is unchanged by the subject/id capture."""
-        page = topic_page(2600, "2026-09-23", PATCH_BODY)
-        author, _created, content = news.parse_first_post(page)
-        self.assertEqual(author, "Kestrel")
-        self.assertIn("Fixed Onyxia breath.", content)
-
-
-class TestPatchNotesThread(unittest.TestCase):
-    """The Changelog is the newest posts in topic 2816."""
-
-    def page(self):
-        def post(pid, subject, when, body):
-            return (f'<div id="p{pid}" class="post bg2"><div class="inner">'
-                    f'<h3><a href="#p{pid}">{subject}</a></h3>'
-                    f'<p class="author">by <a href="./memberlist.php?u=2" '
-                    f'class="username">Kestrel</a> <time datetime="{when}">x</time></p>'
-                    f'<div class="content">{body}</div></div></div>')
-        return ("<html><body>"
-                + post(30003, "Re: Patch Notes", "2026-10-08T16:00:00+00:00",
-                       "Patch 2026-10-08<br>Fixed Onyxia breath.<br>Mages: blink works.")
-                + post(30002, "Hotfix: Warden", "2026-10-02T10:00:00+00:00",
-                       "Warden false positives fixed.")
-                + post(30001, "Re: Patch Notes", "2026-09-30T16:00:00+00:00",
-                       "Patch 2026-09-30<br>Older fixes.")
-                + "</body></html>")
-
-    def test_newest_posts_in_order_with_their_own_links(self):
-        site = FakeSite({"viewtopic.php?t=2816": self.page()})
-        items = [p.to_item() for p in news.fetch_topic_posts(2816, 8, **kw(site))]
-        self.assertEqual(site.asked, [
-            "https://octowow.st/forum/viewtopic.php?t=2816&sk=t&sd=d"])
-        self.assertEqual([i["title"] for i in items],
-                         ["Patch 2026-10-08", "Hotfix: Warden", "Patch 2026-09-30"])
-        self.assertEqual(items[0]["body"], "Fixed Onyxia breath.\nMages: blink works.")
-        self.assertEqual(items[1]["body"], "Warden false positives fixed.")
-        self.assertEqual(items[0]["url"],
-                         "https://octowow.st/forum/viewtopic.php?p=30003#p30003")
-        self.assertEqual(items[0]["date"], "2026-10-08T16:00:00+00:00")
-        self.assertEqual(items[0]["author"], "Kestrel")
-        self.assertEqual(news.PATCH_NOTES_TOPIC_ID, 2816)
-
-    def test_limit(self):
-        site = FakeSite({"viewtopic.php?t=2816": self.page()})
-        self.assertEqual(len(news.fetch_topic_posts(2816, 2, **kw(site))), 2)
-
-    def test_challenge_and_empty_page(self):
-        with self.assertRaises(news.ForumBlockedError):
-            news.fetch_topic_posts(2816, 8, **kw(FakeSite({"t=2816": CHALLENGE})))
-        with self.assertRaises(news.ForumError) as cm:
-            news.fetch_topic_posts(2816, 8, **kw(FakeSite({"t=2816": "<html></html>"})))
-        self.assertEqual(cm.exception.stage, "topic 2816 parse")
-
-
-import json  # noqa: E402
-
 FEED_ITEM = {"id": "2026-10-08-ddos", "title": "DDoS Updates",
              "date": "2026-10-08", "body": "Mitigation is live.\nThanks!",
              "author": "Kestrel",
@@ -583,8 +462,8 @@ except ImportError:
 
 @unittest.skipUnless(HAVE_TK, "the app needs tkinter")
 class TestAnnouncementsFallbackOrder(unittest.TestCase):
-    """Topic 2848 first; news.json only when the forum fails; if both fail
-    the forum's error is raised and the panel keeps its cached post."""
+    """Forum 2 first; news.json only when the forum fails; if both fail the
+    forum's error is raised and the panel keeps its cached post."""
 
     def setUp(self):
         # The app's own news module: other test files reload the package,
@@ -594,7 +473,7 @@ class TestAnnouncementsFallbackOrder(unittest.TestCase):
         self.app, self.n = app, sys.modules["equpdater.news"]
         self.POST = self.n.ForumPost(2848, "Realm restart", "Kestrel",
                                      "2026-10-09T12:00:00+00:00",
-                                     "https://octowow.st/forum/viewtopic.php?p=1#p1", "b")
+                                     "https://octowow.st/forum/viewtopic.php?t=2848", "b")
 
     def run_with(self, forum, feed):
         from unittest import mock
@@ -612,7 +491,7 @@ class TestAnnouncementsFallbackOrder(unittest.TestCase):
             if isinstance(feed, Exception):
                 raise feed
             return feed
-        with mock.patch.object(app, "fetch_newest_post_in_topic", topic), \
+        with mock.patch.object(app, "fetch_latest_post", topic), \
                 mock.patch.object(app, "fetch_news_feed", news_feed):
             try:
                 return app.fetch_featured_post(), calls
@@ -620,7 +499,7 @@ class TestAnnouncementsFallbackOrder(unittest.TestCase):
                 return exc, calls
 
     def blocked(self):
-        return self.n.ForumBlockedError("topic 2848", "u", "challenge",
+        return self.n.ForumBlockedError("forum 2 listing", "u", "challenge",
                                       short="octowow.st is showing its "
                                             "DDoS-protection check to apps right now")
 
@@ -661,3 +540,206 @@ class TestAnnouncementsFallbackOrder(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Regression: topic titles, never latest-post links or replies (2026-10-24)
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# From 2026-10-09 the panels read one thread each newest-post-first, and
+# showed players' replies ("We patiently wait for Thorn Gorge fix...") as
+# patch notes. The rows below follow OctoWoW's live forum markup (2026-10-24):
+# a page-number list of viewtopic.php?t= links inside the row, the mobile
+# "Last post by" line, "View the latest post" and "Mark as read" links, and a
+# start date in text rather than a <time>.
+
+def live_row(tid, title, author, started, last_by, last_pid, pages=3,
+             latest_first=False):
+    latest = (f'''<div class="responsive-show" style="display: none;">
+      Last post by <a href="./memberlist.php?mode=viewprofile&amp;u=12438&amp;{SID}"
+        class="username">{last_by}</a> &laquo; <a href="./viewtopic.php?p={last_pid}&amp;{SID}#p{last_pid}"
+        title="Go to last post">Mon Oct 12, 2026 1:05 pm</a></div>''')
+    title_link = (f'<a href="./viewtopic.php?t={tid}&amp;{SID}" '
+                  f'class="topictitle">{title}</a><br />')
+    pagination = "".join(
+        f'<li><a href="./viewtopic.php?t={tid}&amp;{SID}&amp;start={10 * n}">{n + 1}</a></li>'
+        for n in range(pages))
+    head = latest + title_link if latest_first else title_link + latest
+    return f'''
+    <li class="row bg2">
+      <dl class="icon topic_read_hot">
+        <dt title="No unread posts"><div class="list-inner">
+          {head}
+          <span class="responsive-show left-box" style="display: none;">Replies: <strong>35</strong></span>
+          <div class="pagination"><ul>{pagination}</ul></div>
+          <div class="responsive-hide">
+            by <a href="./memberlist.php?mode=viewprofile&amp;u=60&amp;{SID}"
+                  class="username">{author}</a> &raquo; {started}
+          </div>
+          <a href="/forum/app.php/markread/topic/4/{tid}?hash=b4d0dbaa&amp;{SID}"
+             class="mark-topic-read is-read" title="Mark as read" data-topic-id="{tid}"></a>
+        </div></dt>
+        <dd class="posts">35 <dfn>Replies</dfn></dd>
+        <dd class="views">216154 <dfn>Views</dfn></dd>
+        <dd class="lastpost"><span><dfn>Last post </dfn>by
+          <a href="./memberlist.php?mode=viewprofile&amp;u=12438&amp;{SID}" class="username">{last_by}</a>
+          <a href="./viewtopic.php?p={last_pid}&amp;{SID}#p{last_pid}" title="Go to last post"><span
+             class="imageset icon_topic_latest" title="View the latest post">View the latest post</span></a>
+          <br />Mon Oct 12, 2026 1:05 pm</span></dd>
+      </dl>
+    </li>'''
+
+
+LIVE_CHANGELOG = ("<ul class=\"topiclist topics\">"
+                  + live_row(3087, "2026-10-24", "Archer", "Sat Oct 24, 2026 7:42 am",
+                             "Rook", 17501, pages=1)
+                  + live_row(2816, "2026-10-06", "Kestrel", "Tue Oct 06, 2026 4:54 am",
+                             "Covernl", 16964, pages=4, latest_first=True)
+                  + live_row(2730, "2026-09-30", "Kestrel", "Wed Sep 30, 2026 6:21 am",
+                             "Cinnamonspice", 17421)
+                  + "</ul>")
+
+LIVE_ANNOUNCEMENTS = ("<ul class=\"topiclist topics\">"
+                      + row("announce", 3, "Beta Test Info", "Kestrel",
+                            "2026-04-28T21:16:00+00:00", "Someone",
+                            "2026-10-23T08:00:00+00:00")
+                      + live_row(2848, "Blackwing Lair Arrives November 1st",
+                                 "Kestrel", "Thu Oct 08, 2026 9:00 am",
+                                 "PvPer", 17000)
+                      + live_row(3086, "Cross Realm Battlegrounds", "Kestrel",
+                                 "Sat Oct 24, 2026 7:37 am", "Fan", 17510, pages=1)
+                      + "</ul>")
+
+
+class TestTopicTitlesNotLatestPosts(unittest.TestCase):
+
+    def rows(self, html):
+        return news.parse_forum_topics(html, news.forum_url(4))
+
+    def test_only_the_title_link_makes_a_row(self):
+        rows = self.rows(LIVE_CHANGELOG)
+        self.assertEqual([(r.topic_id, r.title) for r in rows],
+                         [(3087, "2026-10-24"), (2816, "2026-10-06"),
+                          (2730, "2026-09-30")])
+        for r in rows:
+            self.assertEqual(r.url, news.topic_url(r.topic_id))
+            self.assertNotIn("p=", r.url)
+            self.assertNotIn("start=", r.url)
+
+    def test_the_starter_not_the_last_poster(self):
+        by_id = {r.topic_id: r for r in self.rows(LIVE_CHANGELOG)}
+        self.assertEqual(by_id[2816].author, "Kestrel")       # not Covernl
+        self.assertEqual(by_id[3087].author, "Archer")        # not Rook
+        self.assertEqual(by_id[2816].created_at.isoformat(),
+                         "2026-10-06T04:54:00+00:00")         # not Oct 12
+
+    def test_no_link_text_becomes_a_title(self):
+        titles = " ".join(r.title for r in self.rows(LIVE_CHANGELOG))
+        for junk in ("View the latest post", "Go to last post", "Mark as read",
+                     "Covernl", "Last post", "Replies"):
+            self.assertNotIn(junk, titles)
+        self.assertFalse(any(r.title.isdigit() for r in self.rows(LIVE_CHANGELOG)))
+
+    def test_latest_post_links_alone_are_not_rows(self):
+        only_latest = ('<ul><li class="row"><dl><dt><div class="list-inner">'
+                       '<a href="./viewtopic.php?p=17000#p17000" title="Go to last post">'
+                       'View the latest post</a></div></dt></dl></li></ul>')
+        self.assertEqual(self.rows(only_latest), [])
+
+
+def _topic_with_replies(tid, title, first_body, author="Kestrel"):
+    """A topic page: the opening post, then players' replies."""
+    return topic_page(tid, title, first_body, first_author=author)
+
+
+class TestNewsPanelsReadTheForums(unittest.TestCase):
+    """What the app's News panels fetch, through its own functions."""
+
+    def setUp(self):
+        from unittest import mock
+        from equpdater import app
+        self.app = app
+        self.cfg = {}
+
+        def update(mutator, *a, **k):
+            mutator(self.cfg)
+            return self.cfg
+        self.site = FakeSite({
+            "viewforum.php?f=4": LIVE_CHANGELOG,
+            "viewforum.php?f=2": LIVE_ANNOUNCEMENTS,
+            "viewtopic.php?t=3087": _topic_with_replies(3087, "2026-10-24",
+                                                        "Shared BG queues.", "Archer"),
+            "viewtopic.php?t=2816": _topic_with_replies(2816, "2026-10-06",
+                                                        "Cla'ckora can be summoned."),
+            "viewtopic.php?t=2730": _topic_with_replies(2730, "2026-09-30",
+                                                        "Inns rest only faction-aligned."),
+            "viewtopic.php?t=3086": _topic_with_replies(3086, "Cross Realm Battlegrounds",
+                                                        "Cross Realm BGs are live."),
+        })
+        self.patches = [
+            mock.patch.object(app, "_news_open", self.site.opener),
+            mock.patch.object(app, "load_config", lambda *a, **k: self.cfg),
+            mock.patch.object(app, "update_config", update),
+        ]
+        for p in self.patches:
+            p.start()
+
+    def tearDown(self):
+        for p in self.patches:
+            p.stop()
+
+    def test_changelog_is_forum_4_topics_with_their_opening_posts(self):
+        items = self.app.fetch_patch_notes()
+        self.assertEqual([i["title"] for i in items],
+                         ["2026-10-24", "2026-10-06", "2026-09-30"])
+        self.assertEqual(items[1]["body"], "Cla'ckora can be summoned.")
+        self.assertEqual(items[1]["author"], "Kestrel")
+        self.assertEqual(items[1]["url"], news.topic_url(2816))
+        for item in items:
+            self.assertNotIn("reply", item["body"])
+            self.assertNotIn("Replier", item["author"] or "")
+        self.assertEqual(self.site.asked[0], news.forum_url(4))
+        # Each topic opened on its first page, default order: no sk=t&sd=d.
+        self.assertEqual(self.site.asked[1:], [news.topic_url(t)
+                                               for t in (3087, 2816, 2730)])
+
+    def test_a_refresh_is_the_listing_alone(self):
+        self.app.fetch_patch_notes()
+        self.site.asked.clear()
+        items = self.app.fetch_patch_notes()
+        self.assertEqual(self.site.asked, [news.forum_url(4)])
+        self.assertEqual(items[0]["body"], "Shared BG queues.")
+
+    def test_an_old_preview_is_read_again(self):
+        self.app.fetch_patch_notes()
+        self.cfg["news_first_posts"]["2816"]["timestamp"] -= self.app.NEWS_FIRST_POST_TTL
+        self.site.asked.clear()
+        self.app.fetch_patch_notes()
+        self.assertEqual(self.site.asked, [news.forum_url(4), news.topic_url(2816)])
+
+    def test_a_challenged_topic_stops_the_rest(self):
+        self.site.pages["viewtopic.php?t=3087"] = (CHALLENGE, {"X-BF-Challenge": "pending"})
+        items = self.app.fetch_patch_notes()
+        self.assertEqual(self.site.asked, [news.forum_url(4), news.topic_url(3087)])
+        self.assertEqual([i["title"] for i in items],
+                         ["2026-10-24", "2026-10-06", "2026-09-30"])
+        self.assertTrue(all(i["body"] == "" for i in items))   # titles only
+
+    def test_a_challenged_listing_is_an_error(self):
+        self.site.pages["viewforum.php?f=4"] = (CHALLENGE, {"X-BF-Challenge": "pending"})
+        with self.assertRaises(self.app.ForumBlockedError):
+            self.app.fetch_patch_notes()
+
+    def test_announcement_is_forum_2s_newest_topic_opening_post(self):
+        item = self.app.fetch_featured_post()
+        self.assertEqual(item["title"], "Cross Realm Battlegrounds")
+        self.assertEqual(item["body"], "Cross Realm BGs are live.")
+        self.assertEqual(self.site.asked, [news.forum_url(2), news.topic_url(3086)])
+        self.assertNotIn("_note", item)        # the forum, not the fallback
+
+    def test_no_topic_is_read_newest_post_first(self):
+        self.app.fetch_featured_post()
+        self.app.fetch_patch_notes()
+        self.assertFalse([u for u in self.site.asked if "sk=t&" in u or "p=" in u])
+        self.assertFalse(hasattr(news, "fetch_topic_posts"))
+        self.assertFalse(hasattr(news, "ANNOUNCEMENTS_TOPIC_ID"))
