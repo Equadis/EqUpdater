@@ -194,7 +194,6 @@ STRINGS = {
         "Evita las caídas de fotogramas al morir el personaje causadas por el recálculo de durabilidad de la transfiguración en el servidor.",
     "Project page": "Página del proyecto",
     "REPOSITORY URL": "URL DEL REPOSITORIO",
-    "Read more": "Leer más",
     "Ready to update": "Listo para actualizar",
     "Recommended addon": "Addon recomendado",
     "Recommended values by aspect ratio: [4:3 = 90] [16:9 = 110] [21:9 = 150] [32:9 = 180]":
@@ -357,6 +356,7 @@ STRINGS = {
         "{dll} de {source} y {dll} de {other} son dos versiones del mismo mod. Solo se puede cargar una.\n\n¿Desactivar la de {other} y usar {source}?",
     "Load more": "Cargar más",
     "Loading…": "Cargando…",
+    "Open in Browser": "Abrir en el navegador",
     "Verify game files": "Verificar archivos del juego",
     "Verifying game files…": "Verificando archivos del juego…",
     "Verifying…": "Verificando…",

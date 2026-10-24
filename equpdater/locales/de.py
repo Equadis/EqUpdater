@@ -194,7 +194,6 @@ STRINGS = {
         "Verhindert Bildeinbrüche beim Tod des Charakters, die durch die serverseitige Neuberechnung der Haltbarkeit bei Transmogrifikation entstehen.",
     "Project page": "Projektseite",
     "REPOSITORY URL": "REPOSITORY-URL",
-    "Read more": "Weiterlesen",
     "Ready to update": "Bereit zum Aktualisieren",
     "Recommended addon": "Empfohlenes Addon",
     "Recommended values by aspect ratio: [4:3 = 90] [16:9 = 110] [21:9 = 150] [32:9 = 180]":
@@ -357,6 +356,7 @@ STRINGS = {
         "{dll} von {source} und {dll} von {other} sind zwei Versionen derselben Mod. Es kann nur eine geladen werden.\n\nDie von {other} ausschalten und {source} verwenden?",
     "Load more": "Mehr laden",
     "Loading…": "Wird geladen…",
+    "Open in Browser": "Im Browser öffnen",
     "Verify game files": "Spieldateien überprüfen",
     "Verifying game files…": "Spieldateien werden überprüft…",
     "Verifying…": "Prüfe…",

@@ -710,6 +710,17 @@ class TestNewsPanelsReadTheForums(unittest.TestCase):
         self.assertEqual(self.site.asked, [news.forum_url(4)])
         self.assertEqual(items[0]["body"], "Shared BG queues.")
 
+    def test_changelog_links_survive_the_cache(self):
+        self.site.pages["viewtopic.php?t=2816"] = topic_page(2816, "2026-10-06",
+                                                             LINK_BODY)
+        first = self.app.fetch_patch_notes()[1]
+        self.site.asked.clear()
+        again = self.app.fetch_patch_notes()[1]       # from the day's cache
+        self.assertEqual(self.site.asked, [news.forum_url(4)])
+        for item in (first, again):
+            self.assertEqual([item["body"][s:e] for s, e, _u in item["links"]],
+                             ["Click here to enter", "the rules"])
+
     def test_an_old_preview_is_read_again(self):
         self.app.fetch_patch_notes()
         self.cfg["news_first_posts"]["2816"]["timestamp"] -= self.app.NEWS_FIRST_POST_TTL
@@ -807,6 +818,60 @@ class TestForumPages(unittest.TestCase):
         self.assertEqual(cm.exception.stage, "forum 2 listing from 25 parse")
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+#  Links in a post
+# ──────────────────────────────────────────────────────────────────────────────
+
+LINK_BODY = ('The deadline is creeping   closer.<br><br>'
+             'Deadline: Sunday, October 29th<br><br>'
+             'Where: <a href="./viewtopic.php?t=2742&amp;sid=abc" class="postlink">'
+             'Click here to enter</a><br>'
+             'Rules: <a href="https://example.com/rules">the rules</a> and '
+             '<a href="javascript:alert(1)">not a link</a>.'
+             '<blockquote><div><cite>Q</cite><a href="https://quoted.example">'
+             'quoted link</a></div></blockquote>')
+
+
+class TestPostLinks(unittest.TestCase):
+
+    def parsed(self, body=LINK_BODY):
+        return news.parse_first_post_links(
+            topic_page(3010, "Transmog", body), news.topic_url(3010))
+
+    def test_links_keep_their_words_and_address(self):
+        author, _created, content, links = self.parsed()
+        self.assertEqual(author, "Kestrel")
+        spans = [(content[s:e], url) for s, e, url in links]
+        self.assertEqual(spans, [
+            ("Click here to enter",
+             "https://octowow.st/forum/viewtopic.php?t=2742&sid=abc"),
+            ("the rules", "https://example.com/rules"),
+        ])
+        # The text itself is as before: tidied, no marks left in it.
+        self.assertIn("The deadline is creeping closer.", content)
+        self.assertIn("Where: Click here to enter", content)
+        self.assertIn("not a link", content)               # words kept
+        self.assertNotIn("quoted link", content)            # quotes dropped
+        self.assertFalse(any(c in content for c in "\x01\x02\x03"))
+        self.assertEqual(news.parse_first_post(
+            topic_page(3010, "Transmog", LINK_BODY))[2], content)
+
+    def test_an_unclosed_link_is_text(self):
+        _a, _c, content, links = self.parsed('Go <a href="https://x.example">here')
+        self.assertEqual(content, "Go here")
+        self.assertEqual(links, ())
+
+    def test_fetched_posts_carry_their_links(self):
+        site = FakeSite({"t=3010": topic_page(3010, "Transmog", LINK_BODY)})
+        (row3010,) = [r for r in news.parse_forum_topics(
+            "<ul>" + row("", 3010, "Transmog", "Kestrel",
+                         "2026-10-19T08:00:00+00:00", "X",
+                         "2026-10-20T08:00:00+00:00") + "</ul>")]
+        item = news.fetch_first_post(row3010, **kw(site)).to_item()
+        self.assertEqual([item["body"][s:e] for s, e, _u in item["links"]],
+                         ["Click here to enter", "the rules"])
+
+
 @unittest.skipUnless(HAVE_TK, "no display")
 class TestAnnouncementsList(unittest.TestCase):
     """The Announcements panel is every announcement, newest first, ten at
@@ -887,8 +952,9 @@ class TestAnnouncementsList(unittest.TestCase):
             if not kids or not isinstance(kids[0], self.m.tk.Frame):
                 continue
             head = kids[0].winfo_children()
-            text = [k.cget("text") for k in kids[1:]
-                    if isinstance(k, self.m.tk.Label)]
+            text = [k.get("1.0", "end-1c") if isinstance(k, self.m.tk.Text)
+                    else k.cget("text") for k in kids[1:]
+                    if isinstance(k, (self.m.tk.Label, self.m.tk.Text))]
             rows.append((head[0].cget("text"), head[1].cget("text").endswith("▴"),
                          text[0] if text else ""))
         return rows, buttons
@@ -971,6 +1037,47 @@ class TestAnnouncementsList(unittest.TestCase):
         self.app._ann_more()                       # Load more too
         self.app.update()
         self.assertEqual(self.app._acc_canvas["ann"].canvasy(0), top)
+
+    def test_links_in_an_open_post_are_clickable(self):
+        self.site.pages["viewtopic.php?t=99"] = topic_page(99, "Topic 99", LINK_BODY)
+        opened = []
+        self.app._open_url, real = opened.append, self.app._open_url
+        try:
+            self.load()
+            self.app._ann_toggle("99")
+            self.app.update()
+            canvas = self.app._acc_canvas["ann"]
+            inner = canvas.nametowidget(canvas.itemcget(canvas.find_all()[0], "window"))
+            entry = next(e for e in inner.winfo_children()
+                         if e.winfo_children()
+                         and isinstance(e.winfo_children()[0], self.m.tk.Frame)
+                         and e.winfo_children()[0].winfo_children()[0]
+                         .cget("text") == "Topic 99")
+            txt = next(w for w in entry.winfo_children()
+                       if isinstance(w, self.m.tk.Text))
+            ranges = txt.tag_ranges("link0")
+            self.assertEqual(txt.get(ranges[0], ranges[1]), "Click here to enter")
+            # A click on the words opens the address.
+            self.app.update()
+            x, y, w, h = txt.bbox(f"{ranges[0]}+2c")
+            txt.event_generate("<Motion>", x=x + 1, y=y + h // 2)   # Tk's "current"
+            txt.event_generate("<Button-1>", x=x + 1, y=y + h // 2)
+            self.app.update()
+            self.assertEqual(opened,
+                             ["https://octowow.st/forum/viewtopic.php?t=2742&sid=abc"])
+            self.assertEqual(str(txt.cget("state")), "disabled")
+            self.assertGreater(int(txt.cget("height")), 1)       # all of it shown
+            labels = [w.cget("text") for w in entry.winfo_children()
+                      if isinstance(w, self.m.tk.Label)]
+            self.assertIn("Open in Browser  ↗", labels)
+            # What the link opens.
+            self.app._news_text(entry, "Go here", [[3, 7, "https://x.example/a"]])
+            self.app._news_text(entry, "Bad", [[0, 3, "javascript:alert(1)"]])
+            last = [w for w in entry.winfo_children()
+                    if isinstance(w, self.m.tk.Text)][-1]
+            self.assertEqual(last.tag_names(), ("sel",))           # not a link
+        finally:
+            self.app._open_url = real
 
     def test_refresh_starts_over(self):
         self.load()

@@ -3959,14 +3959,17 @@ def fetch_patch_notes() -> list:
     for row in rows:
         key = str(row.topic_id)
         entry = cache.get(key) or {}
-        body = entry.get("body")
+        body, links = entry.get("body"), entry.get("links") or []
         if body is None or now - entry.get("timestamp", 0) >= NEWS_FIRST_POST_TTL:
             if not blocked:
                 try:
-                    body = fetch_first_post(row, opener=_news_open,
+                    post = fetch_first_post(row, opener=_news_open,
                                             user_agent=UA,
-                                            timeout=NEWS_TIMEOUT).content
-                    fresh[key] = {"body": body, "timestamp": now}
+                                            timeout=NEWS_TIMEOUT)
+                    body = post.content
+                    links = [list(link) for link in post.links]
+                    fresh[key] = {"body": body, "links": links,
+                                  "timestamp": now}
                 except ForumBlockedError as exc:
                     blocked = True
                     log(f"Changelog: {exc}", "dim")
@@ -3975,6 +3978,7 @@ def fetch_patch_notes() -> list:
         item = row.to_item()
         if body:
             item["body"] = item["html"] = body
+            item["links"] = links
         items.append(item)
 
     shown = {str(r.topic_id) for r in rows}
@@ -5323,12 +5327,9 @@ class EqUpdaterApp(tk.Tk):
                              justify="left", anchor="w").pack(
                                  fill="x", pady=(self._px(6), 0))
                 elif body.strip():
-                    tk.Label(entry, text=body.strip(), font=self._font(10),
-                             fg=C_TEXT, bg=C_PANEL, wraplength=wrap_w,
-                             justify="left", anchor="w").pack(
-                                 fill="x", pady=(self._px(8), 0))
+                    self._news_text(entry, body, item.get("links") or [])
                 if item.get("url"):
-                    lnk = tk.Label(entry, text="⧉  " + tr("Read more"),
+                    lnk = tk.Label(entry, text=tr("Open in Browser") + "  \u2197",
                                    font=self._font(9, bold=True), fg=C_GOLD,
                                    bg=C_PANEL, cursor="hand2", anchor="w")
                     lnk.pack(fill="x", pady=(self._px(8), 0))
@@ -5348,6 +5349,43 @@ class EqUpdaterApp(tk.Tk):
             total = max(1, inner.winfo_reqheight())
             canvas.configure(scrollregion=(0, 0, inner.winfo_reqwidth(), total))
             canvas.yview_moveto(y_px / total)
+
+    def _news_text(self, parent, body, links):
+        """A post's text, its links clickable (opened in the browser), sized
+        to its wrapped lines -- and resized with the column. Read-only, but
+        selectable for copying."""
+        txt = tk.Text(parent, bg=C_PANEL, fg=C_TEXT, font=self._font(10),
+                      wrap="word", height=1, relief="flat", bd=0,
+                      highlightthickness=0, padx=0, pady=0,
+                      spacing2=self._px(2), cursor="arrow")
+        txt.insert("1.0", body)
+        for n, link in enumerate(links):
+            try:
+                start, end, url = int(link[0]), int(link[1]), str(link[2])
+            except (TypeError, ValueError, IndexError):
+                continue
+            if not (0 <= start < end <= len(body)) or \
+                    urlsplit(url).scheme not in ("http", "https"):
+                continue
+            tag = f"link{n}"
+            txt.tag_add(tag, f"1.0+{start}c", f"1.0+{end}c")
+            txt.tag_configure(tag, foreground=C_GOLD, underline=True)
+            txt.tag_bind(tag, "<Button-1>", lambda e, u=url: self._open_url(u))
+            txt.tag_bind(tag, "<Enter>", lambda e: txt.configure(cursor="hand2"))
+            txt.tag_bind(tag, "<Leave>", lambda e: txt.configure(cursor="arrow"))
+        txt.configure(state="disabled")
+        txt.pack(fill="x", pady=(self._px(8), 0))
+
+        def fit(_event=None):
+            try:
+                n = txt.count("1.0", "end-1c", "displaylines")
+                n = (n[0] if isinstance(n, tuple) else n) or 0
+                if int(txt.cget("height")) != n + 1:
+                    txt.configure(height=n + 1)
+            except (tk.TclError, TypeError, ValueError):
+                pass
+        txt.bind("<Configure>", fit, add="+")
+        return txt
 
     def _acc_remember(self, key):
         """Note how far a list is scrolled, before its panel is redrawn."""
@@ -5436,6 +5474,7 @@ class EqUpdaterApp(tk.Tk):
             item = row.to_item()
             known = st["posts"].get(str(row.topic_id))
             item["body"] = known.get("body") if known else None
+            item["links"] = (known or {}).get("links") or []
             if known and known.get("_error"):
                 item["_error"] = known["_error"]
             out.append(item)

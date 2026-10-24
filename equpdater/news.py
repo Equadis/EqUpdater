@@ -114,12 +114,15 @@ class ForumPost:
     created_at: str                 # ISO 8601, or "" if the forum gave none
     url: str
     content: str
+    #: (start, end, url) of each link in ``content``.
+    links: tuple = ()
 
     def to_item(self) -> dict:
         """The dict shape the News renderer and the config cache use."""
         return {"id": str(self.topic_id), "title": self.title,
                 "author": self.author, "date": self.created_at,
-                "body": self.content, "html": self.content, "url": self.url}
+                "body": self.content, "html": self.content, "url": self.url,
+                "links": [list(link) for link in self.links]}
 
 
 class ForumError(RuntimeError):
@@ -400,6 +403,8 @@ class _FirstPostParser(HTMLParser):
         self._content_depth = 0    # div depth inside div.content
         self._drop_tag = None      # inside something that is not the post's
         self._drop_depth = 0       # own words: script, quote, signature
+        self._hrefs: list[str] = []
+        self._in_link = False
 
     def handle_starttag(self, tag, attrs):
         if self._done:
@@ -434,6 +439,11 @@ class _FirstPostParser(HTMLParser):
                 self.parts.append("\n")
             elif tag == "img" and a.get("alt") and "smilies" not in (a.get("src") or ""):
                 self.parts.append(a["alt"])
+            elif tag == "a" and a.get("href") and not self._in_link:
+                # Marked in the text, resolved after whitespace is tidied.
+                self.parts.append(f"\x01{len(self._hrefs)}\x03")
+                self._hrefs.append(a["href"])
+                self._in_link = True
             return
 
         if tag == "h3" and self.subject is None:
@@ -478,6 +488,9 @@ class _FirstPostParser(HTMLParser):
                 self._drop_depth -= 1
             return
         if self._content_depth:
+            if tag == "a" and self._in_link:
+                self.parts.append("\x02")
+                self._in_link = False
             if tag in _BLOCK_TAGS:
                 self.parts.append("\n")
             if tag == "div":
@@ -495,23 +508,53 @@ class _FirstPostParser(HTMLParser):
                 self._done = True
 
     def content(self) -> str:
+        return self.content_and_links()[0]
+
+    def content_and_links(self, base: str = BASE) -> tuple:
+        """The post's text, and (start, end, url) for each link in it: the
+        link's words in the text, and where they lead. Only http(s) links
+        are kept; a forum-relative one is made absolute."""
         text = "".join(self.parts).replace("\xa0", " ")
         text = re.sub(r"[ \t]+", " ", text)
         text = re.sub(r" ?\n ?", "\n", text)
         text = re.sub(r"\n{3,}", "\n\n", text)
-        return text.strip()
+        text = text.strip()
+        out, links, pos = [], [], 0
+        for m in re.finditer(r"\x01(\d+)\x03(.*?)\x02", text, re.S):
+            out.append(text[pos:m.start()])
+            start = sum(map(len, out))
+            words = m.group(2)
+            out.append(words)
+            href = urljoin(base, unescape(self._hrefs[int(m.group(1))]))
+            if words.strip() and urlparse(href).scheme in ("http", "https"):
+                links.append((start, start + len(words), href))
+            pos = m.end()
+        out.append(text[pos:])
+        clean = re.sub(r"[\x01-\x03]|\x01\d+\x03", "", "".join(out))
+        if clean != "".join(out):        # an unclosed link: drop the marks
+            return re.sub(r"\x01\d+\x03|[\x02\x03]", "", text), []
+        return clean, links
 
 
 def parse_first_post(html: str) -> tuple[str | None, datetime | None, str] | None:
     """(author, created, content) of the first post on a topic page, or None
     if the page has no post in it."""
+    parsed = parse_first_post_links(html)
+    return parsed[:3] if parsed else None
+
+
+def parse_first_post_links(html: str, base: str = BASE):
+    """(author, created, content, links) of the first post on a topic page,
+    or None if the page has no post in it. ``links`` as in
+    _FirstPostParser.content_and_links."""
     p = _FirstPostParser()
     p.feed(html or "")
     p.close()
     if not p.found:
         return None
     author = " ".join((p.author or "").split()) or None
-    return author, parse_forum_date(p.time), p.content()
+    content, links = p.content_and_links(base)
+    return author, parse_forum_date(p.time), content, tuple(links)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -602,14 +645,15 @@ def fetch_first_post(topic: TopicRow, *, opener, user_agent: str,
     url = topic_url(topic.topic_id, base)
     html = _get(url, f"topic {topic.topic_id}", opener=opener,
                 user_agent=user_agent, timeout=timeout)
-    parsed = parse_first_post(html)
+    parsed = parse_first_post_links(html, url)
     if parsed is None:
         raise ForumError(f"topic {topic.topic_id} parse", url,
                          "no post found on the topic page",
                          short=N_("the forum topic could not be read"))
-    author, created, content = parsed
+    author, created, content, links = parsed
     return ForumPost(topic.topic_id, topic.title, topic.author or author,
-                     _iso(topic.created_at or created), topic.url, content)
+                     _iso(topic.created_at or created), topic.url, content,
+                     links)
 
 
 def fetch_latest_post(forum_id: int, *, opener, user_agent: str,
