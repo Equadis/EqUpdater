@@ -512,19 +512,35 @@ challenge (HTTP 200, `X-BF-Challenge`), detected by `news.is_challenge_page`
 and `_refuse_challenge` -> `DdosCheckError`. OctoBot gets through via a
 named User-Agent allowlist entry; EqUpdater must not borrow it.
 
-Requested from OctoWoW on 2026-10-14 (any one of): exempt the read-only
-paths (`/git/api/v1/*`, `/api/addons.json`, `/news.json`, the two forum
-topics) from the challenge with normal rate limiting; or exempt User-Agent
-prefix `EqUpdater/` on those paths; or issue an app key/header. If they
-allowlist, nothing needs to change - News and OctoWoW Git update checks
-start working for 2.1.0 users. If they issue a key/header, add it to the
-requests to octowow.st in a 2.1.1.
+Requested from OctoWoW on 2026-10-14: an exemption for the read-only
+paths, the `EqUpdater/` User-Agent, or an app key. **Their answer
+(2026-10-24):**
+- The challenge is triggered by the User-Agent. `EqUpdater/<version>` alone
+  is challenged on the front page, the forum topics and the Git API.
+  `EqUpdater/<version> Python-urllib/<x.y>` gets normal answers. Keep
+  `EqUpdater` first so they can tell our traffic apart.
+- Exemptions, UA rules and app keys are their DDoS provider's, not theirs
+  to set.
+- They have seen a request challenged even with a User-Agent that worked
+  elsewhere, so challenge detection and the cached fallbacks stay.
+- `news.json` is not challenged but is stale: fallback only.
+  `/api/addons.json` is not challenged even with the bare UA.
+- Our request rates are fine. Call the Git compare endpoint only when the
+  latest commit has changed.
+
+Done (after 2.1.1): `branding.user_agent()` builds
+`EqUpdater/<APP_VERSION> Python-urllib/<major>.<minor>` (urllib's own token,
+from the running interpreter), and every request sends it.
+`addon_ancestry()` asks the compare endpoint once per (repository,
+installed commit, latest commit): a definite answer is kept, and "unknown"
+is retried after an hour or on a forced refresh. Verified live: the old UA
+is challenged on all three kinds of URL, and the new one is not.
 
 What EqUpdater requests from octowow.st: forum t=2848 and t=2816 (launch,
 refresh), `news.json` (fallback), `/api/addons.json` (daily), Gitea API
 commits/compare/releases (cached 1 h), repository archives (install/update;
 not blocked), `https://octowow.st/` (Login Doctor). User-Agent
-`EqUpdater/<version>`.
+`EqUpdater/<version> Python-urllib/<x.y>` (`branding.USER_AGENT`).
 
 ## Important files
 
@@ -639,8 +655,8 @@ Do not reintroduce these:
    credentials. Not listed; players can add it themselves as a custom git
    mod if they want it.
 2. **Release-notes line** about Microsoft (see State at handoff).
-3. **Wait for OctoWoW's reply** on the DDoS exemption; act per "OctoWoW
-   DDoS protection".
+3. **OctoWoW replied** on the DDoS challenge; acted on (see "OctoWoW DDoS
+   protection").
 4. **Defender**: consider building PyInstaller's bootloader from source in
    `release.yml`, or code signing.
 5. **Tag rule**: relax it, or release fixes as 2.1.1 instead of

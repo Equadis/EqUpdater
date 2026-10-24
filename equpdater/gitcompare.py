@@ -332,7 +332,9 @@ def _read_gitlab(payload: dict):
 
 
 def _default_fetch(url: str, timeout: int = 10):
-    req = urllib.request.Request(url, headers={"Accept": "application/json"})
+    from .branding import USER_AGENT     # the one every request sends
+    req = urllib.request.Request(url, headers={"Accept": "application/json",
+                                               "User-Agent": USER_AGENT})
     with urllib.request.urlopen(req, timeout=timeout) as r:   # nosec - callers inject a hardened opener
         return json.load(r)
 

@@ -117,7 +117,9 @@ class TestAppStarts(unittest.TestCase):
     def test_product_identity(self):
         self.assertEqual(self.app.title(), "EqUpdater")
         self.assertEqual(self.app_mod.UA,
-                         f"EqUpdater/{self.branding.APP_VERSION}")
+                         f"EqUpdater/{self.branding.APP_VERSION} "
+                         f"Python-urllib/{sys.version_info[0]}."
+                         f"{sys.version_info[1]}")
         # A release (2.1.0) or a numbered test build of one (2.0.6.1).
         self.assertRegex(self.branding.APP_VERSION, r"^\d+\.\d+\.\d+(\.\d+)?$")
 

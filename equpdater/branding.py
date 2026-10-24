@@ -34,7 +34,21 @@ UPSTREAM_NAME = "Octo Updater"
 PROJECT_REPO = "Equadis/EqUpdater"
 PROJECT_URL = f"https://github.com/{PROJECT_REPO}"
 
-USER_AGENT = f"{APP_NAME}/{APP_VERSION}"
+def user_agent(version: str = APP_VERSION,
+               python=sys.version_info) -> str:
+    """``EqUpdater/<version> Python-urllib/<major>.<minor>``.
+
+    OctoWoW's DDoS protection (BlazingFast) answers a request whose
+    User-Agent is ``EqUpdater/<version>`` alone with its challenge page; with
+    the HTTP library named after it, the same requests get their normal
+    answers (OctoWoW's admins, October 2026). They asked that EqUpdater stay
+    first, so they can tell our traffic apart. ``Python-urllib/<x.y>`` is the
+    exact token urllib itself sends, taken from the running interpreter."""
+    return f"{APP_NAME}/{version} Python-urllib/{python[0]}.{python[1]}"
+
+
+#: Every HTTP request EqUpdater makes sends this.
+USER_AGENT = user_agent()
 WINDOWS_APP_ID = "eqomdx.EqUpdater.2"
 
 #: The products whose settings this one inherits, newest first. Each is a

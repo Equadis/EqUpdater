@@ -3190,6 +3190,57 @@ def _api_json(url: str, timeout=10):
     return json.loads(body)
 
 
+#: How long "could not tell" is remembered for one commit pair before the
+#: compare endpoint is asked again. A definite answer is kept for good: which
+#: of two commits came first cannot change.
+ADDON_ANCESTRY_RETRY = 3600
+#: Pairs remembered at most; the oldest go first.
+ADDON_ANCESTRY_CACHE_MAX = 200
+
+
+def addon_ancestry(git_url: str, installed_sha: str, remote_sha: str,
+                   force: bool = False) -> Ancestry:
+    """ancestry(), asking the host's compare endpoint only for a commit pair
+    it has not answered before.
+
+    OctoWoW asked that the compare endpoint be called only when the latest
+    commit has actually changed. The verify already skips it when the latest
+    commit is the installed one; this also skips it while an update stays
+    pending, when every verify (each launch, each Addons tab visit after a
+    few minutes) would otherwise ask the same question again. ``force``
+    (a refresh the player asked for) retries an "unknown", never a
+    definite answer."""
+    if not installed_sha or not remote_sha:
+        return Ancestry.UNKNOWN
+    if installed_sha == remote_sha:
+        return Ancestry.IDENTICAL
+    ref = repo_ref(git_url)
+    where = ref.url.lower() if ref else (git_url or "").strip().lower()
+    key = f"{where}|{installed_sha}|{remote_sha}"
+    now = time.time()
+    entry = load_config().get("addon_ancestry_cache", {}).get(key)
+    if entry:
+        try:
+            known = Ancestry(entry.get("result"))
+        except ValueError:
+            known = None
+        if known is not None and known is not Ancestry.UNKNOWN:
+            return known
+        if (known is Ancestry.UNKNOWN and not force
+                and now - entry.get("timestamp", 0) < ADDON_ANCESTRY_RETRY):
+            return known
+    result = ancestry(git_url, installed_sha, remote_sha, fetch=_api_json)
+
+    def remember(c):
+        cache = c.setdefault("addon_ancestry_cache", {})
+        cache[key] = {"result": result.value, "timestamp": now}
+        for old in sorted(cache, key=lambda k: cache[k].get("timestamp", 0)
+                          )[:max(0, len(cache) - ADDON_ANCESTRY_CACHE_MAX)]:
+            cache.pop(old, None)
+    update_config(remember)
+    return result
+
+
 def _describe_net_error(e: Exception) -> str:
     """Human-readable cause for a failed API request."""
     import urllib.error
@@ -7628,8 +7679,8 @@ class EqUpdaterApp(tk.Tk):
                     anc = None
                     if (remote and saved.get("sha")
                             and remote != saved.get("sha") and remote_checks):
-                        anc = ancestry(rec["git"], saved["sha"], remote,
-                                       fetch=_api_json)
+                        anc = addon_ancestry(rec["git"], saved["sha"], remote,
+                                             force=force)
                     elif remote and remote == saved.get("sha"):
                         anc = Ancestry.IDENTICAL
 

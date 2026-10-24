@@ -243,10 +243,11 @@ confirmed, and skips the rest.
 
 ## Known issues
 
-- **OctoWoW's DDoS protection sometimes blocks apps** from parts of the
-  website. News then shows the public news feed or the last news received,
-  and changed OctoWoW Git addons show **Unable to verify** with
-  **Replace…** (installing them still works).
+- **OctoWoW's DDoS protection can still occasionally challenge a
+  request.** EqUpdater recognises the challenge page: News then shows the
+  public news feed or the last news received, and a changed OctoWoW Git
+  addon shows **Unable to verify** with **Replace…** until the next check
+  gets through (installing still works).
 - **Priority Sign In** from the official OctoLauncher cannot be used through
   EqUpdater. Login Doctor explains when it may help.
 
