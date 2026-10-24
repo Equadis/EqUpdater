@@ -194,7 +194,6 @@ STRINGS = {
         "Предотвращает просадки кадров при смерти персонажа, вызванные пересчётом прочности трансмогрификации на сервере.",
     "Project page": "Страница проекта",
     "REPOSITORY URL": "АДРЕС РЕПОЗИТОРИЯ",
-    "Read full announcement": "Читать объявление полностью",
     "Read more": "Подробнее",
     "Ready to update": "Готово к обновлению",
     "Recommended addon": "Рекомендуемый аддон",
@@ -357,7 +356,7 @@ STRINGS = {
     "{dll} from {source} and {dll} from {other} are two builds of the same mod. Only one can be loaded.\n\nTurn off the one from {other} and use {source}?":
         "{dll} из {source} и {dll} из {other} — две сборки одного и того же мода. Загружаться может только одна.\n\nОтключить сборку из {other} и использовать {source}?",
     "Load more": "Загрузить ещё",
-    "Show every announcement": "Показать все объявления",
+    "Loading…": "Загрузка…",
     "Verify game files": "Проверить файлы игры",
     "Verifying game files…": "Проверка файлов игры…",
     "Verifying…": "Проверка…",

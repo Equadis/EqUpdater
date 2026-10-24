@@ -195,7 +195,6 @@ STRINGS = {
         "Evita quedas de quadros na morte do personagem causadas pelo recálculo de durabilidade da transmogrificação no servidor.",
     "Project page": "Página do projeto",
     "REPOSITORY URL": "URL DO REPOSITÓRIO",
-    "Read full announcement": "Ler o anúncio completo",
     "Read more": "Ler mais",
     "Ready to update": "Pronto para atualizar",
     "Recommended addon": "Addon recomendado",
@@ -358,7 +357,7 @@ STRINGS = {
     "{dll} from {source} and {dll} from {other} are two builds of the same mod. Only one can be loaded.\n\nTurn off the one from {other} and use {source}?":
         "{dll} de {source} e {dll} de {other} são duas versões do mesmo mod. Só uma pode ser carregada.\n\nDesativar a de {other} e usar {source}?",
     "Load more": "Carregar mais",
-    "Show every announcement": "Ver todos os anúncios",
+    "Loading…": "Carregando…",
     "Verify game files": "Verificar arquivos do jogo",
     "Verifying game files…": "Verificando arquivos do jogo…",
     "Verifying…": "Verificando…",

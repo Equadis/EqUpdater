@@ -809,23 +809,23 @@ class TestForumPages(unittest.TestCase):
 
 @unittest.skipUnless(HAVE_TK, "no display")
 class TestAnnouncementsList(unittest.TestCase):
-    """Click the title: every announcement, newest first, ten at a time;
-    Load more reads the next forum page when the read ones run out."""
+    """The Announcements panel is every announcement, newest first, ten at
+    a time, the newest open; each title opens and closes its post. The
+    Changelog's entries open and close too, the newest open."""
 
     @classmethod
     def setUpClass(cls):
         import tempfile
+        from unittest import mock
         cls.tmp = tempfile.mkdtemp(prefix="equ-ann-")
         os.environ["LOCALAPPDATA"] = cls.tmp
         os.environ["XDG_DATA_HOME"] = cls.tmp
         os.environ["EQUPDATER_NO_LANGUAGE_PROMPT"] = "1"
         for mod in [m for m in list(sys.modules) if m.startswith("equpdater")]:
             del sys.modules[mod]
-        from unittest import mock
         from equpdater import app
         cls.m = app
-        # No launch-time read of the real forum: it would land mid-test and
-        # draw the panel again under the list.
+        # No launch-time read of the real forum: it would land mid-test.
         cls.no_launch_news = mock.patch.object(app.EqUpdaterApp, "_load_news",
                                                lambda self: None)
         cls.no_launch_news.start()
@@ -839,6 +839,10 @@ class TestAnnouncementsList(unittest.TestCase):
         cls.app.destroy()
         cls.no_launch_news.stop()
         shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    NEWEST = {"id": "100", "title": "Topic 100", "author": "Kestrel",
+              "date": "2026-10-24T08:00:00+00:00", "body": "Newest.",
+              "html": "Newest.", "url": news.topic_url(100)}
 
     def setUp(self):
         from unittest import mock
@@ -855,82 +859,125 @@ class TestAnnouncementsList(unittest.TestCase):
                                    starts=(0, 25)),
             "viewforum.php?f=2": forum_page(PINNED_APRIL + numbered_rows(100, 12),
                                             starts=(25,)),
-            "viewtopic.php?t=95": topic_page(95, "Topic 95", "Opening post 95."),
+            "viewtopic.php?t=99": topic_page(99, "Topic 99", "Opening post 99."),
         })
         self.patches = [mock.patch.object(self.m.threading, "Thread", thread),
                         mock.patch.object(self.m, "_news_open", self.site.opener)]
         for p in self.patches:
             p.start()
         self.app._ann_reset()
-        self.app._render_featured({"id": "100", "title": "Topic 100",
-                                   "author": "Kestrel",
-                                   "date": "2026-10-24T08:00:00+00:00",
-                                   "body": "Newest.", "html": "Newest.",
-                                   "url": news.topic_url(100)})
+        self.app._render_featured(dict(self.NEWEST))
 
     def tearDown(self):
         for p in reversed(self.patches):
             p.stop()
         self.app._ann_reset()
 
-    def shown(self):
+    def entries(self, key="ann"):
+        """(title, open?, text shown) per entry, and the buttons under them."""
         self.app.update()
-        out = []
-        for item in self.app._ann_inner.winfo_children():
-            kids = item.winfo_children()
-            if kids and isinstance(kids[0], self.m.tk.Label):
-                out.append(kids[0].cget("text"))
-        return out
+        canvas = self.app._acc_canvas[key]
+        inner = canvas.nametowidget(canvas.itemcget(canvas.find_all()[0], "window"))
+        rows, buttons = [], []
+        for entry in inner.winfo_children():
+            if isinstance(entry, self.m.tk.Label):
+                buttons.append(entry.cget("text"))
+                continue
+            kids = entry.winfo_children()
+            if not kids or not isinstance(kids[0], self.m.tk.Frame):
+                continue
+            head = kids[0].winfo_children()
+            text = [k.cget("text") for k in kids[1:]
+                    if isinstance(k, self.m.tk.Label)]
+            rows.append((head[0].cget("text"), head[1].cget("text").endswith("▴"),
+                         text[0] if text else ""))
+        return rows, buttons
 
-    def has_load_more(self):
-        return any(isinstance(w, self.m.tk.Label) and w.cget("text") == "Load more"
-                   for w in self.app._ann_inner.winfo_children())
+    def load(self):
+        self.app._ann_load_page()
+        self.app.update()
 
-    def test_the_title_opens_ten_newest_first(self):
-        self.app.update()
-        head = self.app._feat_head
-        head.winfo_children()[0].event_generate("<Button-1>")   # the title
-        self.app.update()
-        self.assertTrue(self.app._ann_open)
-        self.assertEqual(self.shown(), [f"Topic {t}" for t in range(100, 90, -1)])
-        self.assertTrue(self.has_load_more())
+    def test_before_the_list_is_read_the_newest_is_shown_open(self):
+        rows, _ = self.entries()
+        self.assertEqual(rows, [("Topic 100", True, "Newest.")])
+
+    def test_the_list_fills_the_panel_newest_open_the_rest_closed(self):
+        self.load()
+        rows, buttons = self.entries()
+        self.assertEqual([r[0] for r in rows],
+                         [f"Topic {t}" for t in range(100, 90, -1)])
+        self.assertEqual(rows[0], ("Topic 100", True, "Newest."))
+        self.assertFalse(any(r[1] for r in rows[1:]))
+        self.assertEqual(buttons, ["Load more"])
         self.assertEqual(self.site.asked, [news.forum_url(2)])
-        self.assertIn("▴", self.app._feat_head.winfo_children()[1].cget("text"))
+        # The list is the whole panel under its header.
+        canvas = self.app._acc_canvas["ann"]
+        self.assertGreater(canvas.winfo_height(),
+                           self.app._feat_frame.winfo_height() // 2)
+
+    def test_a_title_opens_its_post_once_and_closes_it(self):
+        self.load()
+        self.app._ann_toggle("99")
+        rows, _ = self.entries()
+        self.assertEqual(rows[1], ("Topic 99", True, "Opening post 99."))
+        self.app._ann_toggle("99")
+        self.assertEqual(self.entries()[0][1], ("Topic 99", False, ""))
+        asked = len(self.site.asked)
+        self.app._ann_toggle("99")                     # read once
+        self.assertEqual(len(self.site.asked), asked)
+        self.app._ann_toggle("100")                    # the newest closes too
+        self.assertFalse(self.entries()[0][0][1])
+
+    def test_clicking_the_title_toggles(self):
+        self.load()
+        self.app.update()
+        canvas = self.app._acc_canvas["ann"]
+        inner = canvas.nametowidget(canvas.itemcget(canvas.find_all()[0], "window"))
+        title = inner.winfo_children()[0].winfo_children()[0].winfo_children()[0]
+        title.event_generate("<Button-1>")
+        self.assertFalse(self.entries()[0][0][1])     # the newest closed
 
     def test_load_more_reads_the_next_page_and_holds_the_old_pin_back(self):
-        self.app._toggle_ann_list()
-        self.app.update()                    # the read page is applied
+        self.load()
         self.app._ann_more()                 # 20: page one has only 12
         self.app.update()
-        shown = self.shown()
+        rows, _ = self.entries()
         self.assertEqual(self.site.asked, [news.forum_url(2),
                                            news.forum_url(2, start=25)])
-        self.assertEqual(shown, [f"Topic {t}" for t in range(100, 80, -1)])
-        self.assertNotIn("Beta Test Info", shown)   # April: held back
+        self.assertEqual([r[0] for r in rows],
+                         [f"Topic {t}" for t in range(100, 80, -1)])
         self.app._ann_more()                 # the last page is read: all of it
         self.app.update()
-        shown = self.shown()
-        self.assertEqual(shown[-1], "Beta Test Info")
-        self.assertEqual(len(shown), 25)
-        self.assertEqual(shown.count("Beta Test Info"), 1)
-        self.assertFalse(self.has_load_more())
+        rows, buttons = self.entries()
+        self.assertEqual(rows[-1][0], "Beta Test Info")
+        self.assertEqual(len(rows), 25)
+        self.assertEqual([r[0] for r in rows].count("Beta Test Info"), 1)
+        self.assertEqual(buttons, [])
 
-    def test_picking_one_shows_its_opening_post(self):
-        self.app._toggle_ann_list()
-        self.app.update()
-        row = next(r for r in self.app._ann_visible() if r.topic_id == 95)
-        self.app._ann_pick(row)
-        self.app.update()
-        post = self.app._feat_render_args[0]
-        self.assertEqual(post["title"], "Topic 95")
-        self.assertEqual(post["body"], "Opening post 95.")
-        self.assertFalse(self.app._ann_open)
-        asked = len(self.site.asked)
-        self.app._ann_pick(row)               # read once
-        self.assertEqual(len(self.site.asked), asked)
-
-    def test_refresh_forgets_the_list(self):
-        self.app._toggle_ann_list()
+    def test_refresh_starts_over(self):
+        self.load()
+        self.app._ann_toggle("99")
         self.app._ann_reset()
-        self.assertFalse(self.app._ann_open)
-        self.assertEqual(self.app._ann()["rows"], {})
+        st = self.app._ann()
+        self.assertEqual(st["rows"], {})
+        self.assertIsNone(st["open"])
+
+    def test_the_changelog_opens_and_closes(self):
+        items = [{"id": str(t), "title": f"2026-10-{d:02d}", "author": "Archer",
+                  "date": f"2026-10-{d:02d}T08:00:00+00:00",
+                  "body": f"Notes {t}.", "html": "", "url": news.topic_url(t)}
+                 for t, d in ((3087, 24), (3074, 23), (2902, 12))]
+        self.app._patch_open = None
+        self.app._render_patch_notes(items)
+        rows, _ = self.entries("patch")
+        self.assertEqual(rows, [("2026-10-24", True, "Notes 3087."),
+                                ("2026-10-23", False, ""),
+                                ("2026-10-12", False, "")])
+        self.app._patch_toggle("3087")
+        self.app._patch_toggle("2902")
+        rows, _ = self.entries("patch")
+        self.assertEqual([r[1] for r in rows], [False, False, True])
+        self.assertEqual(rows[2][2], "Notes 2902.")
+        self.app._render_patch_notes(items)            # a refresh keeps it
+        self.assertEqual([r[1] for r in self.entries("patch")[0]],
+                         [False, False, True])

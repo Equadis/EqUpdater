@@ -5030,9 +5030,6 @@ class EqUpdaterApp(tk.Tk):
         # bubbles through it.
         self._news_gap = self._px(10)
         self._news_column_widths()
-        # The width the Changelog was designed at: its previews are as long
-        # as at this width, and longer as the column grows.
-        self._news_right_base = self._news_right_w
 
         feat = tk.Frame(panel, bg=C_PANEL,
                         highlightthickness=1,
@@ -5133,9 +5130,10 @@ class EqUpdaterApp(tk.Tk):
     def _load_featured(self):
         """Read the Announcements once, in the background: forum 2's newest
         topic, else news.json (fetch_featured_post); if both fail, the last
-        good one stays on screen. A click on refresh while a read is already
-        running does not start a second. It also closes and forgets the list
-        of every announcement, which is read again when next opened."""
+        good one stays on screen. Then the list of every announcement is
+        read (forum 2's first page), unless the forum could not be. A click
+        on refresh while a read is already running does not start a second;
+        a refresh starts the list over, newest open."""
         if getattr(self, "_feat_loading", False):
             return
         self._feat_loading = True
@@ -5157,6 +5155,8 @@ class EqUpdaterApp(tk.Tk):
                     self._featured = feat
                     self._save_news_cache("announcements", "item", feat)
                     self._render_featured(feat, note=note)
+                    if not note:
+                        self._ann_load_page()
                 else:
                     self._render_featured(self._featured, error=err)
             self.after(0, apply)
@@ -5208,120 +5208,189 @@ class EqUpdaterApp(tk.Tk):
         rf.bind("<Leave>", lambda e: rf.configure(fg=C_TEXT_DIM))
         tk.Frame(parent, bg=C_DIVIDER, height=self._px(1)).pack(fill="x")
 
+    # ── open/close lists: Announcements and the Changelog ────────────────────
+
+    def _render_accordion(self, f, key, entries, open_ids, toggle, *,
+                          wrap_w, title_size=11, footer=None):
+        """A scrolling list filling ``f`` below its header: one entry per
+        item, its title and byline a single control that opens or closes
+        the entry. An open entry shows its text (``body``; None while it is
+        being read) and a link to the forum. The scroll position survives
+        the redraw that every open, close and Load more causes.
+
+        ``footer(inner)`` adds what goes under the entries."""
+        old = getattr(self, "_acc_canvas", {}).get(key)
+        y = 0.0
+        try:
+            if old is not None and old.winfo_exists():
+                y = old.yview()[0]
+        except tk.TclError:
+            pass
+
+        list_frame = tk.Frame(f, bg=C_PANEL)
+        list_frame.pack(fill="both", expand=True,
+                        padx=(self._px(14), self._px(4)),
+                        pady=(0, self._px(8)))
+        canvas = tk.Canvas(list_frame, bg=C_PANEL, highlightthickness=0)
+        sb = SlimScrollbar(list_frame, command=canvas.yview, bg=C_PANEL,
+                           width=self._px(10), thumb="#31547e")
+        canvas.configure(yscrollcommand=sb.set)
+        sb.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        self._wheel_canvases.append(canvas)
+        inner = tk.Frame(canvas, bg=C_PANEL)
+        win = canvas.create_window((0, 0), window=inner, anchor="nw")
+        inner.bind("<Configure>",
+                   lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.bind("<Configure>",
+                    lambda e: canvas.itemconfigure(win, width=e.width))
+        self._acc_canvas = {**getattr(self, "_acc_canvas", {}), key: canvas}
+
+        for item in entries:
+            iid = str(item.get("id", ""))
+            is_open = iid in open_ids
+            entry = tk.Frame(inner, bg=C_PANEL)
+            entry.pack(fill="x", padx=(0, self._px(8)))
+            head = tk.Frame(entry, bg=C_PANEL, cursor="hand2")
+            head.pack(fill="x", pady=(self._px(10), 0))
+            title = tk.Label(head, text=item.get("title", ""),
+                             font=self._font(title_size, bold=True),
+                             fg=C_GOLD_LT if is_open else C_TEXT, bg=C_PANEL,
+                             wraplength=wrap_w, justify="left", anchor="w",
+                             cursor="hand2")
+            title.pack(fill="x")
+            meta = []
+            if item.get("author"):
+                meta.append(tr("by {author}", author=item["author"]))
+            date = _format_news_date(item.get("date", ""))
+            if date:
+                meta.append(date)
+            byline = tk.Label(head, text=" · ".join(meta) + "  "
+                              + ("▴" if is_open else "▾"),
+                              font=self._font(8), fg=C_TEXT_DIM, bg=C_PANEL,
+                              anchor="w", cursor="hand2")
+            byline.pack(fill="x", pady=(self._px(2), 0))
+            base = C_GOLD_LT if is_open else C_TEXT
+            for w in (head, title, byline):
+                w.bind("<Button-1>", lambda e, i=iid: toggle(i))
+                w.bind("<Enter>", lambda e, l=title: l.configure(fg=C_GOLD))
+                w.bind("<Leave>", lambda e, l=title, c=base: l.configure(fg=c))
+
+            if is_open:
+                body = item.get("body")
+                if body is None:
+                    tk.Label(entry, text=tr("Loading…"), font=self._font(9),
+                             fg=C_TEXT_DIM, bg=C_PANEL, anchor="w").pack(
+                                 fill="x", pady=(self._px(6), 0))
+                elif item.get("_error"):
+                    tk.Label(entry, text=item["_error"], font=self._font(9),
+                             fg=C_ERR, bg=C_PANEL, wraplength=wrap_w,
+                             justify="left", anchor="w").pack(
+                                 fill="x", pady=(self._px(6), 0))
+                elif body.strip():
+                    tk.Label(entry, text=body.strip(), font=self._font(10),
+                             fg=C_TEXT, bg=C_PANEL, wraplength=wrap_w,
+                             justify="left", anchor="w").pack(
+                                 fill="x", pady=(self._px(8), 0))
+                if item.get("url"):
+                    lnk = tk.Label(entry, text="⧉  " + tr("Read more"),
+                                   font=self._font(9, bold=True), fg=C_GOLD,
+                                   bg=C_PANEL, cursor="hand2", anchor="w")
+                    lnk.pack(fill="x", pady=(self._px(8), 0))
+                    lnk.bind("<Button-1>",
+                             lambda e, u=item["url"]: self._open_url(u))
+                    lnk.bind("<Enter>", lambda e, w=lnk: w.configure(fg=C_GOLD_LT))
+                    lnk.bind("<Leave>", lambda e, w=lnk: w.configure(fg=C_GOLD))
+            tk.Frame(inner, bg=C_DIVIDER, height=self._px(1)).pack(
+                fill="x", padx=(0, self._px(8)), pady=(self._px(10), 0))
+
+        if footer is not None:
+            footer(inner)
+        if y:
+            inner.update_idletasks()
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            canvas.yview_moveto(y)
+
+    def _news_message(self, f, text, wrap_w, *, error=False, bottom=False):
+        tk.Label(f, text=text, font=self._font(8 if bottom else 10),
+                 fg=C_ERR if error else C_TEXT_DIM, bg=C_PANEL,
+                 wraplength=wrap_w, justify="left", anchor="w").pack(
+                     side="bottom" if bottom else "top", fill="x",
+                     padx=self._px(16),
+                     pady=(0, self._px(4)) if bottom else self._px(16))
+
+    # ── Announcements ────────────────────────────────────────────────────────
+
+    #: Announcements listed at first, and added by each Load more.
+    ANN_PAGE = 10
+
     def _render_featured(self, post, loading=False, error="", note=""):
+        """The Announcements panel: every announcement in forum 2, newest
+        first, ten at a time, each opening to its post; the newest is open
+        by default. ``post`` is the newest announcement as read at launch
+        (or news.json's, while the forum cannot be read): until the list
+        itself is read, it is shown alone."""
         self._feat_render_args = (post, loading, error, note)
         f = self._feat_frame
         for w in f.winfo_children():
             w.destroy()
         f.configure(bg=C_PANEL, highlightthickness=1,
                     highlightbackground=C_PANEL_BDR)
-        self._news_header(
-            f, tr("ANNOUNCEMENTS"),
-            self._load_featured, loading=loading)
-
-        if not post:
-            msg = error or (tr("Loading announcements…") if loading
-                            else tr("No announcements available."))
-            tk.Label(f, text=msg, font=self._font(10),
-                     fg=C_TEXT_DIM, bg=C_PANEL, wraplength=self._news_left_w - self._px(40),
-                     justify="left").pack(padx=self._px(20),
-                                          pady=self._px(18), anchor="w")
-            return
-
-        # The title and byline are one control: a click opens the list of
-        # every announcement below them (and closes it again).
-        is_open = getattr(self, "_ann_open", False)
-        head = tk.Frame(f, bg=C_PANEL, cursor="hand2")
-        head.pack(fill="x", padx=self._px(20), pady=(self._px(16), 0))
-        self._feat_head = head
-        title = post.get("title", "")
-        title_lbl = tk.Label(head, text=title,
-                             font=self._font(15, bold=True),
-                             fg=C_TEXT, bg=C_PANEL, cursor="hand2",
-                             wraplength=self._news_left_w - self._px(40),
-                             justify="left", anchor="w")
-        title_lbl.pack(fill="x", pady=(0, self._px(3)))
-
-        byline = []
-        if post.get("author"):
-            byline.append(tr("by {author}", author=post["author"]))
-        date = _format_news_date(post.get("date", ""))
-        if date:
-            byline.append(date)
-        byline.append("\u25b4" if is_open else "\u25be")
-        by_lbl = tk.Label(head, text=" · ".join(byline[:-1]) + "  " + byline[-1],
-                          font=self._font(9, italic=True),
-                          fg=C_TEXT_DIM, bg=C_PANEL, anchor="w",
-                          cursor="hand2")
-        by_lbl.pack(fill="x", pady=(0, self._px(10)))
-        for w in (head, title_lbl, by_lbl):
-            w.bind("<Button-1>", lambda e: self._toggle_ann_list())
-            w.bind("<Enter>", lambda e: title_lbl.configure(fg=C_GOLD_LT))
-            w.bind("<Leave>", lambda e: title_lbl.configure(fg=C_TEXT))
-        self._add_tooltip(title_lbl, tr("Show every announcement"))
-        tk.Frame(f, bg=C_DIVIDER, height=self._px(1)).pack(
-            fill="x", padx=self._px(20))
-
-        if post.get("url"):
-            link = tk.Label(f, text="⧉  " + tr("Read full announcement"),
-                            font=self._font(10, bold=True),
-                            fg=C_GOLD, bg=C_PANEL,
-                            cursor="hand2", anchor="w")
-            link.pack(side="bottom", fill="x", padx=self._px(20),
-                      pady=(self._px(5), self._px(14)))
-            link.bind("<Button-1>", lambda e, u=post["url"]: self._open_url(u))
-            link.bind("<Enter>", lambda e: link.configure(fg=C_GOLD_LT))
-            link.bind("<Leave>", lambda e: link.configure(fg=C_GOLD))
-
-        body = post.get("body") or _strip_html(post.get("html", ""))
-        txt = tk.Text(f, bg=C_PANEL, fg=C_TEXT, relief="flat",
-                      font=self._font(10), wrap="word", height=1,
-                      padx=self._px(2), pady=self._px(8),
-                      spacing2=self._px(3), spacing3=self._px(4),
-                      highlightthickness=0, cursor="arrow")
-        txt.insert("1.0", body)
-        txt.configure(state="disabled")
-        txt.pack(fill="both", expand=True, padx=self._px(18),
-                 pady=(self._px(6), self._px(2)))
-
+        st = self._ann()
+        self._news_header(f, tr("ANNOUNCEMENTS"), self._load_featured,
+                          loading=loading or st["loading"])
+        wrap_w = max(self._px(200), self._news_left_w - self._px(70))
         if error or note:
             text = (tr("{error} · showing cached content", error=error) if error
                     else tr("{error} · showing the news feed instead",
                             error=tr(note)))
-            tk.Label(f, text=text,
-                     font=self._font(8), fg=C_TEXT_DIM, bg=C_PANEL,
-                     wraplength=self._news_left_w - self._px(40),
-                     justify="left", anchor="w").pack(
-                         side="bottom", fill="x", padx=self._px(20),
-                         pady=(0, self._px(4)))
-        if is_open:
-            self._show_ann_list()
+            self._news_message(f, text, wrap_w, bottom=True)
 
-    # ── every announcement: the list under the title ─────────────────────────
-
-    #: Announcements shown at first, and added by each Load more.
-    ANN_PAGE = 10
+        entries = self._ann_entries(post)
+        if not entries:
+            self._news_message(f, error or (tr("Loading announcements…")
+                                            if loading else
+                                            tr("No announcements available.")),
+                               wrap_w)
+            return
+        if st["open"] is None:
+            st["open"] = {str(entries[0].get("id", ""))}
+        self._render_accordion(f, "ann", entries, st["open"],
+                               self._ann_toggle, wrap_w=wrap_w,
+                               title_size=12, footer=self._ann_footer)
 
     def _ann(self) -> dict:
-        """The list's state: the topics read so far (by id), the offset of
-        the next forum page (None after the last), how many are shown, and
-        the opening posts already read."""
+        """The Announcements list: the topics read so far (by id), the offset
+        of the next forum page (None after the last), how many are listed,
+        which are open, and the posts already read (by id)."""
         st = getattr(self, "_ann_state", None)
         if st is None:
             st = self._ann_state = {"rows": {}, "next": 0, "loaded": False,
                                     "shown": self.ANN_PAGE, "loading": False,
-                                    "error": "", "posts": {}}
+                                    "error": "", "posts": {}, "open": None}
         return st
 
     def _ann_reset(self):
-        """Forget the list (the refresh button): it is read again when next
-        opened, and the panel goes back to the newest announcement."""
+        """Forget the list (refresh): read again, newest open again."""
         self._ann_state = None
-        self._ann_open = False
 
-    def _toggle_ann_list(self):
-        self._ann_open = not getattr(self, "_ann_open", False)
-        self._render_featured(*self._feat_render_args)
+    def _ann_entries(self, post) -> list:
+        """The items listed: the forum's topics once read, each with its
+        post where read (None while not); before that, ``post`` alone."""
+        st = self._ann()
+        if post and post.get("id") is not None:
+            st["posts"].setdefault(str(post["id"]), post)
+        if not st["loaded"]:
+            return [post] if post else []
+        out = []
+        for row in self._ann_visible()[:st["shown"]]:
+            item = row.to_item()
+            known = st["posts"].get(str(row.topic_id))
+            item["body"] = known.get("body") if known else None
+            if known and known.get("_error"):
+                item["_error"] = known["_error"]
+            out.append(item)
+        return out
 
     def _ann_visible(self) -> list:
         """The topics read so far, newest started first. Pinned topics sit
@@ -5338,6 +5407,44 @@ class EqUpdaterApp(tk.Tk):
                 rows = [r for r in rows if r.kind == "normal"
                         or (r.created_at and r.created_at >= floor)]
         return rows
+
+    def _ann_redraw(self):
+        self._render_featured(*self._feat_render_args)
+
+    def _ann_toggle(self, iid: str):
+        """Open or close one announcement; its post is read the first time."""
+        st = self._ann()
+        if iid in st["open"]:
+            st["open"].discard(iid)
+        else:
+            st["open"].add(iid)
+            known = st["posts"].get(iid)
+            if known is None or known.get("_error"):
+                st["posts"].pop(iid, None)      # a failed read is tried again
+                self._ann_read_post(iid)
+        self._ann_redraw()
+
+    def _ann_read_post(self, iid: str):
+        st = self._ann()
+        row = st["rows"].get(int(iid)) if iid.isdigit() else None
+        if row is None:
+            return
+
+        def worker():
+            try:
+                item = fetch_first_post(row, opener=_news_open, user_agent=UA,
+                                        timeout=NEWS_TIMEOUT).to_item()
+            except Exception as exc:
+                item = {"_error": _news_error(N_("Announcements"), exc),
+                        "body": ""}
+
+            def apply():
+                if self._ann_state is not st:
+                    return                      # refreshed meanwhile
+                st["posts"][iid] = item         # an error is shown in place
+                self._ann_redraw()
+            self.after(0, apply)
+        threading.Thread(target=worker, daemon=True).start()
 
     def _ann_load_page(self):
         """Read the next page of forum 2's listing, in the background."""
@@ -5359,7 +5466,7 @@ class EqUpdaterApp(tk.Tk):
 
             def apply():
                 if self._ann_state is not st:
-                    return                      # reset meanwhile
+                    return                      # refreshed meanwhile
                 st["loading"] = False
                 if err:
                     st["error"] = err
@@ -5367,100 +5474,38 @@ class EqUpdaterApp(tk.Tk):
                     for row in rows:
                         st["rows"].setdefault(row.topic_id, row)
                     st["next"], st["loaded"] = nxt, True
-                if getattr(self, "_ann_open", False):
-                    self._render_ann_rows()
+                self._ann_redraw()
             self.after(0, apply)
         threading.Thread(target=worker, daemon=True).start()
 
-    def _show_ann_list(self):
-        """The list, dropped down under the title over the post's text."""
-        f, head = self._feat_frame, self._feat_head
-        f.update_idletasks()
-        top = head.winfo_y() + head.winfo_height()
-        box = tk.Frame(f, bg=C_PANEL_ALT, highlightthickness=1,
-                       highlightbackground=C_PANEL_BDR)
-        box.place(x=self._px(14), y=top, relwidth=1.0, width=-self._px(28),
-                  relheight=1.0, height=-(top + self._px(12)))
-        box.lift()
-        canvas = tk.Canvas(box, bg=C_PANEL_ALT, highlightthickness=0)
-        sb = SlimScrollbar(box, command=canvas.yview, bg=C_PANEL_ALT,
-                           width=self._px(10), thumb="#31547e")
-        canvas.configure(yscrollcommand=sb.set)
-        sb.pack(side="right", fill="y", pady=self._px(4))
-        canvas.pack(side="left", fill="both", expand=True)
-        self._wheel_canvases.append(canvas)
-        inner = tk.Frame(canvas, bg=C_PANEL_ALT)
-        win = canvas.create_window((0, 0), window=inner, anchor="nw")
-        inner.bind("<Configure>",
-                   lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.bind("<Configure>",
-                    lambda e: canvas.itemconfigure(win, width=e.width))
-        self._ann_canvas, self._ann_inner = canvas, inner
+    def _ann_footer(self, inner):
+        """Under the list: Load more, or why the list could not be read."""
         st = self._ann()
-        if not st["loaded"] and not st["error"]:
-            self._ann_load_page()
-        self._render_ann_rows()
-
-    def _render_ann_rows(self):
-        inner = getattr(self, "_ann_inner", None)
-        if inner is None or not inner.winfo_exists():
-            return
-        for w in inner.winfo_children():
-            w.destroy()
-        st = self._ann()
-        rows = self._ann_visible()
-        current = str((self._feat_render_args[0] or {}).get("id", ""))
-        wrap = max(self._px(200), self._news_left_w - self._px(90))
-        pad = self._px(12)
-        for row in rows[:st["shown"]]:
-            mine = str(row.topic_id) == current
-            item = tk.Frame(inner, bg=C_PANEL_ALT, cursor="hand2")
-            item.pack(fill="x", padx=pad, pady=(self._px(8), 0))
-            t = tk.Label(item, text=row.title, font=self._font(10, bold=True),
-                         fg=C_GOLD_LT if mine else C_TEXT, bg=C_PANEL_ALT,
-                         wraplength=wrap, justify="left", anchor="w",
-                         cursor="hand2")
-            t.pack(fill="x")
-            meta = []
-            if row.author:
-                meta.append(tr("by {author}", author=row.author))
-            date = _format_news_date(row.to_item()["date"])
-            if date:
-                meta.append(date)
-            m = tk.Label(item, text=" · ".join(meta), font=self._font(8),
-                         fg=C_TEXT_DIM, bg=C_PANEL_ALT, anchor="w",
-                         cursor="hand2")
-            m.pack(fill="x")
-            base = C_GOLD_LT if mine else C_TEXT
-            for w in (item, t, m):
-                w.bind("<Button-1>", lambda e, r=row: self._ann_pick(r))
-                w.bind("<Enter>", lambda e, l=t: l.configure(fg=C_GOLD))
-                w.bind("<Leave>", lambda e, l=t, c=base: l.configure(fg=c))
-            tk.Frame(inner, bg=C_DIVIDER, height=self._px(1)).pack(
-                fill="x", padx=pad, pady=(self._px(8), 0))
-
         if st["loading"]:
             tk.Label(inner, text=tr("Loading announcements…"),
                      font=self._font(9), fg=C_TEXT_DIM,
-                     bg=C_PANEL_ALT).pack(pady=self._px(10))
-        elif st["error"]:
+                     bg=C_PANEL).pack(pady=self._px(10))
+            return
+        if st["error"]:
             tk.Label(inner, text=tr("{section} unavailable: {reason}",
                                     section=tr("Announcements"),
                                     reason=tr(st["error"])),
-                     font=self._font(9), fg=C_ERR, bg=C_PANEL_ALT,
-                     wraplength=wrap, justify="left").pack(
-                         padx=pad, pady=(self._px(10), 0), anchor="w")
-        more = len(rows) > st["shown"] or st["next"] is not None
-        if (more or st["error"]) and not st["loading"]:
-            btn = tk.Label(inner, text=tr("Load more"),
-                           font=self._font(10, bold=True), fg=C_TEXT,
-                           bg=C_PANEL_BDR, cursor="hand2",
-                           padx=self._px(16), pady=self._px(4))
-            btn.pack(pady=self._px(12))
-            btn.bind("<Button-1>", lambda e: self._ann_more())
-            btn.bind("<Enter>", lambda e: btn.configure(bg=C_GOLD, fg="#000"))
-            btn.bind("<Leave>", lambda e: btn.configure(bg=C_PANEL_BDR,
-                                                        fg=C_TEXT))
+                     font=self._font(9), fg=C_ERR, bg=C_PANEL,
+                     wraplength=max(self._px(200),
+                                    self._news_left_w - self._px(70)),
+                     justify="left").pack(pady=(self._px(10), 0), anchor="w")
+        more = (not st["loaded"] or len(self._ann_visible()) > st["shown"]
+                or st["next"] is not None)
+        if not (more or st["error"]):
+            return
+        btn = tk.Label(inner, text=tr("Load more"),
+                       font=self._font(10, bold=True), fg=C_TEXT,
+                       bg=C_PANEL_BDR, cursor="hand2",
+                       padx=self._px(16), pady=self._px(4))
+        btn.pack(pady=self._px(12))
+        btn.bind("<Button-1>", lambda e: self._ann_more())
+        btn.bind("<Enter>", lambda e: btn.configure(bg=C_GOLD, fg="#000"))
+        btn.bind("<Leave>", lambda e: btn.configure(bg=C_PANEL_BDR, fg=C_TEXT))
 
     def _ann_more(self):
         """Ten more: from the topics already read, reading the next forum
@@ -5468,40 +5513,18 @@ class EqUpdaterApp(tk.Tk):
         st = self._ann()
         if st["error"]:
             st["error"] = ""
-        else:
+        elif st["loaded"]:
             st["shown"] += self.ANN_PAGE
-        if len(self._ann_visible()) < st["shown"] and st["next"] is not None:
+        if not st["loaded"] or (len(self._ann_visible()) < st["shown"]
+                                and st["next"] is not None):
             self._ann_load_page()
-        self._render_ann_rows()
+        self._ann_redraw()
 
-    def _ann_pick(self, row):
-        """Show one announcement from the list: its opening post, read once."""
-        st = self._ann()
-        self._ann_open = False
-        key = str(row.topic_id)
-        if key in st["posts"]:
-            self._render_featured(st["posts"][key])
-            return
-        self._render_featured(row.to_item(), loading=True)
-
-        def worker():
-            item, err = None, ""
-            try:
-                item = fetch_first_post(row, opener=_news_open, user_agent=UA,
-                                        timeout=NEWS_TIMEOUT).to_item()
-            except Exception as exc:
-                err = _news_error(N_("Announcements"), exc)
-
-            def apply():
-                if item is not None:
-                    st["posts"][key] = item
-                    self._render_featured(item)
-                else:
-                    self._render_featured(row.to_item(), error=err)
-            self.after(0, apply)
-        threading.Thread(target=worker, daemon=True).start()
+    # ── Changelog ────────────────────────────────────────────────────────────
 
     def _render_patch_notes(self, items, loading=False, error=""):
+        """The Changelog: forum 4's newest topics, each opening to its patch
+        notes; the newest is open by default."""
         self._patch_render_args = (items, loading, error)
         f = self._patch_frame
         for w in f.winfo_children():
@@ -5511,86 +5534,27 @@ class EqUpdaterApp(tk.Tk):
         self._news_header(
             f, tr("CHANGELOG"), self._load_patch_notes,
             loading=loading)
-
-        if not items:
-            msg = error or (tr("Loading changelog…") if loading
-                            else tr("No changelog entries available."))
-            tk.Label(f, text=msg, font=self._font(10),
-                     fg=C_TEXT_DIM, bg=C_PANEL, wraplength=self._news_right_w - self._px(30),
-                     justify="left").pack(padx=self._px(14),
-                                          pady=self._px(16), anchor="w")
-            return
-
-        list_frame = tk.Frame(f, bg=C_PANEL)
-        list_frame.pack(fill="both", expand=True,
-                        padx=(self._px(14), self._px(4)),
-                        pady=(0, self._px(10)))
-        canvas = tk.Canvas(list_frame, bg=C_PANEL, highlightthickness=0)
-        sb = SlimScrollbar(list_frame, command=canvas.yview, bg=C_PANEL,
-                           width=self._px(10), thumb="#31547e")
-        self._wheel_canvases.append(canvas)
-        inner = tk.Frame(canvas, bg=C_PANEL)
-        inner.bind("<Configure>",
-                   lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.create_window((0, 0), window=inner, anchor="nw",
-                             width=self._news_right_w - self._px(40))
-        canvas.configure(yscrollcommand=sb.set)
-        sb.pack(side="right", fill="y")
-        canvas.pack(side="left", fill="both", expand=True)
-
-        wrap_w = self._news_right_w - self._px(50)
-        for item in items:
-            card = tk.Frame(inner, bg=C_PANEL)
-            card.pack(fill="x", pady=(self._px(11), 0))
-            tk.Label(card, text=item.get("title", ""),
-                     font=self._font(10, bold=True),
-                     fg=C_GOLD_LT, bg=C_PANEL,
-                     wraplength=wrap_w, justify="left",
-                     anchor="w").pack(fill="x")
-
-            meta = []
-            date = _format_news_date(item.get("date", ""))
-            if date:
-                meta.append(date)
-            if item.get("author"):
-                meta.append(item["author"])
-            if meta:
-                tk.Label(card, text=" · ".join(meta),
-                         font=self._font(8), fg=C_TEXT_DIM,
-                         bg=C_PANEL, anchor="w").pack(fill="x", pady=(self._px(2), 0))
-
-            body = (item.get("body") or "").strip()
-            limit = int(220 * max(1.0, self._news_right_w
-                                  / max(1, self._news_right_base)))
-            if len(body) > limit:
-                body = body[:limit].rstrip() + "…"
-            if body:
-                tk.Label(card, text=body, font=self._font(9),
-                         fg=C_TEXT, bg=C_PANEL,
-                         wraplength=wrap_w, justify="left",
-                         anchor="w").pack(fill="x", pady=(self._px(5), 0))
-
-            if item.get("url"):
-                lnk = tk.Label(card, text=tr("Read more"),
-                               font=self._font(9, bold=True),
-                               fg=C_GOLD, bg=C_PANEL,
-                               cursor="hand2", anchor="w")
-                lnk.pack(fill="x", pady=(self._px(5), 0))
-                lnk.bind("<Button-1>",
-                         lambda e, u=item["url"]: self._open_url(u))
-                lnk.bind("<Enter>", lambda e, w=lnk: w.configure(fg=C_GOLD_LT))
-                lnk.bind("<Leave>", lambda e, w=lnk: w.configure(fg=C_GOLD))
-
-            tk.Frame(inner, bg=C_DIVIDER, height=self._px(1)).pack(
-                fill="x", pady=(self._px(11), 0))
-
+        wrap_w = max(self._px(160), self._news_right_w - self._px(60))
         if error:
-            tk.Label(f, text=tr("{error} · showing cached content",
-                                error=error),
-                     font=self._font(8), fg=C_TEXT_DIM, bg=C_PANEL,
-                     wraplength=self._news_right_w - self._px(30),
-                     justify="left", anchor="w").pack(
-                         side="bottom", fill="x", padx=self._px(14), pady=(0, self._px(4)))
+            self._news_message(f, tr("{error} · showing cached content",
+                                     error=error), wrap_w, bottom=True)
+        if not items:
+            self._news_message(f, error or (tr("Loading changelog…") if loading
+                                            else tr("No changelog entries "
+                                                    "available.")), wrap_w)
+            return
+        opened = getattr(self, "_patch_open", None)
+        if opened is None:                      # the newest, until changed
+            opened = self._patch_open = {str(items[0].get("id", ""))}
+        self._render_accordion(f, "patch", items, opened, self._patch_toggle,
+                               wrap_w=wrap_w, title_size=10)
+
+    def _patch_toggle(self, iid: str):
+        opened = getattr(self, "_patch_open", None) or set()
+        opened ^= {iid}
+        self._patch_open = opened
+        self._render_patch_notes(*self._patch_render_args)
+
 
     # ── tweaks panel ─────────────────────────────────────────────────────────────
 

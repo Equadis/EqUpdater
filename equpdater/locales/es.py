@@ -194,7 +194,6 @@ STRINGS = {
         "Evita las caídas de fotogramas al morir el personaje causadas por el recálculo de durabilidad de la transfiguración en el servidor.",
     "Project page": "Página del proyecto",
     "REPOSITORY URL": "URL DEL REPOSITORIO",
-    "Read full announcement": "Leer el anuncio completo",
     "Read more": "Leer más",
     "Ready to update": "Listo para actualizar",
     "Recommended addon": "Addon recomendado",
@@ -357,7 +356,7 @@ STRINGS = {
     "{dll} from {source} and {dll} from {other} are two builds of the same mod. Only one can be loaded.\n\nTurn off the one from {other} and use {source}?":
         "{dll} de {source} y {dll} de {other} son dos versiones del mismo mod. Solo se puede cargar una.\n\n¿Desactivar la de {other} y usar {source}?",
     "Load more": "Cargar más",
-    "Show every announcement": "Ver todos los anuncios",
+    "Loading…": "Cargando…",
     "Verify game files": "Verificar archivos del juego",
     "Verifying game files…": "Verificando archivos del juego…",
     "Verifying…": "Verificando…",

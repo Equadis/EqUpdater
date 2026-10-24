@@ -195,7 +195,6 @@ STRINGS = {
         "防止角色死亡时因服务器端幻化耐久度重新计算而导致的掉帧。",
     "Project page": "项目主页",
     "REPOSITORY URL": "仓库地址",
-    "Read full announcement": "阅读完整公告",
     "Read more": "阅读更多",
     "Ready to update": "可以更新",
     "Recommended addon": "推荐插件",
@@ -358,7 +357,7 @@ STRINGS = {
     "{dll} from {source} and {dll} from {other} are two builds of the same mod. Only one can be loaded.\n\nTurn off the one from {other} and use {source}?":
         "来自 {source} 的 {dll} 和来自 {other} 的 {dll} 是同一模组的两个版本，只能加载其中一个。\n\n关闭来自 {other} 的版本并使用 {source}？",
     "Load more": "加载更多",
-    "Show every announcement": "显示所有公告",
+    "Loading…": "正在加载…",
     "Verify game files": "校验游戏文件",
     "Verifying game files…": "正在校验游戏文件…",
     "Verifying…": "正在校验…",
