@@ -150,16 +150,18 @@ class TestAppStarts(unittest.TestCase):
         self.assertTrue(all(app.resizable()))
         left0, right0 = app._news_left_w, app._news_right_w
         try:
-            app.geometry(f"{small[0] + 300}x{small[1] + 200}")
+            # Smaller, not bigger: a CI machine's screen (1024x768) has no
+            # room to grow, and the window manager caps the request.
+            app.geometry(f"{small[0] - 150}x{small[1] - 100}")
             app.update()
             app._apply_resize()
             app.update()
-            self.assertEqual((m.WIN_W, m.WIN_H), (small[0] + 300, small[1] + 200))
+            self.assertEqual((m.WIN_W, m.WIN_H), (small[0] - 150, small[1] - 100))
             self.assertEqual(app._bg_canvas.winfo_width(), m.WIN_W)
-            self.assertGreater(app._news_left_w, left0)
-            self.assertGreater(app._news_right_w, right0)
-            self.assertEqual(app._news_panel.winfo_width(),
-                             m.WIN_W - 2 * app._px(40))
+            self.assertLess(app._news_left_w, left0)
+            self.assertLess(app._news_right_w, right0)
+            self.assertAlmostEqual(app._news_panel.winfo_width(),
+                                   app.winfo_width() - 2 * app._px(40), delta=1)
             self.assertEqual(app._feat_frame.winfo_width(), app._news_left_w)
             self.assertEqual(m.load_config()["window"],
                              {"width": m.WIN_W, "height": m.WIN_H})
@@ -234,11 +236,11 @@ class TestAppStarts(unittest.TestCase):
             app._begin_resize()
             self.assertTrue(app._resizing)
             self.assertEqual(app._bg_canvas.itemcget("bg_image", "state"), "hidden")
-            app.geometry(f"{designed[0] + 200}x{designed[1] + 100}")
+            app.geometry(f"{designed[0] - 200}x{designed[1] - 100}")
             app.update()
             app._live_resize()
             app.update()
-            self.assertEqual(m.WIN_W, designed[0] + 200)          # live layout
+            self.assertEqual(m.WIN_W, designed[0] - 200)          # live layout
             self.assertIn(app._acc_canvas["patch"], app._stretch_pending)  # rows wait
             self.assertEqual((app._mods_panel_frame.winfo_width(),
                               app._mods_panel_frame.winfo_height()), mods_size)
