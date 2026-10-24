@@ -4266,12 +4266,14 @@ class EqUpdaterApp(tk.Tk):
             self.bind_all(sequence, self._on_mousewheel)
 
         self.title(branding.APP_TITLE)
-        # Resizable, never smaller than the size everything was designed at
-        # (WIN_W x WIN_H here, already DPI-scaled). From here on WIN_W/WIN_H
-        # are the window's *current* size: _apply_resize updates them.
-        self._min_w, self._min_h = WIN_W, WIN_H
+        # Resizable. The smallest size is set once the header is drawn
+        # (_update_minsize): the logo and tabs side by side above the
+        # footer's buttons, with the content panels hidden when there is no
+        # room for them. From here on WIN_W/WIN_H are the window's *current*
+        # size: _apply_resize updates them.
+        self._min_w, self._min_h = self._px(400), self._px(260)
+        self._panels_hidden = False
         self.resizable(True, True)
-        self.minsize(WIN_W, WIN_H)
         self.configure(bg=C_BG)
         self._apply_window_icon()
 
@@ -4286,7 +4288,7 @@ class EqUpdaterApp(tk.Tk):
         except (TypeError, ValueError):
             w = h = 0
         if self._min_w <= w <= sw and self._min_h <= h <= sh:
-            WIN_W, WIN_H = w, h
+            WIN_W, WIN_H = w, h     # minsize() may still enlarge it a little
         x  = max(0, (sw - WIN_W) // 2)
         y  = max(0, (sh - WIN_H) // 2)
         self.geometry(f"{WIN_W}x{WIN_H}+{x}+{y}")
@@ -4579,8 +4581,6 @@ class EqUpdaterApp(tk.Tk):
         self._draw_nav_tab(prev)
         self._draw_nav_tab(tab)
 
-        PANEL_TOP = self._px(119)
-
         # Panels stay mapped and stacked; switching tabs only raises the
         # active one. place_forget()/place() would unmap and remap the whole
         # widget tree of a populated panel (hundreds of widgets) every
@@ -4591,11 +4591,8 @@ class EqUpdaterApp(tk.Tk):
                   "MODS":   self._mods_panel_frame,
                   "MPQ":    self._mpq_panel_frame}
         target = panels.get(tab, self._news_panel)
-        if not target.winfo_ismapped():
-            # Relative to the window, so it follows every resize.
-            target.place(x=self._px(40), y=PANEL_TOP,
-                         relwidth=1.0, width=-self._px(80), relheight=1.0,
-                         height=-(PANEL_TOP + FOOT_H + self._px(10)))
+        if not target.winfo_ismapped() and not self._panels_hidden:
+            self._place_panel(target)
         target.tkraise()
         self._active_panel = target
 
@@ -4939,6 +4936,7 @@ class EqUpdaterApp(tk.Tk):
                                       self._hdr_h)
             x += w
             self._draw_nav_tab(tab)
+        self._update_minsize()
 
     def _draw_update_label(self, hover: bool = False):
         cv = self._hdr_canvas
@@ -5011,17 +5009,11 @@ class EqUpdaterApp(tk.Tk):
             self.after(0, show)
 
     def _build_panel(self):
-        PANEL_TOP  = self._px(109)
-        PANEL_BOT  = FOOT_H
-        PAD        = self._px(40)
-
         # A backdrop, not a plain frame: the gap between the two news panels
         # shows the (animated) window background instead of a flat colour.
         panel = BackdropCanvas(self, bg=C_BG)
         self._bg_backdrops = [panel]
-        panel.place(x=PAD, y=PANEL_TOP + self._px(10),
-                    relwidth=1.0, width=-PAD * 2, relheight=1.0,
-                    height=-(PANEL_TOP + PANEL_BOT + self._px(20)))
+        self._place_panel(panel)
         panel.set_image(getattr(self, "_bg_current", None))
         self._news_panel = panel
         self._active_panel = panel
@@ -5051,6 +5043,52 @@ class EqUpdaterApp(tk.Tk):
         self._build_tweaks_panel()
         self._build_addons_panel()
         self._build_mpq_panel()
+
+    def _place_panel(self, panel):
+        """A tab's panel between the header and the footer, relative to the
+        window so it follows every resize."""
+        top = self._px(119)
+        panel.place(x=self._px(40), y=top, relwidth=1.0, width=-self._px(80),
+                    relheight=1.0, height=-(top + FOOT_H + self._px(10)))
+
+    def _all_panels(self) -> list:
+        return [p for p in (getattr(self, n, None) for n in (
+            "_news_panel", "_tweaks_panel_frame", "_addons_panel_frame",
+            "_mods_panel_frame", "_mpq_panel_frame")) if p is not None]
+
+    def _update_panel_visibility(self):
+        """Too little height between the header and the footer: hide the
+        panels rather than squeeze them; put the active one back when there
+        is room again (the others come back as their tabs are opened)."""
+        room = WIN_H - (self._px(119) + FOOT_H + self._px(10))
+        hide = room < self._px(120)
+        if hide == self._panels_hidden:
+            return
+        self._panels_hidden = hide
+        if hide:
+            for panel in self._all_panels():
+                panel.place_forget()
+        else:
+            self._place_panel(self._active_panel)
+            self._active_panel.tkraise()
+
+    def _update_minsize(self):
+        """The smallest window: the logo and the tabs side by side (they are
+        laid out from the right edge, so their width is fixed), and the
+        footer's buttons with a short progress bar; as tall as the header
+        and footer alone. Again whenever the font or language changes."""
+        c = getattr(self, "_bg_canvas", None)
+        tabs = [r for k, r in getattr(self, "_hdr_regions", {}).items()
+                if k in getattr(self, "_nav_pos", {})]
+        if c is None or not tabs:
+            return
+        logo = c.bbox("logo")
+        logo_right = logo[2] if logo else self._px(260)
+        tabs_w = WIN_W - min(r[0] for r in tabs)
+        self._min_w = max(logo_right + self._px(24) + tabs_w,
+                          self._px(400) + self._px(120) + self._px(40))
+        self._min_h = self._px(119) + FOOT_H + self._px(10)
+        self.minsize(self._min_w, self._min_h)
 
     def _news_column_widths(self):
         """The two News columns' widths for the window's current width:
@@ -5091,6 +5129,7 @@ class EqUpdaterApp(tk.Tk):
         if w < 2 or h < 2 or (w, h) == (WIN_W, WIN_H):
             return
         WIN_W, WIN_H = max(w, self._min_w), max(h, self._min_h)
+        self._update_panel_visibility()
 
         self._bg_canvas.configure(width=WIN_W, height=WIN_H)
         self._draw_bg()
@@ -5099,7 +5138,7 @@ class EqUpdaterApp(tk.Tk):
         self._hdr_regions["gear"] = (WIN_W - self._px(36), self._px(2),
                                      WIN_W - self._px(2), self._px(34))
         self._draw_gear()
-        self._pb_width = WIN_W - self._px(400) - self._px(40)
+        self._pb_width = max(self._px(60), WIN_W - self._px(400) - self._px(40))
         self._layout_footer()
 
         self._news_column_widths()
@@ -5219,13 +5258,9 @@ class EqUpdaterApp(tk.Tk):
         the redraw that every open, close and Load more causes.
 
         ``footer(inner)`` adds what goes under the entries."""
-        old = getattr(self, "_acc_canvas", {}).get(key)
-        y = 0.0
-        try:
-            if old is not None and old.winfo_exists():
-                y = old.yview()[0]
-        except tk.TclError:
-            pass
+        # Where the old list was scrolled to, in pixels: taken by
+        # _acc_remember before the panel was cleared.
+        y_px = getattr(self, "_acc_keep", {}).pop(key, 0)
 
         list_frame = tk.Frame(f, bg=C_PANEL)
         list_frame.pack(fill="both", expand=True,
@@ -5306,10 +5341,23 @@ class EqUpdaterApp(tk.Tk):
 
         if footer is not None:
             footer(inner)
-        if y:
+        if y_px:
+            # The same pixel offset, not the same fraction: opening an entry
+            # makes the list longer, and a fraction would then move the view.
             inner.update_idletasks()
-            canvas.configure(scrollregion=canvas.bbox("all"))
-            canvas.yview_moveto(y)
+            total = max(1, inner.winfo_reqheight())
+            canvas.configure(scrollregion=(0, 0, inner.winfo_reqwidth(), total))
+            canvas.yview_moveto(y_px / total)
+
+    def _acc_remember(self, key):
+        """Note how far a list is scrolled, before its panel is redrawn."""
+        canvas = getattr(self, "_acc_canvas", {}).get(key)
+        try:
+            if canvas is not None and canvas.winfo_exists():
+                self._acc_keep = {**getattr(self, "_acc_keep", {}),
+                                  key: canvas.canvasy(0)}
+        except tk.TclError:
+            pass
 
     def _news_message(self, f, text, wrap_w, *, error=False, bottom=False):
         tk.Label(f, text=text, font=self._font(8 if bottom else 10),
@@ -5331,6 +5379,7 @@ class EqUpdaterApp(tk.Tk):
         (or news.json's, while the forum cannot be read): until the list
         itself is read, it is shown alone."""
         self._feat_render_args = (post, loading, error, note)
+        self._acc_remember("ann")
         f = self._feat_frame
         for w in f.winfo_children():
             w.destroy()
@@ -5526,6 +5575,7 @@ class EqUpdaterApp(tk.Tk):
         """The Changelog: forum 4's newest topics, each opening to its patch
         notes; the newest is open by default."""
         self._patch_render_args = (items, loading, error)
+        self._acc_remember("patch")
         f = self._patch_frame
         for w in f.winfo_children():
             w.destroy()

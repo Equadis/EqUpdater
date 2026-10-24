@@ -954,6 +954,24 @@ class TestAnnouncementsList(unittest.TestCase):
         self.assertEqual([r[0] for r in rows].count("Beta Test Info"), 1)
         self.assertEqual(buttons, [])
 
+    def test_opening_and_closing_keep_the_scroll_position(self):
+        """Every click redraws the list; the view must not jump to the top."""
+        self.load()
+        self.app._ann_more()
+        self.app.update()
+        canvas = self.app._acc_canvas["ann"]
+        canvas.yview_moveto(0.5)
+        self.app.update()
+        top = self.app._acc_canvas["ann"].canvasy(0)
+        self.assertGreater(top, 0)
+        for iid in ("99", "99", "100"):           # open, close, close the newest
+            self.app._ann_toggle(iid)
+            self.app.update()
+            self.assertEqual(self.app._acc_canvas["ann"].canvasy(0), top, iid)
+        self.app._ann_more()                       # Load more too
+        self.app.update()
+        self.assertEqual(self.app._acc_canvas["ann"].canvasy(0), top)
+
     def test_refresh_starts_over(self):
         self.load()
         self.app._ann_toggle("99")

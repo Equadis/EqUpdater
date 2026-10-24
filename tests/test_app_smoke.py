@@ -166,6 +166,43 @@ class TestAppStarts(unittest.TestCase):
         self.assertEqual((m.WIN_W, m.WIN_H), small)
         self.assertEqual((app._news_left_w, app._news_right_w), (left0, right0))
 
+    def test_a_small_window_keeps_the_header_and_footer_only(self):
+        """Smaller than the designed size: down to the header and footer,
+        the content panels hidden when there is no room, back when there
+        is."""
+        app, m = self.app, self.app_mod
+        designed = (m.WIN_W, m.WIN_H)
+        self.assertLess(app._min_w, designed[0])
+        self.assertLess(app._min_h, designed[1])
+        self.assertEqual(app._min_h, app._px(119) + m.FOOT_H + app._px(10))
+        logo = app._bg_canvas.bbox("logo")
+        first_tab = min(r[0] for k, r in app._hdr_regions.items()
+                        if k in app._nav_pos)
+        try:
+            app.geometry(f"{app._min_w}x{app._min_h}")
+            app.update()
+            app._apply_resize()
+            app.update()
+            self.assertTrue(app._panels_hidden)
+            self.assertFalse(app._news_panel.winfo_ismapped())
+            # The tabs still clear the logo; the buttons are still there.
+            first_tab = min(r[0] for k, r in app._hdr_regions.items()
+                            if k in app._nav_pos)
+            self.assertGreater(first_tab, logo[2])
+            self.assertTrue(app._btn_glow.winfo_ismapped())
+            # A tab switch while hidden does not squeeze a panel in.
+            app._switch_tab("MODS")
+            app.update()
+            self.assertFalse(app._mods_panel_frame.winfo_ismapped())
+            app._switch_tab("NEWS")
+        finally:
+            app.geometry(f"{designed[0]}x{designed[1]}")
+            app.update()
+            app._apply_resize()
+            app.update()
+        self.assertFalse(app._panels_hidden)
+        self.assertTrue(app._news_panel.winfo_ismapped())
+
     def test_the_window_carries_the_product_icon(self):
         self.assertIsNotNone(getattr(self.app, "_window_icon_photo", None))
 
