@@ -142,10 +142,12 @@ class ForumBlockedError(ForumError):
 #  URLs
 # ──────────────────────────────────────────────────────────────────────────────
 
-def forum_url(forum_id: int, base: str = BASE) -> str:
+def forum_url(forum_id: int, base: str = BASE, start: int = 0) -> str:
     """A forum's listing, newest *created* topics first (phpBB's ``sk=tt``).
-    Stickies still come first; ``newest_first`` puts them in their place."""
-    return f"{base}viewforum.php?f={int(forum_id)}&sk=tt&sd=d"
+    Stickies still come first; ``newest_first`` puts them in their place.
+    ``start`` is phpBB's offset of a later page (25 topics a page there)."""
+    url = f"{base}viewforum.php?f={int(forum_id)}&sk=tt&sd=d"
+    return url + (f"&start={int(start)}" if start else "")
 
 
 def topic_url(topic_id: int, base: str = BASE) -> str:
@@ -561,6 +563,37 @@ def fetch_forum_topics(forum_id: int, *, opener, user_agent: str,
                          "listing or its markup has changed",
                          short=N_("the forum page could not be read"))
     return newest_first(rows)
+
+
+_PAGE_START = re.compile(r"viewforum\.php\?[^\"'<>\s]*?\bstart=(\d+)")
+
+
+def next_page_start(html: str, start: int = 0) -> int | None:
+    """The offset of the listing page after the one at ``start``, from the
+    forum's own page-number links, or None on the last page. Only links back
+    to the *forum* count: the page numbers inside a topic row point at
+    viewtopic.php and are not the forum's pages."""
+    later = {int(m.group(1)) for m in _PAGE_START.finditer(unescape(html or ""))}
+    later = {n for n in later if n > start}
+    return min(later) if later else None
+
+
+def fetch_forum_page(forum_id: int, start: int = 0, *, opener, user_agent: str,
+                     timeout: int = 8, base: str = BASE) -> tuple:
+    """One page of a forum listing: (its topic rows, newest-started first,
+    and the next page's offset or None). One request. A page with no topics
+    is an error, as in fetch_forum_topics."""
+    url = forum_url(forum_id, base, start)
+    stage = f"forum {forum_id} listing" + (f" from {start}" if start else "")
+    html = _get(url, stage, opener=opener, user_agent=user_agent,
+                timeout=timeout)
+    rows = parse_forum_topics(html, url)
+    if not rows:
+        raise ForumError(f"{stage} parse", url,
+                         "no topic rows found; the page is not a phpBB "
+                         "listing or its markup has changed",
+                         short=N_("the forum page could not be read"))
+    return newest_first(rows), next_page_start(html, start)
 
 
 def fetch_first_post(topic: TopicRow, *, opener, user_agent: str,

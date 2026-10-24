@@ -134,6 +134,38 @@ class TestAppStarts(unittest.TestCase):
         self.assertFalse(game.startswith(app_dir + os.sep), game)
         self.assertEqual(os.path.basename(game).lower(), "octowow")
 
+    def test_the_window_resizes_and_remembers_its_size(self):
+        """Resizable down to the designed size; the panels, the News columns
+        and what is drawn to measure follow, and the size is kept."""
+        app, m = self.app, self.app_mod
+        small = (m.WIN_W, m.WIN_H)
+        self.assertEqual(tuple(app.minsize()), (app._min_w, app._min_h))
+        self.assertTrue(all(app.resizable()))
+        left0, right0 = app._news_left_w, app._news_right_w
+        try:
+            app.geometry(f"{small[0] + 300}x{small[1] + 200}")
+            app.update()
+            app._apply_resize()
+            app.update()
+            self.assertEqual((m.WIN_W, m.WIN_H), (small[0] + 300, small[1] + 200))
+            self.assertEqual(app._bg_canvas.winfo_width(), m.WIN_W)
+            self.assertGreater(app._news_left_w, left0)
+            self.assertGreater(app._news_right_w, right0)
+            self.assertEqual(app._news_panel.winfo_width(),
+                             m.WIN_W - 2 * app._px(40))
+            self.assertEqual(app._feat_frame.winfo_width(), app._news_left_w)
+            self.assertEqual(m.load_config()["window"],
+                             {"width": m.WIN_W, "height": m.WIN_H})
+            gear = app._hdr_regions["gear"]
+            self.assertEqual(gear[2], m.WIN_W - app._px(2))
+        finally:
+            app.geometry(f"{small[0]}x{small[1]}")
+            app.update()
+            app._apply_resize()
+            app.update()
+        self.assertEqual((m.WIN_W, m.WIN_H), small)
+        self.assertEqual((app._news_left_w, app._news_right_w), (left0, right0))
+
     def test_the_window_carries_the_product_icon(self):
         self.assertIsNotNone(getattr(self.app, "_window_icon_photo", None))
 

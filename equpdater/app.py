@@ -56,8 +56,8 @@ from .planner import (Component, plan, skipped_notably,
 from .states import Action, Plan, Status
 from .news import (ANNOUNCEMENTS_FORUM_ID, CHANGELOG_FORUM_ID,
                    ForumBlockedError, ForumError, fetch_first_post,
-                   fetch_latest_post, fetch_news_feed, fetch_topic_list,
-                   is_challenge_page)
+                   fetch_forum_page, fetch_latest_post, fetch_news_feed,
+                   fetch_topic_list, is_challenge_page, newest_first)
 from .ui import (AnimatedBackground, FontManager, GradientButton, prepare_fonts,
                  GradientPalette, apply_edge_fades, cover_background,
                  BackdropCanvas, blend, edge_fade_layers, photo_image,
@@ -4266,17 +4266,32 @@ class EqUpdaterApp(tk.Tk):
             self.bind_all(sequence, self._on_mousewheel)
 
         self.title(branding.APP_TITLE)
-        self.resizable(False, False)
+        # Resizable, never smaller than the size everything was designed at
+        # (WIN_W x WIN_H here, already DPI-scaled). From here on WIN_W/WIN_H
+        # are the window's *current* size: _apply_resize updates them.
+        self._min_w, self._min_h = WIN_W, WIN_H
+        self.resizable(True, True)
+        self.minsize(WIN_W, WIN_H)
         self.configure(bg=C_BG)
         self._apply_window_icon()
 
-        # Center on screen up front. WIN_W/WIN_H are fixed, so we can position
-        # the window in a single geometry call (no need to map-then-measure).
+        # The size it had last time, if it still fits this screen; centred
+        # either way, in a single geometry call.
         sw = self.winfo_screenwidth()
         sh = self.winfo_screenheight()
-        x  = (sw - WIN_W) // 2
-        y  = (sh - WIN_H) // 2
+        saved = self._cfg.get("window") or {}
+        try:
+            w = int(saved.get("width") or 0)
+            h = int(saved.get("height") or 0)
+        except (TypeError, ValueError):
+            w = h = 0
+        if self._min_w <= w <= sw and self._min_h <= h <= sh:
+            WIN_W, WIN_H = w, h
+        x  = max(0, (sw - WIN_W) // 2)
+        y  = max(0, (sh - WIN_H) // 2)
         self.geometry(f"{WIN_W}x{WIN_H}+{x}+{y}")
+        self._resize_job = None
+        self.bind("<Configure>", self._on_window_configure, add="+")
 
         self._build()
 
@@ -4565,7 +4580,6 @@ class EqUpdaterApp(tk.Tk):
         self._draw_nav_tab(tab)
 
         PANEL_TOP = self._px(119)
-        PANEL_H   = WIN_H - PANEL_TOP - FOOT_H - self._px(10)
 
         # Panels stay mapped and stacked; switching tabs only raises the
         # active one. place_forget()/place() would unmap and remap the whole
@@ -4578,8 +4592,10 @@ class EqUpdaterApp(tk.Tk):
                   "MPQ":    self._mpq_panel_frame}
         target = panels.get(tab, self._news_panel)
         if not target.winfo_ismapped():
+            # Relative to the window, so it follows every resize.
             target.place(x=self._px(40), y=PANEL_TOP,
-                         width=WIN_W - self._px(80), height=PANEL_H)
+                         relwidth=1.0, width=-self._px(80), relheight=1.0,
+                         height=-(PANEL_TOP + FOOT_H + self._px(10)))
         target.tkraise()
         self._active_panel = target
 
@@ -4640,7 +4656,9 @@ class EqUpdaterApp(tk.Tk):
         the animation's first frame is being made, when animation is off,
         and if the animation cannot be played."""
         c = self._bg_canvas
-        c.delete("all")
+        # Only its own items: the header and footer are drawn on this canvas
+        # too, and a resize redraws the background under them.
+        c.delete("bg")
         self._bg_item = None
         # The top eases into the window edge behind the header, and the
         # bottom fades to the footer's dark so the controls sit on a soft
@@ -4659,10 +4677,13 @@ class EqUpdaterApp(tk.Tk):
             self._bg_item = c.create_image(0, 0, image=self._bg_photo,
                                            anchor="nw", tags="bg")
         else:
-            c.create_rectangle(0, 0, WIN_W, WIN_H, fill=C_BG, outline="")
+            c.create_rectangle(0, 0, WIN_W, WIN_H, fill=C_BG, outline="",
+                               tags="bg")
         # A tiny dark veil keeps the bright bubble highlights from fighting
         # with edge text while leaving the supplied artwork clearly visible.
-        c.create_rectangle(0, 0, WIN_W, WIN_H, fill="", outline=C_PANEL_BDR)
+        c.create_rectangle(0, 0, WIN_W, WIN_H, fill="", outline=C_PANEL_BDR,
+                           tags="bg")
+        c.tag_lower("bg")
         if self._cfg.get("animated_background", True):
             self._start_bg_animation()
 
@@ -4992,7 +5013,6 @@ class EqUpdaterApp(tk.Tk):
     def _build_panel(self):
         PANEL_TOP  = self._px(109)
         PANEL_BOT  = FOOT_H
-        PANEL_H    = WIN_H - PANEL_TOP - PANEL_BOT
         PAD        = self._px(40)
 
         # A backdrop, not a plain frame: the gap between the two news panels
@@ -5000,31 +5020,29 @@ class EqUpdaterApp(tk.Tk):
         panel = BackdropCanvas(self, bg=C_BG)
         self._bg_backdrops = [panel]
         panel.place(x=PAD, y=PANEL_TOP + self._px(10),
-                    width=WIN_W - PAD * 2,
-                    height=PANEL_H - self._px(20))
+                    relwidth=1.0, width=-PAD * 2, relheight=1.0,
+                    height=-(PANEL_TOP + PANEL_BOT + self._px(20)))
         panel.set_image(getattr(self, "_bg_current", None))
         self._news_panel = panel
         self._active_panel = panel
 
-        inner_w = WIN_W - PAD * 2
         # A small gap between the two panels; the backdrop shows the
         # bubbles through it.
-        gap = self._px(10)
-        self._news_left_w  = int(inner_w * 0.60)
-        self._news_right_w = inner_w - self._news_left_w - gap
+        self._news_gap = self._px(10)
+        self._news_column_widths()
+        # The width the Changelog was designed at: its previews are as long
+        # as at this width, and longer as the column grows.
+        self._news_right_base = self._news_right_w
 
         feat = tk.Frame(panel, bg=C_PANEL,
                         highlightthickness=1,
                         highlightbackground=C_PANEL_BDR)
-        feat.place(x=0, y=0, width=self._news_left_w, relheight=1.0)
         self._feat_frame = feat
-
         changelog = tk.Frame(panel, bg=C_PANEL,
                              highlightthickness=1,
                              highlightbackground=C_PANEL_BDR)
-        changelog.place(x=self._news_left_w + gap, y=0,
-                        width=self._news_right_w, relheight=1.0)
         self._patch_frame = changelog
+        self._place_news_columns()
 
         self._render_featured(self._featured, loading=self._featured is None)
         self._render_patch_notes(self._patch_items,
@@ -5036,6 +5054,65 @@ class EqUpdaterApp(tk.Tk):
         self._build_tweaks_panel()
         self._build_addons_panel()
         self._build_mpq_panel()
+
+    def _news_column_widths(self):
+        """The two News columns' widths for the window's current width:
+        Announcements 60 %, the Changelog the rest, a gap between."""
+        inner_w = WIN_W - self._px(40) * 2
+        self._news_left_w = int(inner_w * 0.60)
+        self._news_right_w = inner_w - self._news_left_w - self._news_gap
+
+    def _place_news_columns(self):
+        self._feat_frame.place(x=0, y=0, width=self._news_left_w,
+                               relheight=1.0)
+        self._patch_frame.place(x=self._news_left_w + self._news_gap, y=0,
+                                width=self._news_right_w, relheight=1.0)
+
+    # ── window size ──────────────────────────────────────────────────────────
+
+    def _on_window_configure(self, event):
+        """The window was moved or resized. Re-laid out once the size settles
+        (a drag sends dozens of these), and only if the size changed."""
+        if event.widget is not self:
+            return
+        if self._resize_job is not None:
+            try:
+                self.after_cancel(self._resize_job)
+            except tk.TclError:
+                pass
+        self._resize_job = self.after(150, self._apply_resize)
+
+    def _apply_resize(self):
+        """Lay everything out for the window's current size. Panels follow
+        on their own (they are placed relative to the window); this redoes
+        what is drawn to measure: the background, the header's tabs and gear,
+        the footer, the News columns and their text. The size is remembered
+        for the next start."""
+        global WIN_W, WIN_H
+        self._resize_job = None
+        w, h = self.winfo_width(), self.winfo_height()
+        if w < 2 or h < 2 or (w, h) == (WIN_W, WIN_H):
+            return
+        WIN_W, WIN_H = max(w, self._min_w), max(h, self._min_h)
+
+        self._bg_canvas.configure(width=WIN_W, height=WIN_H)
+        self._draw_bg()
+        self._show_bg_image(self._bg_current)
+        self._layout_nav()
+        self._hdr_regions["gear"] = (WIN_W - self._px(36), self._px(2),
+                                     WIN_W - self._px(2), self._px(34))
+        self._draw_gear()
+        self._pb_width = WIN_W - self._px(400) - self._px(40)
+        self._layout_footer()
+
+        self._news_column_widths()
+        self._place_news_columns()
+        self._render_featured(*self._feat_render_args)
+        self._render_patch_notes(*self._patch_render_args)
+
+        size = {"width": WIN_W, "height": WIN_H}
+        if (self._cfg.get("window") or {}) != size:
+            self._cfg = update_config(lambda c: c.__setitem__("window", size))
 
     # ── news panel ───────────────────────────────────────────────────────────
 
@@ -5054,13 +5131,15 @@ class EqUpdaterApp(tk.Tk):
         self._load_patch_notes()
 
     def _load_featured(self):
-        """Read the Announcements once, in the background: the thread, else
-        news.json (fetch_featured_post); if both fail, the last good one
-        stays on screen. A click on refresh while a read is already running
-        does not start a second."""
+        """Read the Announcements once, in the background: forum 2's newest
+        topic, else news.json (fetch_featured_post); if both fail, the last
+        good one stays on screen. A click on refresh while a read is already
+        running does not start a second. It also closes and forgets the list
+        of every announcement, which is read again when next opened."""
         if getattr(self, "_feat_loading", False):
             return
         self._feat_loading = True
+        self._ann_reset()
         self._render_featured(self._featured, loading=True)
 
         def worker():
@@ -5130,6 +5209,7 @@ class EqUpdaterApp(tk.Tk):
         tk.Frame(parent, bg=C_DIVIDER, height=self._px(1)).pack(fill="x")
 
     def _render_featured(self, post, loading=False, error="", note=""):
+        self._feat_render_args = (post, loading, error, note)
         f = self._feat_frame
         for w in f.winfo_children():
             w.destroy()
@@ -5148,14 +5228,19 @@ class EqUpdaterApp(tk.Tk):
                                           pady=self._px(18), anchor="w")
             return
 
+        # The title and byline are one control: a click opens the list of
+        # every announcement below them (and closes it again).
+        is_open = getattr(self, "_ann_open", False)
+        head = tk.Frame(f, bg=C_PANEL, cursor="hand2")
+        head.pack(fill="x", padx=self._px(20), pady=(self._px(16), 0))
+        self._feat_head = head
         title = post.get("title", "")
-        tk.Label(f, text=title,
-                 font=self._font(15, bold=True),
-                 fg=C_TEXT, bg=C_PANEL,
-                 wraplength=self._news_left_w - self._px(40),
-                 justify="left", anchor="w").pack(
-                     fill="x", padx=self._px(20),
-                     pady=(self._px(16), self._px(3)))
+        title_lbl = tk.Label(head, text=title,
+                             font=self._font(15, bold=True),
+                             fg=C_TEXT, bg=C_PANEL, cursor="hand2",
+                             wraplength=self._news_left_w - self._px(40),
+                             justify="left", anchor="w")
+        title_lbl.pack(fill="x", pady=(0, self._px(3)))
 
         byline = []
         if post.get("author"):
@@ -5163,11 +5248,17 @@ class EqUpdaterApp(tk.Tk):
         date = _format_news_date(post.get("date", ""))
         if date:
             byline.append(date)
-        if byline:
-            tk.Label(f, text=" · ".join(byline),
-                     font=self._font(9, italic=True),
-                     fg=C_TEXT_DIM, bg=C_PANEL, anchor="w").pack(
-                         fill="x", padx=self._px(20), pady=(0, self._px(10)))
+        byline.append("\u25b4" if is_open else "\u25be")
+        by_lbl = tk.Label(head, text=" · ".join(byline[:-1]) + "  " + byline[-1],
+                          font=self._font(9, italic=True),
+                          fg=C_TEXT_DIM, bg=C_PANEL, anchor="w",
+                          cursor="hand2")
+        by_lbl.pack(fill="x", pady=(0, self._px(10)))
+        for w in (head, title_lbl, by_lbl):
+            w.bind("<Button-1>", lambda e: self._toggle_ann_list())
+            w.bind("<Enter>", lambda e: title_lbl.configure(fg=C_GOLD_LT))
+            w.bind("<Leave>", lambda e: title_lbl.configure(fg=C_TEXT))
+        self._add_tooltip(title_lbl, tr("Show every announcement"))
         tk.Frame(f, bg=C_DIVIDER, height=self._px(1)).pack(
             fill="x", padx=self._px(20))
 
@@ -5203,8 +5294,215 @@ class EqUpdaterApp(tk.Tk):
                      justify="left", anchor="w").pack(
                          side="bottom", fill="x", padx=self._px(20),
                          pady=(0, self._px(4)))
+        if is_open:
+            self._show_ann_list()
+
+    # ── every announcement: the list under the title ─────────────────────────
+
+    #: Announcements shown at first, and added by each Load more.
+    ANN_PAGE = 10
+
+    def _ann(self) -> dict:
+        """The list's state: the topics read so far (by id), the offset of
+        the next forum page (None after the last), how many are shown, and
+        the opening posts already read."""
+        st = getattr(self, "_ann_state", None)
+        if st is None:
+            st = self._ann_state = {"rows": {}, "next": 0, "loaded": False,
+                                    "shown": self.ANN_PAGE, "loading": False,
+                                    "error": "", "posts": {}}
+        return st
+
+    def _ann_reset(self):
+        """Forget the list (the refresh button): it is read again when next
+        opened, and the panel goes back to the newest announcement."""
+        self._ann_state = None
+        self._ann_open = False
+
+    def _toggle_ann_list(self):
+        self._ann_open = not getattr(self, "_ann_open", False)
+        self._render_featured(*self._feat_render_args)
+
+    def _ann_visible(self) -> list:
+        """The topics read so far, newest started first. Pinned topics sit
+        on every page of a phpBB listing whatever their age, so one older
+        than the oldest ordinary topic read so far is held back until the
+        pages around its date are read, or the forum's last page is."""
+        st = self._ann()
+        rows = newest_first(list(st["rows"].values()))
+        if st["next"] is not None:
+            dated = [r.created_at for r in rows
+                     if r.kind == "normal" and r.created_at]
+            if dated:
+                floor = min(dated)
+                rows = [r for r in rows if r.kind == "normal"
+                        or (r.created_at and r.created_at >= floor)]
+        return rows
+
+    def _ann_load_page(self):
+        """Read the next page of forum 2's listing, in the background."""
+        st = self._ann()
+        if st["loading"] or st["next"] is None:
+            return
+        st["loading"], st["error"] = True, ""
+        start = st["next"]
+
+        def worker():
+            rows, nxt, err = [], start, ""
+            try:
+                rows, nxt = fetch_forum_page(
+                    ANNOUNCEMENTS_FORUM_ID, start, opener=_news_open,
+                    user_agent=UA, timeout=NEWS_TIMEOUT)
+            except Exception as exc:
+                log(f"Announcements list: {exc}", "dim")
+                err = getattr(exc, "short", None) or str(exc)
+
+            def apply():
+                if self._ann_state is not st:
+                    return                      # reset meanwhile
+                st["loading"] = False
+                if err:
+                    st["error"] = err
+                else:
+                    for row in rows:
+                        st["rows"].setdefault(row.topic_id, row)
+                    st["next"], st["loaded"] = nxt, True
+                if getattr(self, "_ann_open", False):
+                    self._render_ann_rows()
+            self.after(0, apply)
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _show_ann_list(self):
+        """The list, dropped down under the title over the post's text."""
+        f, head = self._feat_frame, self._feat_head
+        f.update_idletasks()
+        top = head.winfo_y() + head.winfo_height()
+        box = tk.Frame(f, bg=C_PANEL_ALT, highlightthickness=1,
+                       highlightbackground=C_PANEL_BDR)
+        box.place(x=self._px(14), y=top, relwidth=1.0, width=-self._px(28),
+                  relheight=1.0, height=-(top + self._px(12)))
+        box.lift()
+        canvas = tk.Canvas(box, bg=C_PANEL_ALT, highlightthickness=0)
+        sb = SlimScrollbar(box, command=canvas.yview, bg=C_PANEL_ALT,
+                           width=self._px(10), thumb="#31547e")
+        canvas.configure(yscrollcommand=sb.set)
+        sb.pack(side="right", fill="y", pady=self._px(4))
+        canvas.pack(side="left", fill="both", expand=True)
+        self._wheel_canvases.append(canvas)
+        inner = tk.Frame(canvas, bg=C_PANEL_ALT)
+        win = canvas.create_window((0, 0), window=inner, anchor="nw")
+        inner.bind("<Configure>",
+                   lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.bind("<Configure>",
+                    lambda e: canvas.itemconfigure(win, width=e.width))
+        self._ann_canvas, self._ann_inner = canvas, inner
+        st = self._ann()
+        if not st["loaded"] and not st["error"]:
+            self._ann_load_page()
+        self._render_ann_rows()
+
+    def _render_ann_rows(self):
+        inner = getattr(self, "_ann_inner", None)
+        if inner is None or not inner.winfo_exists():
+            return
+        for w in inner.winfo_children():
+            w.destroy()
+        st = self._ann()
+        rows = self._ann_visible()
+        current = str((self._feat_render_args[0] or {}).get("id", ""))
+        wrap = max(self._px(200), self._news_left_w - self._px(90))
+        pad = self._px(12)
+        for row in rows[:st["shown"]]:
+            mine = str(row.topic_id) == current
+            item = tk.Frame(inner, bg=C_PANEL_ALT, cursor="hand2")
+            item.pack(fill="x", padx=pad, pady=(self._px(8), 0))
+            t = tk.Label(item, text=row.title, font=self._font(10, bold=True),
+                         fg=C_GOLD_LT if mine else C_TEXT, bg=C_PANEL_ALT,
+                         wraplength=wrap, justify="left", anchor="w",
+                         cursor="hand2")
+            t.pack(fill="x")
+            meta = []
+            if row.author:
+                meta.append(tr("by {author}", author=row.author))
+            date = _format_news_date(row.to_item()["date"])
+            if date:
+                meta.append(date)
+            m = tk.Label(item, text=" · ".join(meta), font=self._font(8),
+                         fg=C_TEXT_DIM, bg=C_PANEL_ALT, anchor="w",
+                         cursor="hand2")
+            m.pack(fill="x")
+            base = C_GOLD_LT if mine else C_TEXT
+            for w in (item, t, m):
+                w.bind("<Button-1>", lambda e, r=row: self._ann_pick(r))
+                w.bind("<Enter>", lambda e, l=t: l.configure(fg=C_GOLD))
+                w.bind("<Leave>", lambda e, l=t, c=base: l.configure(fg=c))
+            tk.Frame(inner, bg=C_DIVIDER, height=self._px(1)).pack(
+                fill="x", padx=pad, pady=(self._px(8), 0))
+
+        if st["loading"]:
+            tk.Label(inner, text=tr("Loading announcements…"),
+                     font=self._font(9), fg=C_TEXT_DIM,
+                     bg=C_PANEL_ALT).pack(pady=self._px(10))
+        elif st["error"]:
+            tk.Label(inner, text=tr("{section} unavailable: {reason}",
+                                    section=tr("Announcements"),
+                                    reason=tr(st["error"])),
+                     font=self._font(9), fg=C_ERR, bg=C_PANEL_ALT,
+                     wraplength=wrap, justify="left").pack(
+                         padx=pad, pady=(self._px(10), 0), anchor="w")
+        more = len(rows) > st["shown"] or st["next"] is not None
+        if (more or st["error"]) and not st["loading"]:
+            btn = tk.Label(inner, text=tr("Load more"),
+                           font=self._font(10, bold=True), fg=C_TEXT,
+                           bg=C_PANEL_BDR, cursor="hand2",
+                           padx=self._px(16), pady=self._px(4))
+            btn.pack(pady=self._px(12))
+            btn.bind("<Button-1>", lambda e: self._ann_more())
+            btn.bind("<Enter>", lambda e: btn.configure(bg=C_GOLD, fg="#000"))
+            btn.bind("<Leave>", lambda e: btn.configure(bg=C_PANEL_BDR,
+                                                        fg=C_TEXT))
+
+    def _ann_more(self):
+        """Ten more: from the topics already read, reading the next forum
+        page when those run out."""
+        st = self._ann()
+        if st["error"]:
+            st["error"] = ""
+        else:
+            st["shown"] += self.ANN_PAGE
+        if len(self._ann_visible()) < st["shown"] and st["next"] is not None:
+            self._ann_load_page()
+        self._render_ann_rows()
+
+    def _ann_pick(self, row):
+        """Show one announcement from the list: its opening post, read once."""
+        st = self._ann()
+        self._ann_open = False
+        key = str(row.topic_id)
+        if key in st["posts"]:
+            self._render_featured(st["posts"][key])
+            return
+        self._render_featured(row.to_item(), loading=True)
+
+        def worker():
+            item, err = None, ""
+            try:
+                item = fetch_first_post(row, opener=_news_open, user_agent=UA,
+                                        timeout=NEWS_TIMEOUT).to_item()
+            except Exception as exc:
+                err = _news_error(N_("Announcements"), exc)
+
+            def apply():
+                if item is not None:
+                    st["posts"][key] = item
+                    self._render_featured(item)
+                else:
+                    self._render_featured(row.to_item(), error=err)
+            self.after(0, apply)
+        threading.Thread(target=worker, daemon=True).start()
 
     def _render_patch_notes(self, items, loading=False, error=""):
+        self._patch_render_args = (items, loading, error)
         f = self._patch_frame
         for w in f.winfo_children():
             w.destroy()
@@ -5262,8 +5560,10 @@ class EqUpdaterApp(tk.Tk):
                          bg=C_PANEL, anchor="w").pack(fill="x", pady=(self._px(2), 0))
 
             body = (item.get("body") or "").strip()
-            if len(body) > 220:
-                body = body[:220].rstrip() + "…"
+            limit = int(220 * max(1.0, self._news_right_w
+                                  / max(1, self._news_right_base)))
+            if len(body) > limit:
+                body = body[:limit].rstrip() + "…"
             if body:
                 tk.Label(card, text=body, font=self._font(9),
                          fg=C_TEXT, bg=C_PANEL,
@@ -7447,7 +7747,7 @@ class EqUpdaterApp(tk.Tk):
         if self._settings_overlay is not None:
             return
         ov = tk.Frame(self, bg="#0a0a0e")
-        ov.place(x=0, y=0, width=WIN_W, height=WIN_H)
+        ov.place(x=0, y=0, relwidth=1.0, relheight=1.0)
         ov.bind("<Button-1>", lambda e: self._close_settings())
         self._settings_overlay = ov
         self.bind("<Escape>", lambda e: self._close_settings())
@@ -7457,7 +7757,7 @@ class EqUpdaterApp(tk.Tk):
         MH = self._px(260 + 28 * len(MPQ_PATCHES))
         panel = tk.Frame(ov, bg=P_BG, highlightthickness=1,
                          highlightbackground=P_BDR, highlightcolor=P_BDR)
-        panel.place(x=(WIN_W - MW) // 2, y=(WIN_H - MH) // 2 - self._px(20),
+        panel.place(relx=0.5, rely=0.5, anchor="center", y=-self._px(20),
                     width=MW, height=MH)
 
         hdr = tk.Frame(panel, bg=P_HDR, height=self._px(46))
@@ -8003,7 +8303,7 @@ class EqUpdaterApp(tk.Tk):
         if self._settings_overlay is not None:
             return
         ov = tk.Frame(self, bg="#0a0a0e")
-        ov.place(x=0, y=0, width=WIN_W, height=WIN_H)
+        ov.place(x=0, y=0, relwidth=1.0, relheight=1.0)
         ov.bind("<Button-1>", lambda e: self._close_settings())
         self._settings_overlay = ov
         self.bind("<Escape>", lambda e: self._close_settings())
@@ -8012,7 +8312,7 @@ class EqUpdaterApp(tk.Tk):
         MW, MH = self._px(580), self._px(380)
         panel = tk.Frame(ov, bg=P_BG, highlightthickness=1,
                          highlightbackground=P_BDR, highlightcolor=P_BDR)
-        panel.place(x=(WIN_W - MW) // 2, y=(WIN_H - MH) // 2 - self._px(20),
+        panel.place(relx=0.5, rely=0.5, anchor="center", y=-self._px(20),
                     width=MW, height=MH)
         panel.bind("<Button-1>", lambda e: "break")
 
@@ -8223,7 +8523,7 @@ class EqUpdaterApp(tk.Tk):
         if self._settings_overlay is not None:
             return
         ov = tk.Frame(self, bg="#0a0a0e")
-        ov.place(x=0, y=0, width=WIN_W, height=WIN_H)
+        ov.place(x=0, y=0, relwidth=1.0, relheight=1.0)
         ov.bind("<Button-1>", lambda e: self._close_settings())
         self._settings_overlay = ov
         self.bind("<Escape>", lambda e: self._close_settings())
@@ -8233,7 +8533,7 @@ class EqUpdaterApp(tk.Tk):
         MW, MH = self._px(560), self._px(230)
         panel = tk.Frame(ov, bg=P_BG, highlightthickness=1,
                          highlightbackground=P_BDR, highlightcolor=P_BDR)
-        panel.place(x=(WIN_W - MW) // 2, y=(WIN_H - MH) // 2 - self._px(20),
+        panel.place(relx=0.5, rely=0.5, anchor="center", y=-self._px(20),
                     width=MW, height=MH)
 
         hdr = tk.Frame(panel, bg=P_HDR, height=self._px(46))
@@ -9138,7 +9438,7 @@ class EqUpdaterApp(tk.Tk):
             return
 
         ov = tk.Frame(self, bg="#0a0a0e")
-        ov.place(x=0, y=0, width=WIN_W, height=WIN_H)
+        ov.place(x=0, y=0, relwidth=1.0, relheight=1.0)
         ov.bind("<Button-1>", lambda e: self._close_settings())
         self._settings_overlay = ov
 
@@ -9148,7 +9448,7 @@ class EqUpdaterApp(tk.Tk):
         MW, MH = self._px(800), self._px(500)
         panel = tk.Frame(ov, bg=P_BG, highlightthickness=1,
                          highlightbackground=P_BDR, highlightcolor=P_BDR)
-        panel.place(x=(WIN_W - MW) // 2, y=(WIN_H - MH) // 2 - self._px(20),
+        panel.place(relx=0.5, rely=0.5, anchor="center", y=-self._px(20),
                     width=MW, height=MH)
 
         hdr = tk.Frame(panel, bg=P_HDR, height=self._px(46))
@@ -9779,8 +10079,12 @@ class EqUpdaterApp(tk.Tk):
         margin = self._px(10)
         w = min(max(min_w, panel.winfo_reqwidth()), WIN_W - 2 * margin)
         h = min(max(min_h, panel.winfo_reqheight()), WIN_H - 2 * margin)
-        y = max(margin, (WIN_H - h) // 2 - (self._px(20) if h == min_h else 0))
-        panel.place_configure(x=(WIN_W - w) // 2, y=y, width=w, height=h)
+        # Centred on the window, so it stays centred when the window is
+        # resized; never higher than the margin.
+        lift = self._px(20) if h == min_h else 0
+        lift = min(lift, max(0, (WIN_H - h) // 2 - margin))
+        panel.place_configure(relx=0.5, rely=0.5, anchor="center",
+                              x=0, y=-lift, width=w, height=h)
 
     def _close_settings(self):
         self.unbind("<Escape>")

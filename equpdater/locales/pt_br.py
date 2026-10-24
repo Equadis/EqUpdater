@@ -357,6 +357,8 @@ STRINGS = {
         "Duas versões do mesmo mod",
     "{dll} from {source} and {dll} from {other} are two builds of the same mod. Only one can be loaded.\n\nTurn off the one from {other} and use {source}?":
         "{dll} de {source} e {dll} de {other} são duas versões do mesmo mod. Só uma pode ser carregada.\n\nDesativar a de {other} e usar {source}?",
+    "Load more": "Carregar mais",
+    "Show every announcement": "Ver todos os anúncios",
     "Verify game files": "Verificar arquivos do jogo",
     "Verifying game files…": "Verificando arquivos do jogo…",
     "Verifying…": "Verificando…",

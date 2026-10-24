@@ -356,6 +356,8 @@ STRINGS = {
         "Две сборки одного мода",
     "{dll} from {source} and {dll} from {other} are two builds of the same mod. Only one can be loaded.\n\nTurn off the one from {other} and use {source}?":
         "{dll} из {source} и {dll} из {other} — две сборки одного и того же мода. Загружаться может только одна.\n\nОтключить сборку из {other} и использовать {source}?",
+    "Load more": "Загрузить ещё",
+    "Show every announcement": "Показать все объявления",
     "Verify game files": "Проверить файлы игры",
     "Verifying game files…": "Проверка файлов игры…",
     "Verifying…": "Проверка…",

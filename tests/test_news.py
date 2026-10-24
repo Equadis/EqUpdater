@@ -743,3 +743,194 @@ class TestNewsPanelsReadTheForums(unittest.TestCase):
         self.assertFalse([u for u in self.site.asked if "sk=t&" in u or "p=" in u])
         self.assertFalse(hasattr(news, "fetch_topic_posts"))
         self.assertFalse(hasattr(news, "ANNOUNCEMENTS_TOPIC_ID"))
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+#  Every announcement: forum pages, and the list under the title
+# ──────────────────────────────────────────────────────────────────────────────
+
+def forum_page(rows_html, starts=(), current=0):
+    """A listing page with the forum's own page-number links."""
+    pages = "".join(
+        f'<li><a class="button" href="./viewforum.php?f=2&amp;{SID}&amp;sk=tt'
+        f'&amp;sd=d&amp;start={n}">{n // 25 + 1}</a></li>'
+        for n in starts)
+    return (f'<html><body><div class="pagination"><ul>{pages}</ul></div>'
+            f'<ul class="topiclist topics">{rows_html}</ul></body></html>')
+
+
+def numbered_rows(first, count, day0=24):
+    """``count`` ordinary topics, ids first, first-1, ..., one a day back
+    from 2026-10-<day0>."""
+    out = []
+    for i in range(count):
+        tid = first - i
+        out.append(row("", tid, f"Topic {tid}", "Kestrel",
+                       f"2026-10-{day0 - i:02d}T08:00:00+00:00",
+                       "Replier", "2026-10-25T09:00:00+00:00"))
+    return "".join(out)
+
+
+PINNED_APRIL = row("announce", 3, "Beta Test Info", "Kestrel",
+                   "2026-04-28T21:16:00+00:00", "X", "2026-10-23T08:00:00+00:00")
+
+
+class TestForumPages(unittest.TestCase):
+
+    def test_next_page_from_the_forums_own_links(self):
+        html = forum_page(live_row(2816, "2026-10-06", "Kestrel",
+                                   "Tue Oct 06, 2026 4:54 am", "C", 1, pages=4),
+                          starts=(25, 50))
+        # The topic row's own page links (viewtopic ...&start=30) do not count.
+        self.assertEqual(news.next_page_start(html, 0), 25)
+        self.assertEqual(news.next_page_start(html, 25), 50)
+        self.assertIsNone(news.next_page_start(html, 50))
+        self.assertIsNone(news.next_page_start(live_row(1, "x", "a", "b", "c", 2)))
+
+    def test_a_later_page_is_one_request(self):
+        site = FakeSite({"start=25": forum_page(numbered_rows(100, 3),
+                                                starts=(0, 25))})
+        rows, nxt = news.fetch_forum_page(2, 25, **kw(site))
+        self.assertEqual(site.asked, [news.forum_url(2, start=25)])
+        self.assertTrue(site.asked[0].endswith("&start=25"))
+        self.assertIsNone(nxt)
+        self.assertEqual([r.topic_id for r in rows], [100, 99, 98])
+
+    def test_the_first_page_url_is_unchanged(self):
+        self.assertEqual(news.forum_url(2), news.forum_url(2, start=0))
+        self.assertNotIn("start=", news.forum_url(2))
+
+    def test_an_empty_page_is_an_error(self):
+        site = FakeSite({"start=25": "<html>maintenance</html>"})
+        with self.assertRaises(news.ForumError) as cm:
+            news.fetch_forum_page(2, 25, **kw(site))
+        self.assertEqual(cm.exception.stage, "forum 2 listing from 25 parse")
+
+
+@unittest.skipUnless(HAVE_TK, "no display")
+class TestAnnouncementsList(unittest.TestCase):
+    """Click the title: every announcement, newest first, ten at a time;
+    Load more reads the next forum page when the read ones run out."""
+
+    @classmethod
+    def setUpClass(cls):
+        import tempfile
+        cls.tmp = tempfile.mkdtemp(prefix="equ-ann-")
+        os.environ["LOCALAPPDATA"] = cls.tmp
+        os.environ["XDG_DATA_HOME"] = cls.tmp
+        os.environ["EQUPDATER_NO_LANGUAGE_PROMPT"] = "1"
+        for mod in [m for m in list(sys.modules) if m.startswith("equpdater")]:
+            del sys.modules[mod]
+        from unittest import mock
+        from equpdater import app
+        cls.m = app
+        # No launch-time read of the real forum: it would land mid-test and
+        # draw the panel again under the list.
+        cls.no_launch_news = mock.patch.object(app.EqUpdaterApp, "_load_news",
+                                               lambda self: None)
+        cls.no_launch_news.start()
+        cls.app = app.EqUpdaterApp()
+        for _ in range(8):
+            cls.app.update()
+
+    @classmethod
+    def tearDownClass(cls):
+        import shutil
+        cls.app.destroy()
+        cls.no_launch_news.stop()
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def setUp(self):
+        from unittest import mock
+        real = self.m.threading.Thread
+
+        def thread(target=None, args=(), **k):
+            if "._ann_" in getattr(target, "__qualname__", ""):
+                return type("T", (), {"start": lambda self: target(*args)})()
+            return real(target=target, args=args, **k)
+        # Page one: 12 ordinary topics and an April pin; page two: 12 more,
+        # older, and the same pin again (phpBB repeats it on every page).
+        self.site = FakeSite({
+            "start=25": forum_page(PINNED_APRIL + numbered_rows(88, 12, day0=12),
+                                   starts=(0, 25)),
+            "viewforum.php?f=2": forum_page(PINNED_APRIL + numbered_rows(100, 12),
+                                            starts=(25,)),
+            "viewtopic.php?t=95": topic_page(95, "Topic 95", "Opening post 95."),
+        })
+        self.patches = [mock.patch.object(self.m.threading, "Thread", thread),
+                        mock.patch.object(self.m, "_news_open", self.site.opener)]
+        for p in self.patches:
+            p.start()
+        self.app._ann_reset()
+        self.app._render_featured({"id": "100", "title": "Topic 100",
+                                   "author": "Kestrel",
+                                   "date": "2026-10-24T08:00:00+00:00",
+                                   "body": "Newest.", "html": "Newest.",
+                                   "url": news.topic_url(100)})
+
+    def tearDown(self):
+        for p in reversed(self.patches):
+            p.stop()
+        self.app._ann_reset()
+
+    def shown(self):
+        self.app.update()
+        out = []
+        for item in self.app._ann_inner.winfo_children():
+            kids = item.winfo_children()
+            if kids and isinstance(kids[0], self.m.tk.Label):
+                out.append(kids[0].cget("text"))
+        return out
+
+    def has_load_more(self):
+        return any(isinstance(w, self.m.tk.Label) and w.cget("text") == "Load more"
+                   for w in self.app._ann_inner.winfo_children())
+
+    def test_the_title_opens_ten_newest_first(self):
+        self.app.update()
+        head = self.app._feat_head
+        head.winfo_children()[0].event_generate("<Button-1>")   # the title
+        self.app.update()
+        self.assertTrue(self.app._ann_open)
+        self.assertEqual(self.shown(), [f"Topic {t}" for t in range(100, 90, -1)])
+        self.assertTrue(self.has_load_more())
+        self.assertEqual(self.site.asked, [news.forum_url(2)])
+        self.assertIn("▴", self.app._feat_head.winfo_children()[1].cget("text"))
+
+    def test_load_more_reads_the_next_page_and_holds_the_old_pin_back(self):
+        self.app._toggle_ann_list()
+        self.app.update()                    # the read page is applied
+        self.app._ann_more()                 # 20: page one has only 12
+        self.app.update()
+        shown = self.shown()
+        self.assertEqual(self.site.asked, [news.forum_url(2),
+                                           news.forum_url(2, start=25)])
+        self.assertEqual(shown, [f"Topic {t}" for t in range(100, 80, -1)])
+        self.assertNotIn("Beta Test Info", shown)   # April: held back
+        self.app._ann_more()                 # the last page is read: all of it
+        self.app.update()
+        shown = self.shown()
+        self.assertEqual(shown[-1], "Beta Test Info")
+        self.assertEqual(len(shown), 25)
+        self.assertEqual(shown.count("Beta Test Info"), 1)
+        self.assertFalse(self.has_load_more())
+
+    def test_picking_one_shows_its_opening_post(self):
+        self.app._toggle_ann_list()
+        self.app.update()
+        row = next(r for r in self.app._ann_visible() if r.topic_id == 95)
+        self.app._ann_pick(row)
+        self.app.update()
+        post = self.app._feat_render_args[0]
+        self.assertEqual(post["title"], "Topic 95")
+        self.assertEqual(post["body"], "Opening post 95.")
+        self.assertFalse(self.app._ann_open)
+        asked = len(self.site.asked)
+        self.app._ann_pick(row)               # read once
+        self.assertEqual(len(self.site.asked), asked)
+
+    def test_refresh_forgets_the_list(self):
+        self.app._toggle_ann_list()
+        self.app._ann_reset()
+        self.assertFalse(self.app._ann_open)
+        self.assertEqual(self.app._ann()["rows"], {})
