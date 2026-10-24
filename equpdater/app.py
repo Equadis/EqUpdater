@@ -5372,8 +5372,12 @@ class EqUpdaterApp(tk.Tk):
         """A scrolling list filling ``f`` below its header: one entry per
         item, its title and byline a single control that opens or closes
         the entry. An open entry shows its text (``body``; None while it is
-        being read) and a link to the forum. The scroll position survives
-        the redraw that every open, close and Load more causes.
+        being read) and a link to the forum.
+
+        This builds the list; afterwards _acc_sync changes it in place --
+        an entry opened or closed, a post arrived, entries added by Load
+        more -- so a click redraws one entry, not the panel. Building it
+        again (a refresh) keeps the scroll position.
 
         ``footer(inner)`` adds what goes under the entries."""
         # Where the old list was scrolled to, in pixels: taken by
@@ -5397,74 +5401,154 @@ class EqUpdaterApp(tk.Tk):
                    lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
         canvas.bind("<Configure>", self._list_stretch(canvas, lambda: win))
         self._acc_canvas = {**getattr(self, "_acc_canvas", {}), key: canvas}
-        wraps = self._acc_wraps.setdefault(key, [])
+        self._acc_wraps.setdefault(key, [])
+        lst = {"inner": inner, "order": [], "rows": {}, "toggle": toggle,
+               "title_size": title_size, "footer": footer, "tail": []}
+        self._acc_lists = {**getattr(self, "_acc_lists", {}), key: lst}
 
         for item in entries:
-            iid = str(item.get("id", ""))
-            is_open = iid in open_ids
-            entry = tk.Frame(inner, bg=C_PANEL)
-            entry.pack(fill="x", padx=(0, self._px(8)))
-            head = tk.Frame(entry, bg=C_PANEL, cursor="hand2")
-            head.pack(fill="x", pady=(self._px(10), 0))
-            title = tk.Label(head, text=item.get("title", ""),
-                             font=self._font(title_size, bold=True),
-                             fg=C_GOLD_LT if is_open else C_TEXT, bg=C_PANEL,
-                             wraplength=wrap_w, justify="left", anchor="w",
-                             cursor="hand2")
-            title.pack(fill="x")
-            wraps.append(title)
-            meta = []
-            if item.get("author"):
-                meta.append(tr("by {author}", author=item["author"]))
-            date = _format_news_date(item.get("date", ""))
-            if date:
-                meta.append(date)
-            byline = tk.Label(head, text=" · ".join(meta) + "  "
-                              + ("▴" if is_open else "▾"),
-                              font=self._font(8), fg=C_TEXT_DIM, bg=C_PANEL,
-                              anchor="w", cursor="hand2")
-            byline.pack(fill="x", pady=(self._px(2), 0))
-            base = C_GOLD_LT if is_open else C_TEXT
-            for w in (head, title, byline):
-                w.bind("<Button-1>", lambda e, i=iid: toggle(i))
-                w.bind("<Enter>", lambda e, l=title: l.configure(fg=C_GOLD))
-                w.bind("<Leave>", lambda e, l=title, c=base: l.configure(fg=c))
-
-            if is_open:
-                body = item.get("body")
-                if body is None:
-                    tk.Label(entry, text=tr("Loading…"), font=self._font(9),
-                             fg=C_TEXT_DIM, bg=C_PANEL, anchor="w").pack(
-                                 fill="x", pady=(self._px(6), 0))
-                elif item.get("_error"):
-                    err = tk.Label(entry, text=item["_error"], font=self._font(9),
-                                   fg=C_ERR, bg=C_PANEL, wraplength=wrap_w,
-                                   justify="left", anchor="w")
-                    err.pack(fill="x", pady=(self._px(6), 0))
-                    wraps.append(err)
-                elif body.strip():
-                    self._news_text(entry, body, item.get("links") or [])
-                if item.get("url"):
-                    lnk = tk.Label(entry, text=tr("Open in Browser") + "  \u2197",
-                                   font=self._font(9, bold=True), fg=C_GOLD,
-                                   bg=C_PANEL, cursor="hand2", anchor="w")
-                    lnk.pack(fill="x", pady=(self._px(8), 0))
-                    lnk.bind("<Button-1>",
-                             lambda e, u=item["url"]: self._open_url(u))
-                    lnk.bind("<Enter>", lambda e, w=lnk: w.configure(fg=C_GOLD_LT))
-                    lnk.bind("<Leave>", lambda e, w=lnk: w.configure(fg=C_GOLD))
-            tk.Frame(inner, bg=C_DIVIDER, height=self._px(1)).pack(
-                fill="x", padx=(0, self._px(8)), pady=(self._px(10), 0))
-
-        if footer is not None:
-            footer(inner)
+            self._acc_add(key, item, str(item.get("id", "")) in open_ids)
+        self._acc_footer(key)
         if y_px:
-            # The same pixel offset, not the same fraction: opening an entry
-            # makes the list longer, and a fraction would then move the view.
+            # The same pixel offset, not the same fraction: the list may be
+            # longer than before, and a fraction would then move the view.
             inner.update_idletasks()
             total = max(1, inner.winfo_reqheight())
             canvas.configure(scrollregion=(0, 0, inner.winfo_reqwidth(), total))
             canvas.yview_moveto(y_px / total)
+
+    @staticmethod
+    def _acc_signature(item, is_open):
+        """What an entry shows: when this changes, the entry is redone."""
+        body = item.get("body")
+        return (is_open, item.get("title"), body is None, body or "",
+                item.get("_error") or "", item.get("url") or "")
+
+    def _acc_add(self, key, item, is_open):
+        """One entry at the end of a list, with the divider under it."""
+        lst = self._acc_lists[key]
+        iid = str(item.get("id", ""))
+        entry = tk.Frame(lst["inner"], bg=C_PANEL)
+        entry.pack(fill="x", padx=(0, self._px(8)))
+        head = tk.Frame(entry, bg=C_PANEL, cursor="hand2")
+        head.pack(fill="x", pady=(self._px(10), 0))
+        title = tk.Label(head, text=item.get("title", ""),
+                         font=self._font(lst["title_size"], bold=True),
+                         fg=C_TEXT, bg=C_PANEL,
+                         wraplength=self._news_wrap(key), justify="left",
+                         anchor="w", cursor="hand2")
+        title.pack(fill="x")
+        self._acc_wraps.setdefault(key, []).append(title)
+        byline = tk.Label(head, text="", font=self._font(8), fg=C_TEXT_DIM,
+                          bg=C_PANEL, anchor="w", cursor="hand2")
+        byline.pack(fill="x", pady=(self._px(2), 0))
+        body = tk.Frame(entry, bg=C_PANEL)
+        body.pack(fill="x")
+        divider = tk.Frame(lst["inner"], bg=C_DIVIDER, height=self._px(1))
+        divider.pack(fill="x", padx=(0, self._px(8)), pady=(self._px(10), 0))
+        row = {"entry": entry, "title": title, "byline": byline, "body": body,
+               "divider": divider, "sig": None}
+        for w in (head, title, byline):
+            w.bind("<Button-1>", lambda e, i=iid: lst["toggle"](i))
+            w.bind("<Enter>", lambda e, l=title: l.configure(fg=C_GOLD))
+            w.bind("<Leave>", lambda e, r=row: r["title"].configure(
+                fg=C_GOLD_LT if r["sig"] and r["sig"][0] else C_TEXT))
+        lst["order"].append(iid)
+        lst["rows"][iid] = row
+        self._acc_show(key, iid, item, is_open)
+
+    def _acc_show(self, key, iid, item, is_open):
+        """Bring one entry up to date: its arrow, its title's colour and, if
+        what it shows changed, its text -- nothing else in the list."""
+        row = self._acc_lists[key]["rows"][iid]
+        sig = self._acc_signature(item, is_open)
+        if sig == row["sig"]:
+            return
+        row["sig"] = sig
+        meta = []
+        if item.get("author"):
+            meta.append(tr("by {author}", author=item["author"]))
+        date = _format_news_date(item.get("date", ""))
+        if date:
+            meta.append(date)
+        row["byline"].configure(text=" · ".join(meta) + "  "
+                                + ("▴" if is_open else "▾"))
+        row["title"].configure(text=item.get("title", ""),
+                               fg=C_GOLD_LT if is_open else C_TEXT)
+        body = row["body"]
+        for w in body.winfo_children():
+            w.destroy()
+        if not is_open:
+            body.configure(height=1)
+            return
+        text = item.get("body")
+        if text is None:
+            tk.Label(body, text=tr("Loading…"), font=self._font(9),
+                     fg=C_TEXT_DIM, bg=C_PANEL, anchor="w").pack(
+                         fill="x", pady=(self._px(6), 0))
+        elif item.get("_error"):
+            err = tk.Label(body, text=item["_error"], font=self._font(9),
+                           fg=C_ERR, bg=C_PANEL,
+                           wraplength=self._news_wrap(key),
+                           justify="left", anchor="w")
+            err.pack(fill="x", pady=(self._px(6), 0))
+            self._acc_wraps.setdefault(key, []).append(err)
+        elif text.strip():
+            self._news_text(body, text, item.get("links") or [])
+        if item.get("url"):
+            lnk = tk.Label(body, text=tr("Open in Browser") + "  ↗",
+                           font=self._font(9, bold=True), fg=C_GOLD,
+                           bg=C_PANEL, cursor="hand2", anchor="w")
+            lnk.pack(fill="x", pady=(self._px(8), 0))
+            lnk.bind("<Button-1>", lambda e, u=item["url"]: self._open_url(u))
+            lnk.bind("<Enter>", lambda e, w=lnk: w.configure(fg=C_GOLD_LT))
+            lnk.bind("<Leave>", lambda e, w=lnk: w.configure(fg=C_GOLD))
+
+    def _acc_footer(self, key):
+        """What goes under a list's entries, made again."""
+        lst = self._acc_lists[key]
+        for w in lst["tail"]:
+            try:
+                w.destroy()
+            except tk.TclError:
+                pass
+        before = set(lst["inner"].winfo_children())
+        if lst["footer"] is not None:
+            lst["footer"](lst["inner"])
+        lst["tail"] = [w for w in lst["inner"].winfo_children()
+                       if w not in before]
+
+    def _acc_sync(self, key, entries, open_ids) -> bool:
+        """Change a built list in place to show ``entries``: each entry
+        brought up to date, new ones added at the end, the footer made
+        again. False when that cannot be done (no list on screen, or the
+        entries are not the shown ones plus some at the end): build it."""
+        lst = getattr(self, "_acc_lists", {}).get(key)
+        canvas = getattr(self, "_acc_canvas", {}).get(key)
+        try:
+            if lst is None or canvas is None or not canvas.winfo_exists():
+                return False
+        except tk.TclError:
+            return False
+        ids = [str(item.get("id", "")) for item in entries]
+        if ids[:len(lst["order"])] != lst["order"]:
+            return False
+        for item, iid in zip(entries, ids):
+            if iid in lst["rows"]:
+                self._acc_show(key, iid, item, iid in open_ids)
+        new = [(item, iid) for item, iid in zip(entries, ids)
+               if iid not in lst["rows"]]
+        if new:
+            for w in lst["tail"]:
+                try:
+                    w.destroy()
+                except tk.TclError:
+                    pass
+            lst["tail"] = []
+            for item, iid in new:
+                self._acc_add(key, item, iid in open_ids)
+        self._acc_footer(key)
+        return True
 
     def _news_text(self, parent, body, links):
         """A post's text, its links clickable (opened in the browser), sized
@@ -5501,6 +5585,13 @@ class EqUpdaterApp(tk.Tk):
             except (tk.TclError, TypeError, ValueError):
                 pass
         txt.bind("<Configure>", fit, add="+")
+        # Laid out and fitted now, so it is painted at its full height
+        # instead of one line that grows a moment later.
+        try:
+            txt.update_idletasks()
+        except tk.TclError:
+            pass
+        fit()
         return txt
 
     def _acc_remember(self, key):
@@ -5616,7 +5707,14 @@ class EqUpdaterApp(tk.Tk):
         return rows
 
     def _ann_redraw(self):
-        self._render_featured(*self._feat_render_args)
+        """Show the list's new state: in place when only entries changed or
+        were added; built again otherwise."""
+        st = self._ann()
+        post = self._feat_render_args[0]
+        entries = self._ann_entries(post)
+        if st["open"] is None or not entries \
+                or not self._acc_sync("ann", entries, st["open"]):
+            self._render_featured(*self._feat_render_args)
 
     def _ann_toggle(self, iid: str):
         """Open or close one announcement; its post is read the first time."""
@@ -5762,7 +5860,9 @@ class EqUpdaterApp(tk.Tk):
         opened = getattr(self, "_patch_open", None) or set()
         opened ^= {iid}
         self._patch_open = opened
-        self._render_patch_notes(*self._patch_render_args)
+        items = self._patch_render_args[0] or []
+        if not self._acc_sync("patch", items, opened):
+            self._render_patch_notes(*self._patch_render_args)
 
 
     # ── tweaks panel ─────────────────────────────────────────────────────────────

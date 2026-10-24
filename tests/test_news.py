@@ -952,8 +952,10 @@ class TestAnnouncementsList(unittest.TestCase):
             if not kids or not isinstance(kids[0], self.m.tk.Frame):
                 continue
             head = kids[0].winfo_children()
+            shown = [w for k in kids[1:]
+                     for w in ([k] + list(k.winfo_children()))]
             text = [k.get("1.0", "end-1c") if isinstance(k, self.m.tk.Text)
-                    else k.cget("text") for k in kids[1:]
+                    else k.cget("text") for k in shown
                     if isinstance(k, (self.m.tk.Label, self.m.tk.Text))]
             rows.append((head[0].cget("text"), head[1].cget("text").endswith("▴"),
                          text[0] if text else ""))
@@ -1053,7 +1055,8 @@ class TestAnnouncementsList(unittest.TestCase):
                          and isinstance(e.winfo_children()[0], self.m.tk.Frame)
                          and e.winfo_children()[0].winfo_children()[0]
                          .cget("text") == "Topic 99")
-            txt = next(w for w in entry.winfo_children()
+            body = entry.winfo_children()[1]
+            txt = next(w for w in body.winfo_children()
                        if isinstance(w, self.m.tk.Text))
             ranges = txt.tag_ranges("link0")
             self.assertEqual(txt.get(ranges[0], ranges[1]), "Click here to enter")
@@ -1067,17 +1070,51 @@ class TestAnnouncementsList(unittest.TestCase):
                              ["https://octowow.st/forum/viewtopic.php?t=2742&sid=abc"])
             self.assertEqual(str(txt.cget("state")), "disabled")
             self.assertGreater(int(txt.cget("height")), 1)       # all of it shown
-            labels = [w.cget("text") for w in entry.winfo_children()
+            labels = [w.cget("text") for w in body.winfo_children()
                       if isinstance(w, self.m.tk.Label)]
             self.assertIn("Open in Browser  ↗", labels)
             # What the link opens.
             self.app._news_text(entry, "Go here", [[3, 7, "https://x.example/a"]])
             self.app._news_text(entry, "Bad", [[0, 3, "javascript:alert(1)"]])
             last = [w for w in entry.winfo_children()
-                    if isinstance(w, self.m.tk.Text)][-1]
+                    if isinstance(w, self.m.tk.Text)][-1]   # added to the entry
             self.assertEqual(last.tag_names(), ("sel",))           # not a link
         finally:
             self.app._open_url = real
+
+    def test_a_click_changes_that_entry_only(self):
+        """No rebuild on a click: the list, and every other entry's widgets,
+        stay the very same ones -- through open, close, a post arriving and
+        Load more. (A rebuild is what flickered.)"""
+        self.load()
+        canvas = self.app._acc_canvas["ann"]
+        rows = self.app._acc_lists["ann"]["rows"]
+        others = {iid: row["entry"] for iid, row in rows.items() if iid != "99"}
+        self.app._ann_toggle("99")             # open: its post is read
+        self.app.update()
+        self.app._ann_toggle("99")             # close
+        self.app._ann_more()                   # ten more, page two read
+        self.app.update()
+        self.assertIs(self.app._acc_canvas["ann"], canvas)
+        for iid, entry in others.items():
+            self.assertIs(self.app._acc_lists["ann"]["rows"][iid]["entry"], entry)
+        self.assertEqual(len(self.app._acc_lists["ann"]["order"]), 20)
+        rows, buttons = self.entries()
+        self.assertEqual([r[0] for r in rows],
+                         [f"Topic {t}" for t in range(100, 80, -1)])
+        self.assertEqual(buttons, ["Load more"])           # footer made again
+
+    def test_the_changelog_click_is_in_place_too(self):
+        items = [{"id": str(t), "title": f"T{t}", "author": "A",
+                  "date": "2026-10-24T08:00:00+00:00", "body": f"N{t}",
+                  "html": "", "url": ""} for t in (3, 2, 1)]
+        self.app._patch_open = None
+        self.app._render_patch_notes(items)
+        canvas = self.app._acc_canvas["patch"]
+        self.app._patch_toggle("2")
+        self.assertIs(self.app._acc_canvas["patch"], canvas)
+        self.assertEqual([r[1] for r in self.entries("patch")[0]],
+                         [True, True, False])
 
     def test_refresh_starts_over(self):
         self.load()
