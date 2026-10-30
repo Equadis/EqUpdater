@@ -22,9 +22,9 @@
 - [**Release page**](https://github.com/Equadis/EqUpdater/releases/latest) — release notes and every version
 
 These links always download the newest release. The current one is
-**v2.1.2**:
-[`EqUpdater-v2.1.2-Windows.exe`](https://github.com/Equadis/EqUpdater/releases/download/v2.1.2/EqUpdater-v2.1.2-Windows.exe) ·
-[`EqUpdater-v2.1.2-Linux-x86_64.AppImage`](https://github.com/Equadis/EqUpdater/releases/download/v2.1.2/EqUpdater-v2.1.2-Linux-x86_64.AppImage).
+**v2.1.3**:
+[`EqUpdater-v2.1.3-Windows.exe`](https://github.com/Equadis/EqUpdater/releases/download/v2.1.3/EqUpdater-v2.1.3-Windows.exe) ·
+[`EqUpdater-v2.1.3-Linux-x86_64.AppImage`](https://github.com/Equadis/EqUpdater/releases/download/v2.1.3/EqUpdater-v2.1.3-Linux-x86_64.AppImage).
 The release page has every version.
 
 Nothing else is needed: no Python, no build tools.
@@ -84,10 +84,19 @@ particular Proton, Lutris, Faugus, a custom Wine prefix - open
 - **Wine prefix** - passed as `WINEPREFIX`; leave it empty for the default.
 - **Environment variables** - one `NAME=value` per line, for example
   `DXVK_HUD=fps` or `PROTON_LOG=1`. They are given to the game only, when
-  PLAY starts it, and win over anything set above. The value is passed
-  exactly as typed (spaces and `=` included; nothing is expanded or run).
-  A line EqUpdater cannot use is pointed out straight away, and PLAY will
-  not start the game until it is fixed.
+  PLAY starts it, and win over anything set above. Spaces and `=` are part
+  of the value. A line EqUpdater cannot use is pointed out straight away,
+  and PLAY will not start the game until it is fixed.
+
+Nothing is run through a shell, so EqUpdater does what a shell would with
+the Wine prefix, the variables and the launch command: `~`, `$HOME` and
+`${HOME}` (or any other variable, including one from a line above) become
+their values, and one pair of quotes around a whole value is dropped -
+`"$HOME/Games/pfx"` is `/home/you/Games/pfx`. A path with spaces needs no
+quotes. Before starting, PLAY checks that the runner is on `PATH`, that the
+prefix is a full path and that a `PROTONPATH` folder exists; a runner that
+quits with an error right away is reported, its output kept in
+`last-launch.log` next to the config.
 
 The game runs on its own: closing EqUpdater never closes it. It gets your
 desktop session as EqUpdater got it, without EqUpdater's own launch details
