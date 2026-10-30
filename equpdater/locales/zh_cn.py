@@ -618,8 +618,6 @@ STRINGS = {
         '无法读取发行版：{error}',
     'Custom mod from {source}.':
         '来自 {source} 的自定义模组。',
-    'Find .dll files':
-        '查找 .dll 文件',
     'Install {name}?':
         '安装 {name}？',
     'Latest release: {tag}. Choose the file to install:':
@@ -636,16 +634,66 @@ STRINGS = {
         '移除此自定义模组',
     'Remove {name}?':
         '移除 {name}？',
-    'That download is not a .dll file.':
-        '该下载不是 .dll 文件。',
     'That is not a .dll file name EqUpdater can use.':
         '这不是 EqUpdater 可以使用的 .dll 文件名。',
-    'The latest release has no .dll file to install.':
-        '最新发行版中没有可安装的 .dll 文件。',
     'no release found on OctoWoW Git':
         '在 OctoWoW Git 上未找到发行版',
     '{dll} from {source} will be installed to the mods folder and loaded into the game every time it starts.\n\nA mod runs code inside the game, with the same access to this computer as the game itself. {app} does not check what it does. Only install mods you trust.\n\nInstall it?':
         '来自 {source} 的 {dll} 将被安装到 mods 文件夹，并在每次启动游戏时加载。\n\n模组在游戏内运行代码，对这台电脑拥有与游戏本身相同的访问权限。{app} 不会检查它做了什么。只安装你信任的模组。\n\n要安装吗？',
     '{name} is deleted from the mods folder, taken out of dlls.txt and removed from this list.':
         '{name} 将从 mods 文件夹中删除、从 dlls.txt 中移除，并从此列表中移除。',
+    'Another mod in the Mods list installs the same files.':
+        '模组列表中的另一个模组会安装相同的文件。',
+    'Could not read {name}: {error}':
+        '无法读取 {name}：{error}',
+    'Data already has a file named {name}.':
+        'Data 中已有名为 {name} 的文件。',
+    'Find mod files':
+        '查找模组文件',
+    "It loads no .dll: the game reads its files as it would an addon's or a patch's.":
+        '它不加载任何 .dll：游戏会像读取插件或补丁一样读取它的文件。',
+    'It loads {dll} into the game every time it starts.':
+        '每次游戏启动时，它都会将 {dll} 加载到游戏中。',
+    'Looking inside {name}…':
+        '正在查看 {name}…',
+    'NEW!':
+        '新！',
+    'That download is not a .dll, .zip or .mpq file.':
+        '该下载不是 .dll、.zip 或 .mpq 文件。',
+    'The archive has a file that would land outside the game folder.':
+        '该压缩包中有文件会被放到游戏文件夹之外。',
+    'The archive has a program in it. EqUpdater installs mods, not programs.':
+        '该压缩包中含有程序。EqUpdater 安装的是模组，而不是程序。',
+    'The archive is empty.':
+        '该压缩包是空的。',
+    'The archive is too large to be a mod.':
+        '该压缩包太大，不像是模组。',
+    "The archive would replace one of the game's own files in Data.":
+        '该压缩包会替换 Data 中游戏自带的文件。',
+    'The latest release has no .dll, .zip or .mpq file to install. An addon with no releases is added in Addons: Add custom git addon.':
+        '最新版本中没有可安装的 .dll、.zip 或 .mpq 文件。没有发布版本的插件请在“插件”中添加：添加自定义 git 插件。',
+    'and {count} more':
+        '以及另外 {count} 个',
+    '{name} from {source} puts {count} files into the game folder:\n\n{where}\n\n{loads}\n\nA mod can change how the game behaves, and {app} does not check what it does. Only install mods you trust.\n\nInstall it?':
+        '来自 {source} 的 {name} 会将 {count} 个文件放入游戏文件夹：\n\n{where}\n\n{loads}\n\n模组可以改变游戏的行为，而 {app} 不会检查它做了什么。只安装你信任的模组。\n\n要安装吗？',
+    'The files {name} put into the game folder are deleted, and it is removed from this list.':
+        '{name} 放入游戏文件夹的文件将被删除，并从此列表中移除。',
+    "'{value}' was not found in PATH.":
+        "在 PATH 中找不到 '{value}'。",
+    'Could not launch the game.':
+        '无法启动游戏。',
+    'PROTONPATH does not exist:\n{value}':
+        'PROTONPATH 不存在：\n{value}',
+    'The Wine prefix is a file, not a folder:\n{value}':
+        'Wine 前缀是一个文件，而不是文件夹：\n{value}',
+    'The Wine prefix is not a full path:\n{value}':
+        'Wine 前缀不是完整路径：\n{value}',
+    "The Wine prefix's parent folder does not exist:\n{value}":
+        'Wine 前缀的上级文件夹不存在：\n{value}',
+    'The launcher program does not exist or cannot be run:\n{value}':
+        '启动程序不存在或无法运行：\n{value}',
+    '{program} could not be started: {error}':
+        '无法启动 {program}：{error}',
+    '{program} stopped at once (exit code {code}).':
+        '{program} 立即退出了（退出代码 {code}）。',
 }

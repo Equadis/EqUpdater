@@ -117,6 +117,7 @@ C_LOG_BG     = "#041027"
 C_OK         = "#79bf73"
 C_ERR        = "#d17a7a"
 C_MOD_HL     = "#a8b83c"
+C_NEW        = "#ff3b3b"     # NEW! on a News post, and the line under the new ones
 
 # With nothing to update, UPDATE ALL is the same gold button faded 70%
 # towards the background -- still recognisably itself, not a grey slab.
@@ -2048,7 +2049,9 @@ def install_mod(mod: dict, client_dir: str, release: dict | None = None) -> list
         with secure_urlopen(req, timeout=120,
                             allowed_hosts=ALLOWED_DOWNLOAD_HOSTS) as r:
             data = r.read()
-        if src.get("extract_map") is None:
+        if src.get("extract_all"):
+            written.extend(_install_mod_zip(mod, data, client_dir))
+        elif src.get("extract_map") is None:
             dest_rel = src.get("dest") or asset["name"]
             dest     = os.path.join(client_dir, dest_rel)
             os.makedirs(os.path.dirname(dest) or client_dir, exist_ok=True)
@@ -2095,7 +2098,9 @@ def install_mod(mod: dict, client_dir: str, release: dict | None = None) -> list
                             allowed_hosts=ALLOWED_DOWNLOAD_HOSTS) as r:
             data = r.read()
 
-        if src.get("extract_map") is None:
+        if src.get("extract_all"):
+            written.extend(_install_mod_zip(mod, data, client_dir))
+        elif src.get("extract_map") is None:
             dest_rel = src.get("dest") or asset["name"]
             dest     = os.path.join(client_dir, dest_rel)
             os.makedirs(os.path.dirname(dest) or client_dir, exist_ok=True)
@@ -2256,6 +2261,22 @@ def uninstall_mod(mod: dict, client_dir: str):
         if os.path.exists(full):
             os.remove(full)
             log(f"  Removed {rel}")
+    if mod.get("source", {}).get("extract_all"):
+        # A ZIP mod's folders, emptied: gone too, deepest first. Never the
+        # game folder's own top folders (Interface, Data, mods...).
+        dirs = {os.path.dirname(rel.replace("\\", "/")) for rel in files}
+        parents = set()
+        for d in dirs:
+            while "/" in d:
+                parents.add(d)
+                d = d.rsplit("/", 1)[0]
+        for d in sorted(parents, key=lambda p: -p.count("/")):
+            if d.lower() in ("interface/addons",):
+                continue
+            try:
+                os.rmdir(os.path.join(client_dir, d))
+            except OSError:
+                pass            # not empty, or not there
 
 
 def _read_lines(path: str) -> list:
@@ -2381,20 +2402,35 @@ def reconcile_dlls_txt(client_dir: str, mods_cfg: dict) -> list:
 
 # ── Custom mods ─────────────────────────────────────────────────────────────
 #
-# A player may add a mod EqUpdater does not list: one .dll from the releases
-# of a GitHub, Codeberg or OctoWoW Git repository. It is installed the way
-# OctoLogin is -- to mods/<file>.dll, registered in dlls.txt -- and from then
-# on it is an ordinary entry in MODS_REGISTRY: the same install, update,
-# disable and removal code, the same planner. The records live in the
-# config ("custom_mods"); load_custom_mods() puts them into the registry.
+# A player may add a mod EqUpdater does not list, from the releases of a
+# GitHub, Codeberg or OctoWoW Git repository. One file of the latest release:
 #
-# A mod is code that runs inside the game, so nothing is installed without
-# the player confirming a warning that says so.
+#   * a .dll is installed the way OctoLogin is -- to mods/<file>.dll,
+#     registered in dlls.txt;
+#   * a .zip is unpacked into the game folder (its own top folder dropped
+#     when it has one), and a single loadable .dll in it is registered --
+#     a mod needs no DLL at all;
+#   * an .mpq goes to Data/.
+#
+# From then on it is an ordinary entry in MODS_REGISTRY: the same install,
+# update, disable and removal code, the same planner. The records live in
+# the config ("custom_mods"); load_custom_mods() puts them into the registry.
+#
+# A mod may run code inside the game, so nothing is installed without the
+# player confirming a warning that says so.
 
 CUSTOM_MOD_HOSTS = {"github.com": "github_release",
                     "codeberg.org": "codeberg_release",
                     "octowow.st/git": "gitea_release"}
 CUSTOM_MOD_DIR = "mods"
+#: The release files a custom mod can be: a DLL, a ZIP unpacked into the
+#: game folder, or an MPQ patch for Data/.
+CUSTOM_MOD_EXTS = (".dll", ".zip", ".mpq")
+#: Top folders a mod's ZIP may put files in as they are. Any other single
+#: top folder (``ModName-1.2/``) is the archive's own and is dropped.
+GAME_TOP_FOLDERS = {"interface", "data", "wtf", "fonts", "mods"}
+#: Unpacked size past which a mod's ZIP is refused.
+CUSTOM_ZIP_MAX_BYTES = 512 * 1024 * 1024
 
 
 def parse_mod_release_link(text: str) -> dict:
@@ -2402,7 +2438,7 @@ def parse_mod_release_link(text: str) -> dict:
     sentence the player can act on (an N_ message).
 
     Accepted: a repository, its /releases page, or one of its release
-    downloads (which also names the .dll), on GitHub, Codeberg or OctoWoW Git.
+    downloads (which also names the file), on GitHub, Codeberg or OctoWoW Git.
     """
     url = (text or "").strip()
     if not url:
@@ -2418,8 +2454,9 @@ def parse_mod_release_link(text: str) -> dict:
     if len(rest) >= 4 and rest[0] == "releases" and rest[1] == "download":
         from urllib.parse import unquote
         asset = unquote(rest[-1])
-        if not asset.lower().endswith(".dll"):
-            raise ValueError(N_("That download is not a .dll file."))
+        if not asset.lower().endswith(CUSTOM_MOD_EXTS):
+            raise ValueError(N_("That download is not a .dll, .zip or .mpq "
+                                "file."))
     elif rest and rest[0] != "releases":
         raise ValueError(N_("Link the repository or one of its release "
                             "downloads, not a page inside it."))
@@ -2443,8 +2480,107 @@ def release_dlls(release: dict | None) -> list:
                   key=str.lower)
 
 
+def release_mod_files(release: dict | None) -> list:
+    """The files a release offers that can be a custom mod: its .dll files
+    first (as before), then .zip and .mpq, each by name."""
+    names = [a.get("name") or "" for a in (release or {}).get("assets") or []]
+    return sorted((n for n in names if n.lower().endswith(CUSTOM_MOD_EXTS)),
+                  key=lambda n: (CUSTOM_MOD_EXTS.index(
+                      os.path.splitext(n.lower())[1]), n.lower()))
+
+
+def custom_asset_pattern(name: str) -> str:
+    """The pattern that finds ``name`` again in a later release: each run
+    of digits matches any (``Mod-1.2.zip`` finds ``Mod-1.3.zip``)."""
+    import glob
+    return re.sub(r"\d+", "*", glob.escape(name))
+
+
 def _custom_mod_id(dll: str) -> str:
     return "custom:" + dll.lower()
+
+
+def _custom_rec_id(rec: dict) -> str:
+    """A custom-mod record's registry id. A DLL mod is known by its file
+    name (as it always was); a ZIP or MPQ mod, whose file name changes with
+    each release, by its repository."""
+    if not rec.get("asset"):
+        return _custom_mod_id(rec.get("dll") or "")
+    where = "/".join(p for p in (rec.get("forge") or rec.get("kind"),
+                                 rec.get("owner"), rec.get("repo")) if p)
+    return "custom:" + where.lower()
+
+
+def mod_zip_plan(names: list) -> list:
+    """Where each file of a mod's ZIP goes, as (member, path in the game
+    folder) pairs. Folders are skipped; one top folder that is not a game
+    folder (``ComfyAtmosphere-1.2/``) is dropped. ValueError (an N_
+    message) for a ZIP that would write outside the game folder, or that
+    carries a program."""
+    files = []
+    for name in names:
+        rel = name.replace("\\", "/")
+        if rel.endswith("/"):
+            continue
+        parts = rel.split("/")
+        if (rel.startswith("/") or ":" in rel
+                or any(p in ("", ".", "..") for p in parts)):
+            raise ValueError(N_("The archive has a file that would land "
+                                "outside the game folder."))
+        files.append((name, parts))
+    if not files:
+        raise ValueError(N_("The archive is empty."))
+    tops = {parts[0].lower() for _, parts in files}
+    if (len(tops) == 1 and all(len(parts) > 1 for _, parts in files)
+            and next(iter(tops)) not in GAME_TOP_FOLDERS):
+        files = [(name, parts[1:]) for name, parts in files]
+    plan = [(name, "/".join(parts)) for name, parts in files]
+    if any(dest.lower().endswith((".exe", ".bat", ".cmd", ".ps1", ".scr"))
+           for _, dest in plan):
+        raise ValueError(N_("The archive has a program in it. EqUpdater "
+                            "installs mods, not programs."))
+    return plan
+
+
+def mod_zip_dll(files: list) -> str | None:
+    """The DLL a mod's ZIP has loaded through dlls.txt: its one .dll in the
+    game folder itself or in mods/, or None (none, or more than one -- which
+    one to load is then not EqUpdater's guess)."""
+    dlls = [f for f in files if f.lower().endswith(".dll")
+            and (f.count("/") == 0
+                 or (f.count("/") == 1 and f.lower().startswith("mods/")))]
+    return dlls[0] if len(dlls) == 1 else None
+
+
+def _install_mod_zip(mod: dict, data: bytes, client_dir: str) -> list:
+    """Unpack a custom mod's ZIP into the game folder (mod_zip_plan).
+    Refused: a file another mod installs, a file of the game's own in Data/,
+    and an archive past CUSTOM_ZIP_MAX_BYTES unpacked."""
+    import io
+    import zipfile
+    with zipfile.ZipFile(io.BytesIO(data)) as zf:
+        infos = {i.filename: i for i in zf.infolist()}
+        plan = mod_zip_plan(list(infos))
+        if sum(infos[m].file_size for m, _ in plan) > CUSTOM_ZIP_MAX_BYTES:
+            raise RuntimeError(N_("The archive is too large to be a mod."))
+        problem = custom_files_conflict([d for _, d in plan], mod_id=mod["id"])
+        if problem:
+            raise RuntimeError(problem)
+        for _, dest_rel in plan:
+            full = os.path.join(client_dir, dest_rel)
+            if (dest_rel.lower().startswith("data/") and dest_rel.count("/") == 1
+                    and os.path.exists(full)):
+                raise RuntimeError(N_("The archive would replace one of the "
+                                      "game's own files in Data."))
+        written = []
+        for member, dest_rel in plan:
+            full = os.path.join(client_dir, dest_rel)
+            os.makedirs(os.path.dirname(full) or client_dir, exist_ok=True)
+            with zf.open(member) as src_f, open(full, "wb") as out:
+                shutil.copyfileobj(src_f, out)
+            written.append(dest_rel)
+        log(f"  Installed {len(written)} files")
+        return written
 
 
 def _same_source(mod: dict, src: dict) -> bool:
@@ -2486,6 +2622,23 @@ def custom_mod_conflict(dll: str, src: dict | None = None) -> str | None:
     return None
 
 
+def custom_files_conflict(files: list, src: dict | None = None,
+                          mod_id: str | None = None) -> str | None:
+    """Why a mod installing ``files`` (paths in the game folder) cannot be
+    added (an N_ message), or None: no other listed or custom mod may
+    install one of the same files. ``mod_id`` is the mod itself, on an
+    update."""
+    want = {_dll_key(f) for f in files}
+    for m in MODS_REGISTRY:
+        if m["id"] == mod_id:
+            continue
+        if want & {_dll_key(f) for f in m.get("installed_files", [])}:
+            if src is not None and m.get("custom") and _same_source(m, src):
+                return N_("That mod is already in the Mods list.")
+            return N_("Another mod in the Mods list installs the same files.")
+    return None
+
+
 def mod_dll_name(mod: dict) -> str:
     """The file name of the DLL a mod has loaded through dlls.txt
     (lower case), or "" for one that is not loaded that way."""
@@ -2508,6 +2661,8 @@ def mod_twins(mod_id: str) -> list:
 def custom_mod_entry(rec: dict) -> dict:
     """A MODS_REGISTRY entry for a custom-mod record."""
     import glob
+    if rec.get("asset"):
+        return _custom_asset_entry(rec)
     dll = rec["dll"]
     dest = f"{CUSTOM_MOD_DIR}/{dll}"
     src = {"kind": rec["kind"], "owner": rec["owner"], "repo": rec["repo"],
@@ -2531,6 +2686,39 @@ def custom_mod_entry(rec: dict) -> dict:
     }
 
 
+def _custom_asset_entry(rec: dict) -> dict:
+    """The entry for a ZIP or MPQ mod: ``asset`` the pattern of its release
+    file, ``files`` where it goes in the game folder (as of when it was
+    added; each install records what it wrote), ``dll`` the one it has
+    loaded through dlls.txt, if any."""
+    files = [str(f) for f in rec["files"]]
+    if not files:
+        raise KeyError("files")
+    is_zip = rec["asset"].lower().endswith(".zip")
+    src = {"kind": rec["kind"], "owner": rec["owner"], "repo": rec["repo"],
+           "asset_pattern": rec["asset"], "prefer_no": None,
+           "extract_map": None}
+    if is_zip:
+        src["extract_all"] = True
+    else:
+        src["dest"] = files[0]
+    if rec.get("forge"):
+        src["forge"] = rec["forge"]
+    host = _custom_mod_host(rec)
+    return {
+        "id": _custom_rec_id(rec),
+        "custom": True,
+        "essential": False,
+        "name": rec.get("name") or rec["repo"],
+        "description": tr("Custom mod from {source}.",
+                          source=f"{host}/{rec['owner']}/{rec['repo']}"),
+        "repo_url": f"https://{host}/{rec['owner']}/{rec['repo']}",
+        "source": src,
+        "register_dll": rec.get("dll") or None,
+        "installed_files": files,
+    }
+
+
 def load_custom_mods(cfg: dict | None = None) -> list:
     """Put the configured custom mods into MODS_REGISTRY (in place, so every
     reader sees them), replacing any put there before. Returns their ids."""
@@ -2542,11 +2730,36 @@ def load_custom_mods(cfg: dict | None = None) -> list:
             entry = custom_mod_entry(rec)
         except (KeyError, TypeError):
             continue
-        if entry["id"] in ids or custom_mod_conflict(rec["dll"]):
+        if entry["id"] in ids or (
+                custom_files_conflict(entry["installed_files"]) if rec.get("asset")
+                else custom_mod_conflict(rec["dll"])):
             continue
         MODS_REGISTRY.append(entry)
         ids.append(entry["id"])
     return ids
+
+
+def add_custom_asset_mod(src: dict, asset: str, files: list,
+                         dll: str | None = None) -> str:
+    """Record a ZIP or MPQ custom mod (``asset`` the release file's name,
+    ``files`` where it goes, ``dll`` the one to load, if any) and add it to
+    the registry; returns its id."""
+    rec = {"kind": src["kind"], "owner": src["owner"], "repo": src["repo"],
+           "asset": custom_asset_pattern(asset),
+           "name": src["repo"], "files": list(files)}
+    if dll:
+        rec["dll"] = dll
+    if src.get("forge"):
+        rec["forge"] = src["forge"]
+    mid = _custom_rec_id(rec)
+    if any(m["id"] == mid for m in MODS_REGISTRY):
+        raise ValueError(N_("That mod is already in the Mods list."))
+    problem = custom_files_conflict(files, src)
+    if problem:
+        raise ValueError(problem)
+    cfg = update_config(lambda c: c.setdefault("custom_mods", []).append(rec))
+    load_custom_mods(cfg)
+    return mid
 
 
 def add_custom_mod(src: dict, dll: str) -> str:
@@ -2568,7 +2781,7 @@ def forget_custom_mod(mod_id: str) -> None:
     take it out of the registry. Its files are the caller's to remove."""
     def _drop(c):
         c["custom_mods"] = [r for r in c.get("custom_mods") or []
-                            if _custom_mod_id(r.get("dll") or "") != mod_id]
+                            if _custom_rec_id(r) != mod_id]
         c.get("mods", {}).pop(mod_id, None)
         c.get("mod_release_cache", {}).pop(mod_id, None)
     load_custom_mods(update_config(_drop))
@@ -2999,6 +3212,31 @@ def env_problem_text(problems) -> str:
     """One translated line per unusable environment variable line."""
     return "\n".join(tr(ENV_PROBLEMS[reason], line=number)
                      for number, reason in problems)
+
+
+#: Why a Linux launch would fail at once, by platforms.launch_problems reason.
+LAUNCH_PROBLEMS = {
+    "runner_missing":     N_("'{value}' was not found in PATH."),
+    "runner_not_file":    N_("The launcher program does not exist or cannot "
+                             "be run:\n{value}"),
+    "prefix_relative":    N_("The Wine prefix is not a full path:\n{value}"),
+    "prefix_not_dir":     N_("The Wine prefix is a file, not a folder:\n{value}"),
+    "prefix_parent":      N_("The Wine prefix's parent folder does not "
+                             "exist:\n{value}"),
+    "protonpath_missing": N_("PROTONPATH does not exist:\n{value}"),
+}
+
+
+def launch_problem_text(problems) -> str:
+    """One translated paragraph per launch problem."""
+    return "\n\n".join(tr(LAUNCH_PROBLEMS[reason], value=value)
+                       for reason, value in problems)
+
+
+#: How long after PLAY a runner that quits with an error counts as one that
+#: could not start the game, and where its output goes (Linux).
+LAUNCH_WATCH_MS = 8000
+LAUNCH_OUTPUT = os.path.join(APP_DATA_DIR, "last-launch.log")
 
 
 def addon_install_source(git):
@@ -3929,6 +4167,47 @@ def _format_news_date(iso: str) -> str:
     return f"{d.day:02d} {tr(_MONTHS[d.month - 1])} {d.year}"
 
 
+#: A News post this recent is NEW! whenever the launcher was last opened.
+NEWS_NEW_DAYS = 3
+
+
+def _news_timestamp(iso: str) -> float | None:
+    """A post's date as a Unix time, or None. A date with no offset (the
+    news.json fallback) is taken as UTC, as the forum's are."""
+    from datetime import datetime, timezone
+    try:
+        d = datetime.fromisoformat((iso or "").replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if d.tzinfo is None:
+        d = d.replace(tzinfo=timezone.utc)
+    return d.timestamp()
+
+
+def news_is_new(iso: str, last_seen: float | None, now: float) -> bool:
+    """Whether a post is NEW!: posted after the player last saw that list
+    (``last_seen``, a Unix time; None before the first time), *or* within
+    the last NEWS_NEW_DAYS days. Either is enough: a post four days old is
+    still new to a player who has not opened the launcher for a week."""
+    ts = _news_timestamp(iso)
+    if ts is None:
+        return False
+    return ((last_seen is not None and ts > last_seen)
+            or ts >= now - NEWS_NEW_DAYS * 86400)
+
+
+def news_marks(items: list, last_seen: float | None, now: float) -> dict:
+    """{id: (new, last)} for a list shown newest first: which posts are
+    NEW!, and the oldest of them (``last``), which has the red line under
+    it dividing the new ones from the rest. The line is drawn only when
+    more than one post is new: under a single one it divides nothing a
+    NEW! does not already say."""
+    new = [str(i.get("id", "")) for i in items
+           if news_is_new(i.get("date", ""), last_seen, now)]
+    last = new[-1] if len(new) > 1 else None
+    return {iid: (True, iid == last) for iid in new}
+
+
 def _news_open(req, timeout):
     return secure_urlopen(req, timeout=timeout,
                           allowed_hosts={"octowow.st"})
@@ -4262,6 +4541,13 @@ class EqUpdaterApp(tk.Tk):
         patch_cache = news_cache.get("changelog", {})
         self._featured = feat_cache.get("item")
         self._patch_items = patch_cache.get("items")
+        # When each list was last read, as of this launch: a post after it
+        # is NEW! all session long. The time is moved on (_news_seen) once
+        # the list is read, for the next launch.
+        seen = self._cfg.get("news_seen") or {}
+        self._news_seen_before = {key: seen.get(section) for key, section in
+                                  (("ann", "announcements"),
+                                   ("patch", "changelog"))}
 
         # Scrollable list canvases that respond to the mouse wheel whenever
         # the pointer is anywhere over them (not just over the scrollbar).
@@ -5259,7 +5545,9 @@ class EqUpdaterApp(tk.Tk):
         for key, width in widths.items():
             for label in getattr(self, "_acc_wraps", {}).get(key, ()):
                 try:
-                    label.configure(wraplength=width)
+                    cut = getattr(label, "_wrap_cut", 0)
+                    label.configure(wraplength=max(self._px(80), width - cut)
+                                    if cut else width)
                 except tk.TclError:
                     pass
 
@@ -5278,6 +5566,21 @@ class EqUpdaterApp(tk.Tk):
             entry[payload_key] = payload
         self._cfg = update_config(mutate)
         return stamp
+
+    def _news_seen(self, section: str):
+        """Remember that the player saw ``section``'s list now: what is
+        posted later is NEW! at the next launch."""
+        stamp = time.time()
+        self._cfg = update_config(
+            lambda c: c.setdefault("news_seen", {}).__setitem__(section, stamp))
+
+    def _news_marks(self, key: str, entries: list) -> dict:
+        seen = getattr(self, "_news_seen_before", {}).get(key)
+        try:
+            seen = float(seen) if seen is not None else None
+        except (TypeError, ValueError):
+            seen = None
+        return news_marks(entries, seen, time.time())
 
     def _load_news(self):
         """The launch fetch: one request cycle per panel."""
@@ -5311,6 +5614,7 @@ class EqUpdaterApp(tk.Tk):
                     note = feat.pop("_note", "")
                     self._featured = feat
                     self._save_news_cache("announcements", "item", feat)
+                    self._news_seen("announcements")
                     self._render_featured(feat, note=note)
                     if not note:
                         self._ann_load_page()
@@ -5338,6 +5642,7 @@ class EqUpdaterApp(tk.Tk):
                 if items is not None:
                     self._patch_items = items
                     self._save_news_cache("changelog", "items", items)
+                    self._news_seen("changelog")
                     self._render_patch_notes(items)
                 else:
                     self._render_patch_notes(self._patch_items, error=err)
@@ -5403,7 +5708,8 @@ class EqUpdaterApp(tk.Tk):
         self._acc_canvas = {**getattr(self, "_acc_canvas", {}), key: canvas}
         self._acc_wraps.setdefault(key, [])
         lst = {"inner": inner, "order": [], "rows": {}, "toggle": toggle,
-               "title_size": title_size, "footer": footer, "tail": []}
+               "title_size": title_size, "footer": footer, "tail": [],
+               "marks": self._news_marks(key, entries)}
         self._acc_lists = {**getattr(self, "_acc_lists", {}), key: lst}
 
         for item in entries:
@@ -5418,11 +5724,11 @@ class EqUpdaterApp(tk.Tk):
             canvas.yview_moveto(y_px / total)
 
     @staticmethod
-    def _acc_signature(item, is_open):
+    def _acc_signature(item, is_open, mark=(False, False)):
         """What an entry shows: when this changes, the entry is redone."""
         body = item.get("body")
         return (is_open, item.get("title"), body is None, body or "",
-                item.get("_error") or "", item.get("url") or "")
+                item.get("_error") or "", item.get("url") or "", mark)
 
     def _acc_add(self, key, item, is_open):
         """One entry at the end of a list, with the divider under it."""
@@ -5432,13 +5738,20 @@ class EqUpdaterApp(tk.Tk):
         entry.pack(fill="x", padx=(0, self._px(8)))
         head = tk.Frame(entry, bg=C_PANEL, cursor="hand2")
         head.pack(fill="x", pady=(self._px(10), 0))
-        title = tk.Label(head, text=item.get("title", ""),
+        title_row = tk.Frame(head, bg=C_PANEL, cursor="hand2")
+        title_row.pack(fill="x")
+        title = tk.Label(title_row, text=item.get("title", ""),
                          font=self._font(lst["title_size"], bold=True),
                          fg=C_TEXT, bg=C_PANEL,
                          wraplength=self._news_wrap(key), justify="left",
                          anchor="w", cursor="hand2")
-        title.pack(fill="x")
+        title.pack(side="left")
         self._acc_wraps.setdefault(key, []).append(title)
+        # Shown by _acc_show on a new post, just after its title.
+        badge = tk.Label(title_row, text=tr("NEW!"),
+                         font=self._font(lst["title_size"] + 1, bold=True,
+                                         italic=True),
+                         fg=C_NEW, bg=C_PANEL, cursor="hand2")
         byline = tk.Label(head, text="", font=self._font(8), fg=C_TEXT_DIM,
                           bg=C_PANEL, anchor="w", cursor="hand2")
         byline.pack(fill="x", pady=(self._px(2), 0))
@@ -5447,8 +5760,8 @@ class EqUpdaterApp(tk.Tk):
         divider = tk.Frame(lst["inner"], bg=C_DIVIDER, height=self._px(1))
         divider.pack(fill="x", padx=(0, self._px(8)), pady=(self._px(10), 0))
         row = {"entry": entry, "title": title, "byline": byline, "body": body,
-               "divider": divider, "sig": None}
-        for w in (head, title, byline):
+               "divider": divider, "badge": badge, "sig": None}
+        for w in (head, title_row, title, badge, byline):
             w.bind("<Button-1>", lambda e, i=iid: lst["toggle"](i))
             w.bind("<Enter>", lambda e, l=title: l.configure(fg=C_GOLD))
             w.bind("<Leave>", lambda e, r=row: r["title"].configure(
@@ -5460,11 +5773,26 @@ class EqUpdaterApp(tk.Tk):
     def _acc_show(self, key, iid, item, is_open):
         """Bring one entry up to date: its arrow, its title's colour and, if
         what it shows changed, its text -- nothing else in the list."""
-        row = self._acc_lists[key]["rows"][iid]
-        sig = self._acc_signature(item, is_open)
+        lst = self._acc_lists[key]
+        row = lst["rows"][iid]
+        is_new, is_last_new = lst.get("marks", {}).get(iid, (False, False))
+        sig = self._acc_signature(item, is_open, (is_new, is_last_new))
         if sig == row["sig"]:
             return
         row["sig"] = sig
+        # NEW! after the title, the title wrapping short of it; the oldest
+        # of several new posts has the red line under it, not the divider.
+        badge, title = row["badge"], row["title"]
+        if is_new:
+            title._wrap_cut = badge.winfo_reqwidth() + self._px(8)
+            badge.pack(side="left", anchor="n", padx=(self._px(8), 0))
+        else:
+            title._wrap_cut = 0
+            badge.pack_forget()
+        title.configure(wraplength=max(self._px(80), self._news_wrap(key)
+                                       - title._wrap_cut))
+        row["divider"].configure(bg=C_NEW if is_last_new else C_DIVIDER,
+                                 height=self._px(2 if is_last_new else 1))
         meta = []
         if item.get("author"):
             meta.append(tr("by {author}", author=item["author"]))
@@ -5533,6 +5861,7 @@ class EqUpdaterApp(tk.Tk):
         ids = [str(item.get("id", "")) for item in entries]
         if ids[:len(lst["order"])] != lst["order"]:
             return False
+        lst["marks"] = self._news_marks(key, entries)
         for item, iid in zip(entries, ids):
             if iid in lst["rows"]:
                 self._acc_show(key, iid, item, iid in open_ids)
@@ -8566,9 +8895,11 @@ class EqUpdaterApp(tk.Tk):
         self._refresh_apply_btn_visibility()
 
     def _open_custom_mod_dialog(self):
-        """Add a mod EqUpdater does not list: one .dll from a repository's
-        releases. The link is checked, the release's .dll files are offered,
-        and nothing is installed until the player confirms the warning."""
+        """Add a mod EqUpdater does not list: one .dll, .zip or .mpq from a
+        repository's releases. The link is checked, the release's files are
+        offered, and nothing is installed until the player confirms the
+        warning. A ZIP is downloaded and looked through first, so the
+        warning can say what it puts where."""
         if self._settings_overlay is not None:
             return
         ov = tk.Frame(self, bg="#0a0a0e")
@@ -8622,25 +8953,25 @@ class EqUpdaterApp(tk.Tk):
         status.pack(anchor="w", pady=(self._px(4), 0))
         choices = tk.Frame(body, bg=P_BG)
         choices.pack(fill="x", anchor="w")
-        btn = tk.Label(body, text=tr("Find .dll files"),
+        btn = tk.Label(body, text=tr("Find mod files"),
                        font=self._font(11, bold=True), fg=C_TEXT, bg=P_BDR,
                        cursor="hand2", padx=self._px(16), pady=self._px(7))
         btn.pack(side="bottom", anchor="e")
         btn.bind("<Enter>", lambda e: btn.configure(bg=C_GOLD, fg="#000"))
         btn.bind("<Leave>", lambda e: btn.configure(bg=P_BDR, fg=C_TEXT))
 
-        st = {"src": None, "dlls": [], "busy": False}
+        st = {"src": None, "dlls": [], "release": None, "busy": False}
         choice = tk.StringVar()
         self._custom_mod_ui = {"url": url_var, "status": status,
                                "choice": choice, "state": st,
                                "find": lambda: find(), "install": lambda: install()}
 
         def reset(*_a):
-            st["src"], st["dlls"] = None, []
+            st["src"], st["dlls"], st["release"] = None, [], None
             choice.set("")
             for w in choices.winfo_children():
                 w.destroy()
-            btn.configure(text=tr("Find .dll files"))
+            btn.configure(text=tr("Find mod files"))
             status.configure(text="")
         url_var.trace_add("write", reset)
 
@@ -8652,14 +8983,17 @@ class EqUpdaterApp(tk.Tk):
                 status.configure(text=tr("Could not read the releases: {error}",
                                          error=tr(error)), fg=C_ERR)
                 return
-            dlls = release_dlls(release)
+            dlls = release_mod_files(release)
             if src.get("asset"):
                 dlls = [d for d in dlls if d.lower() == src["asset"].lower()]
             if not dlls:
-                status.configure(text=tr("The latest release has no .dll "
-                                         "file to install."), fg=C_ERR)
+                status.configure(text=tr("The latest release has no .dll, "
+                                         ".zip or .mpq file to install. An "
+                                         "addon with no releases is added "
+                                         "in Addons: Add custom git addon."),
+                                 fg=C_ERR)
                 return
-            st["src"], st["dlls"] = src, dlls
+            st["src"], st["dlls"], st["release"] = src, dlls, release
             choice.set(dlls[0])
             status.configure(text=tr("Latest release: {tag}. Choose the "
                                      "file to install:",
@@ -8694,27 +9028,101 @@ class EqUpdaterApp(tk.Tk):
             threading.Thread(target=worker, daemon=True).start()
 
         def install():
-            dll = choice.get()
-            if not st["src"] or not dll:
+            name = choice.get()
+            if not st["src"] or not name:
                 return find()
-            problem = custom_mod_conflict(dll, st["src"])
+            if name.lower().endswith(".zip"):
+                return inspect_zip(name)
+            if name.lower().endswith(".mpq"):
+                dest = f"Data/{name}"
+                client = self._game_path.get().strip()
+                if client and os.path.exists(os.path.join(client, dest)):
+                    status.configure(text=tr("Data already has a file named "
+                                             "{name}.", name=name), fg=C_ERR)
+                    return
+                return finish(name, [dest], None)
+            problem = custom_mod_conflict(name, st["src"])
             if problem:
                 status.configure(text=tr(problem), fg=C_ERR)
                 return
-            if not self._confirm_custom_mod(st["src"], dll):
+            if not self._confirm_custom_mod(st["src"], name):
                 return
+            add(name, lambda: add_custom_mod(st["src"], name), name)
+
+        def inspect_zip(name):
+            """Download the ZIP and read where its files go, off the UI
+            thread; finish() then asks."""
+            if st["busy"]:
+                return
+            asset = next((a for a in (st["release"] or {}).get("assets") or []
+                          if a.get("name") == name), None)
+            if asset is None:
+                return find()
+            st["busy"] = True
+            status.configure(text=tr("Looking inside {name}…", name=name),
+                             fg=C_TEXT_DIM)
+
+            def worker():
+                import io
+                import zipfile
+                files, err = None, None
+                try:
+                    req = urllib.request.Request(
+                        asset["browser_download_url"],
+                        headers={"User-Agent": UA})
+                    with secure_urlopen(req, timeout=120,
+                                        allowed_hosts=ALLOWED_DOWNLOAD_HOSTS) as r:
+                        data = r.read()
+                    with zipfile.ZipFile(io.BytesIO(data)) as zf:
+                        files = [d for _, d in mod_zip_plan(zf.namelist())]
+                except ValueError as e:
+                    err = tr(str(e))
+                except Exception as e:
+                    err = tr("Could not read {name}: {error}", name=name,
+                             error=e)
+
+                def done():
+                    st["busy"] = False
+                    if not ov.winfo_exists():
+                        return
+                    if err:
+                        status.configure(text=err, fg=C_ERR)
+                        return
+                    status.configure(text="", fg=C_OK)
+                    finish(name, files, mod_zip_dll(files))
+                self.after(0, done)
+            threading.Thread(target=worker, daemon=True).start()
+
+        def finish(name, files, dll):
+            """A ZIP or MPQ mod: checked, confirmed, added."""
+            problem = custom_files_conflict(files, st["src"])
+            if problem:
+                status.configure(text=tr(problem), fg=C_ERR)
+                return
+            if not self._confirm_custom_asset_mod(st["src"], name, files, dll):
+                return
+            add(os.path.basename(dll) if dll else None,
+                lambda: add_custom_asset_mod(st["src"], name, files, dll), name)
+
+        def add(dll, record, name):
+            """Add the mod (``record()``) and install it. ``dll`` is the
+            file it loads, if any."""
             # Another build of the same DLL that is on: it goes off in the
             # same Apply that puts this one in, or this one is not added.
             twins_on = [m for m in MODS_REGISTRY
-                        if mod_dll_name(m) == dll.lower()
+                        if dll and mod_dll_name(m) == dll.lower()
                         and self._mod_is_on(m["id"])]
             if twins_on and not self._confirm_replace_twins(
                     f"{_custom_mod_host(st['src'])}/{st['src']['owner']}/"
                     f"{st['src']['repo']}", dll, twins_on):
                 return
-            mid = add_custom_mod(st["src"], dll)
+            try:
+                mid = record()
+            except ValueError as e:
+                status.configure(text=tr(str(e)), fg=C_ERR)
+                return
             self._close_settings()
-            self._log_line(f"\nAdded custom mod {dll} from "
+            self._log_line(f"\nAdded custom mod {name} from "
                            f"{_custom_mod_host(st['src'])}/{st['src']['owner']}/"
                            f"{st['src']['repo']}.\n", "acct")
             self._rebuild_mod_rows()
@@ -8762,6 +9170,36 @@ class EqUpdaterApp(tk.Tk):
                "Install it?", dll=dll, source=where, app=branding.APP_NAME),
             icon="warning", parent=self)
 
+    def _confirm_custom_asset_mod(self, src: dict, name: str, files: list,
+                                  dll: str | None) -> bool:
+        """The warning for a ZIP or MPQ mod: what it puts where, and what it
+        loads into the game, if anything."""
+        from tkinter import messagebox
+        where = f"{_custom_mod_host(src)}/{src['owner']}/{src['repo']}"
+        def top(f):
+            # An addon by its folder; anything else by its top folder.
+            parts = f.split("/")
+            depth = 3 if [p.lower() for p in parts[:2]] == ["interface",
+                                                            "addons"] else 1
+            return "/".join(parts[:depth]) + ("/" if len(parts) > depth else "")
+        tops = sorted({top(f) for f in files}, key=str.lower)
+        shown = "\n".join("  " + t for t in tops[:8])
+        if len(tops) > 8:
+            shown += "\n  " + tr("and {count} more", count=len(tops) - 8)
+        loads = (tr("It loads {dll} into the game every time it starts.",
+                    dll=dll) if dll else
+                 tr("It loads no .dll: the game reads its files as it would "
+                    "an addon's or a patch's."))
+        return messagebox.askyesno(
+            tr("Install {name}?", name=name),
+            tr("{name} from {source} puts {count} files into the game "
+               "folder:\n\n{where}\n\n{loads}\n\n"
+               "A mod can change how the game behaves, and {app} does not "
+               "check what it does. Only install mods you trust.\n\n"
+               "Install it?", name=name, source=where, count=len(files),
+               where=shown, loads=loads, app=branding.APP_NAME),
+            icon="warning", parent=self)
+
     def _remove_custom_mod(self, mod_id: str):
         """Take a custom mod out of the list: its file is deleted, its
         dlls.txt line removed, and its record forgotten."""
@@ -8772,14 +9210,19 @@ class EqUpdaterApp(tk.Tk):
         if not messagebox.askyesno(
                 tr("Remove {name}?", name=mod["name"]),
                 tr("{name} is deleted from the mods folder, taken out of "
-                   "dlls.txt and removed from this list.", name=mod["name"]),
+                   "dlls.txt and removed from this list.", name=mod["name"])
+                if not mod["source"].get("asset_pattern", "").lower().endswith(
+                    (".zip", ".mpq")) else
+                tr("The files {name} put into the game folder are deleted, "
+                   "and it is removed from this list.", name=mod["name"]),
                 parent=self):
             return
         client = self._game_path.get().strip()
         if client:
             try:
                 uninstall_mod(mod, client)
-                remove_dll(client, mod["register_dll"])
+                if mod.get("register_dll"):
+                    remove_dll(client, mod["register_dll"])
             except OSError as e:
                 self._log_line(f"Could not remove {mod['name']}: {e}\n", "err")
                 return
@@ -11017,13 +11460,38 @@ class EqUpdaterApp(tk.Tk):
                 parent=self)
             return
 
+        problems = platforms.launch_problems(plan)
+        if problems:
+            self._launch_failed(
+                launch_problem_text(problems),
+                "Not launched: " + "; ".join(f"{r}: {v}" for r, v in problems)
+                + f"\n  command: {plan.argv}\n")
+            return
+
         if self._cfg.get("clear_wdb_on_launch", False):
             remove_wdb(client_dir)
 
+        output = None
+        if plan.runner != "windows":
+            try:
+                ensure_dir(os.path.dirname(LAUNCH_OUTPUT))
+                output = LAUNCH_OUTPUT
+            except OSError:
+                pass
         try:
-            platforms.spawn_detached(plan.argv, cwd=plan.cwd, env=plan.env)
+            proc = platforms.spawn_detached(plan.argv, cwd=plan.cwd,
+                                            env=plan.env, output=output)
+        except OSError as e:
+            self._launch_failed(
+                tr("{program} could not be started: {error}",
+                   program=plan.argv[0], error=e.strerror or e),
+                f"Failed to launch {exe_lbl}: {e}\n  command: {plan.argv}\n")
+            return
+        try:
             how = "" if plan.runner == "windows" else f" with {plan.runner}"
             self._log_line(f"Launched {exe_lbl}{how}!\n", "ok")
+            if output:
+                self._watch_launch(proc, plan.argv, output, 0)
             # Briefly disable PLAY so a double-click can't spawn two clients.
             self._set_btn_busy(tr("PLAY"))
             self._status_var.set(tr("Launching..."))
@@ -11033,6 +11501,43 @@ class EqUpdaterApp(tk.Tk):
             self.after(5000, self._refresh_ready_state)
         except Exception as e:
             self._log_line(f"Failed to launch {exe_lbl}: {e}\n", "err")
+
+    def _launch_failed(self, message: str, details: str):
+        """PLAY did not start the game: the details to the log, a short
+        reason to the player, PLAY ready again."""
+        from tkinter import messagebox
+        self._log_line(details, "err")
+        messagebox.showerror(tr("Cannot start the game"),
+                             tr("Could not launch the game.") + "\n\n" + message,
+                             parent=self)
+        self._refresh_ready_state()
+
+    def _watch_launch(self, proc, argv, output, waited: int):
+        """Linux: a runner that quits with an error within LAUNCH_WATCH_MS
+        of PLAY did not start the game -- a bad prefix, a Proton that is not
+        there. Say so, with the end of what it printed, rather than let
+        PLAY come back as if nothing happened. Quitting cleanly is fine:
+        VanillaFixes.exe exits once it has started WoW.exe."""
+        code = proc.poll()
+        if code is None:
+            if waited < LAUNCH_WATCH_MS:
+                self.after(250, lambda: self._watch_launch(
+                    proc, argv, output, waited + 250))
+            return
+        if code == 0:
+            return
+        try:
+            with open(output, encoding="utf-8", errors="replace") as f:
+                lines = [l.rstrip() for l in f.read().splitlines() if l.strip()]
+        except OSError:
+            lines = []
+        tail = "\n".join(lines[-40:])
+        self._launch_failed(
+            tr("{program} stopped at once (exit code {code}).",
+               program=os.path.basename(argv[0]), code=code)
+            + ("\n\n" + "\n".join(lines[-6:]) if lines else ""),
+            f"The game runner exited with code {code} right after launch.\n"
+            f"  command: {argv}\n  output ({output}):\n{tail}\n")
 
     # ── verify lifecycle ──────────────────────────────────────────────────────────
 

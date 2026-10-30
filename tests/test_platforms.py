@@ -417,6 +417,217 @@ class TestGameEnvironment(unittest.TestCase):
             app.i18n.set_language("enUS")
 
 
+class TestShellValues(unittest.TestCase):
+    """Nothing is run through a shell, so ~, $HOME and quotes in the Game
+    launcher's fields are resolved by EqUpdater. A user's UMU setup with
+    "$HOME/..." in quotes launched nothing at all until they typed
+    /home/<name>/... without quotes."""
+
+    ENV = {"HOME": "/home/me", "BASE": "/opt/proton"}
+
+    def setUp(self):
+        _app, self.p = modules()
+
+    def test_outer_quotes_once(self):
+        u = self.p.unquote_value
+        self.assertEqual(u('"$HOME/Games/foo"'), "$HOME/Games/foo")
+        self.assertEqual(u("'/home/me/Games/foo'"), "/home/me/Games/foo")
+        self.assertEqual(u(' "/a b" '), "/a b")
+        self.assertEqual(u('""x""'), '"x"')                 # one pair only
+        for kept in ('"unclosed', "'mixed\"", 'a "b" c', 'x"', '"'):
+            self.assertEqual(u(kept), kept)
+
+    def test_home_three_ways(self):
+        e = lambda v: self.p.expand_value(v, self.ENV)  # noqa: E731
+        for typed in ("~/Games/foo", "$HOME/Games/foo", "${HOME}/Games/foo"):
+            self.assertEqual(e(typed), "/home/me/Games/foo", typed)
+        self.assertEqual(e("~"), "/home/me")
+        self.assertEqual(e("$BASE/GE-Proton"), "/opt/proton/GE-Proton")
+
+    def test_what_is_not_a_variable_stays(self):
+        e = lambda v: self.p.expand_value(v, self.ENV)  # noqa: E731
+        for kept in ("$NOT_SET/x", "$(touch /tmp/pwned)", "/a/~/b", "100$",
+                     "d3d9=n,b;dxgi=n", "$HOMEX/y"):
+            self.assertEqual(e(kept), kept)
+
+    def test_quoted_and_expanded(self):
+        s = lambda v: self.p.shell_value(v, self.ENV)  # noqa: E731
+        self.assertEqual(s('"$HOME/Games/warcraft_octowow/"'),
+                         "/home/me/Games/warcraft_octowow/")
+        self.assertEqual(s("'~/Games/foo'"), "/home/me/Games/foo")
+        self.assertEqual(s("/home/me/Games/foo"), "/home/me/Games/foo")
+        spaced = ("/home/me/.local/share/Steam/compatibilitytools.d/"
+                  "Proton - Experimental")
+        self.assertEqual(s(spaced), spaced)
+        self.assertEqual(s('"' + spaced + '"'), spaced)
+        self.assertEqual(s('"$HOME/.local/share/Steam/compatibilitytools.d/'
+                           'Proton - Experimental"'), spaced)
+
+
+class TestLaunchPaths(unittest.TestCase):
+    EXE = "/home/me/Games/OctoWoW/WoW.exe"
+    DIR = "/home/me/Games/OctoWoW"
+    GE = "/home/me/.local/share/Steam/compatibilitytools.d/GE-Proton11-1-x86_64/"
+
+    def plan(self, settings, found=("wine", "umu-run"), exe=None):
+        _app, platforms = modules()
+        which = lambda name: f"/usr/bin/{name}" if name in found else None  # noqa: E731
+        with On("linux"), mock.patch.dict(os.environ, {"HOME": "/home/me"}):
+            return platforms.launch_plan(self.DIR, exe or self.EXE, settings,
+                                         which=which)
+
+    def test_the_reported_umu_setup_launches(self):
+        plan = self.plan({
+            "launch_command": "umu-run {exe}",
+            "wine_prefix": '"$HOME/Games/warcraft_octowow/"',
+            "env_vars": 'PROTONPATH="$HOME/.local/share/Steam/'
+                        'compatibilitytools.d/GE-Proton11-1-x86_64/"\n'
+                        "GAMEID=0"})
+        self.assertTrue(plan.ok)
+        self.assertEqual(plan.argv, ["umu-run", self.EXE])
+        self.assertEqual(plan.env["WINEPREFIX"], "/home/me/Games/warcraft_octowow/")
+        self.assertEqual(plan.env["PROTONPATH"], self.GE)
+        self.assertEqual(plan.env["GAMEID"], "0")
+
+    def test_the_wine_prefix_every_way(self):
+        for typed in ("~/Games/pfx", "$HOME/Games/pfx", "${HOME}/Games/pfx",
+                      '"$HOME/Games/pfx"', "'~/Games/pfx'", "/home/me/Games/pfx",
+                      "  /home/me/Games/pfx  "):
+            self.assertEqual(self.plan({"wine_prefix": typed}).env["WINEPREFIX"],
+                             "/home/me/Games/pfx", typed)
+
+    def test_protonpath_every_way_and_with_spaces(self):
+        spaced = "/home/me/.local/share/Steam/compatibilitytools.d/Proton - Experimental"
+        for typed, want in (("$HOME/x", "/home/me/x"), ("${HOME}/x", "/home/me/x"),
+                            ("~/x", "/home/me/x"), ("'/home/me/x'", "/home/me/x"),
+                            (spaced, spaced), ('"' + spaced + '"', spaced),
+                            ("GE-Proton", "GE-Proton")):
+            plan = self.plan({"env_vars": "PROTONPATH=" + typed})
+            self.assertEqual(plan.env["PROTONPATH"], want, typed)
+
+    def test_a_line_may_use_one_above_it(self):
+        plan = self.plan({"env_vars": "TOOLS=$HOME/tools\nPROTONPATH=$TOOLS/GE"})
+        self.assertEqual(plan.env["PROTONPATH"], "/home/me/tools/GE")
+
+    def test_custom_commands_parse_as_before(self):
+        plan = self.plan({"launch_command":
+                          '"/opt/My Proton/proton" run {exe} --arg "a b"'})
+        self.assertEqual(plan.argv, ["/opt/My Proton/proton", "run", self.EXE,
+                                     "--arg", "a b"])
+        plan = self.plan({"launch_command": "$HOME/bin/umu-run {exe}"})
+        self.assertEqual(plan.argv, ["/home/me/bin/umu-run", self.EXE])
+        plan = self.plan({"launch_command": "~/bin/run --dir {dir}"})
+        self.assertEqual(plan.argv, ["/home/me/bin/run", "--dir", self.DIR])
+        # The game's own path is never read for variables.
+        odd = "/games/$HOME/WoW.exe"
+        self.assertEqual(self.plan({"launch_command": "wine {exe}"}, exe=odd).argv,
+                         ["wine", odd])
+
+    def test_windows_is_untouched(self):
+        _app, platforms = modules()
+        with On("windows"):
+            plan = platforms.launch_plan(r"D:\OctoWoW", r"D:\OctoWoW\WoW.exe",
+                                         {"env_vars": 'X="$HOME"'})
+        self.assertEqual(plan.env["X"], '"$HOME"')
+        self.assertEqual(platforms.launch_problems(plan), [])
+
+
+class TestLaunchProblems(unittest.TestCase):
+    """What would fail at once is said before PLAY tries it."""
+
+    def setUp(self):
+        _app, self.p = modules()
+        # Linux paths, even where the tests run on Windows.
+        self.tmp = tempfile.mkdtemp(prefix="equ-launch-").replace("\\", "/")
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self.j = lambda *parts: "/".join((self.tmp,) + parts)
+
+    def problems(self, argv=("umu-run", "/g/WoW.exe"), env=None, found=("umu-run",)):
+        plan = self.p.LaunchPlan(list(argv), "/g", dict(env or {}), "custom")
+        which = lambda name: f"/usr/bin/{name}" if name in found else None  # noqa: E731
+        return self.p.launch_problems(plan, which=which)
+
+    def test_a_good_setup_has_none(self):
+        os.makedirs(self.j("GE"))
+        self.assertEqual(self.problems(env={
+            "WINEPREFIX": self.j("not-made-yet"),
+            "PROTONPATH": self.j("GE")}), [])
+        self.assertEqual(self.problems(env={"PROTONPATH": "GE-Proton"}), [])
+
+    def test_the_runner(self):
+        self.assertEqual(self.problems(found=()), [("runner_missing", "umu-run")])
+        missing = self.j("nope", "umu-run")
+        self.assertEqual(self.problems(argv=(missing, "x")),
+                         [("runner_not_file", missing)])
+
+    def test_protonpath_missing(self):
+        gone = self.j("GE-Proton11-1-x86_64")
+        self.assertEqual(self.problems(env={"PROTONPATH": gone}),
+                         [("protonpath_missing", gone)])
+
+    def test_the_prefix(self):
+        afile = self.j("file")
+        open(afile, "w").close()
+        orphan = self.j("no", "such", "pfx")
+        for prefix, reason in (("Games/pfx", "prefix_relative"),
+                               ("$NOT_SET/pfx", "prefix_relative"),
+                               ('"/home/me/pfx"', "prefix_relative"),
+                               (afile, "prefix_not_dir"),
+                               (orphan, "prefix_parent")):
+            self.assertEqual(self.problems(env={"WINEPREFIX": prefix}),
+                             [(reason, prefix)], prefix)
+
+    def test_none_for_an_unusable_plan(self):
+        self.assertEqual(self.p.launch_problems(self.p.LaunchPlan()), [])
+
+
+class TestLaunchFeedback(unittest.TestCase):
+    """A runner that quits with an error right after PLAY is reported, with
+    the end of what it printed; one that quits cleanly is not."""
+
+    def setUp(self):
+        self.app, self.p = modules()
+        self.out = os.path.join(tempfile.mkdtemp(prefix="equ-launch-"), "l.log")
+        self.addCleanup(shutil.rmtree, os.path.dirname(self.out), ignore_errors=True)
+        self.failed, self.later = [], []
+        self.ui = type("UI", (), {})()
+        self.ui._launch_failed = lambda msg, details: self.failed.append((msg, details))
+        self.ui.after = lambda ms, fn: self.later.append(fn)
+
+    def watch(self, code):
+        proc = type("P", (), {"poll": lambda s: code})()
+        self.app.EqUpdaterApp._watch_launch(self.ui, proc, ["/usr/bin/umu-run", "x"],
+                                            self.out, 0)
+
+    def test_an_error_exit_is_reported(self):
+        with open(self.out, "w") as f:
+            f.write("starting\nPROTONPATH: no such directory\n")
+        self.watch(1)
+        msg, details = self.failed[0]
+        self.assertIn("umu-run", msg)
+        self.assertIn("1", msg)
+        self.assertIn("PROTONPATH: no such directory", msg)
+        self.assertIn("PROTONPATH: no such directory", details)
+
+    def test_a_clean_exit_is_not(self):
+        self.watch(0)                    # VanillaFixes.exe exits once WoW runs
+        self.assertEqual(self.failed, [])
+
+    def test_still_running_is_watched_a_while(self):
+        self.watch(None)
+        self.assertEqual(len(self.later), 1)
+        self.assertEqual(self.failed, [])
+
+    def test_the_output_goes_to_the_file(self):
+        with On("linux") as platforms, \
+                mock.patch.object(platforms.subprocess, "Popen") as popen:
+            platforms.spawn_detached(["umu-run", "x"], cwd="/g", output=self.out)
+        kwargs = popen.call_args.kwargs
+        self.assertEqual(kwargs["stdout"].name, self.out)
+        self.assertTrue(kwargs["stdout"].closed)          # the child has it
+        self.assertEqual(kwargs["stderr"], platforms.subprocess.STDOUT)
+
+
 class TestAria2(unittest.TestCase):
     def test_the_name_follows_the_platform_flag(self):
         """Decided when asked, not when the module was imported: on a Linux

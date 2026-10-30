@@ -617,8 +617,6 @@ STRINGS = {
         'Die Releases konnten nicht gelesen werden: {error}',
     'Custom mod from {source}.':
         'Eigener Mod von {source}.',
-    'Find .dll files':
-        '.dll-Dateien suchen',
     'Install {name}?':
         '{name} installieren?',
     'Latest release: {tag}. Choose the file to install:':
@@ -635,16 +633,66 @@ STRINGS = {
         'Diesen eigenen Mod entfernen',
     'Remove {name}?':
         '{name} entfernen?',
-    'That download is not a .dll file.':
-        'Dieser Download ist keine .dll-Datei.',
     'That is not a .dll file name EqUpdater can use.':
         'Das ist kein .dll-Dateiname, den EqUpdater verwenden kann.',
-    'The latest release has no .dll file to install.':
-        'Das neueste Release enthält keine .dll-Datei zum Installieren.',
     'no release found on OctoWoW Git':
         'kein Release auf OctoWoW Git gefunden',
     '{dll} from {source} will be installed to the mods folder and loaded into the game every time it starts.\n\nA mod runs code inside the game, with the same access to this computer as the game itself. {app} does not check what it does. Only install mods you trust.\n\nInstall it?':
         '{dll} von {source} wird in den mods-Ordner installiert und bei jedem Spielstart geladen.\n\nEin Mod führt Code im Spiel aus, mit denselben Zugriffsrechten auf diesen Computer wie das Spiel selbst. {app} prüft nicht, was er tut. Installiere nur Mods, denen du vertraust.\n\nInstallieren?',
     '{name} is deleted from the mods folder, taken out of dlls.txt and removed from this list.':
         '{name} wird aus dem mods-Ordner gelöscht, aus dlls.txt entfernt und aus dieser Liste genommen.',
+    'Another mod in the Mods list installs the same files.':
+        'Ein anderer Mod in der Mod-Liste installiert dieselben Dateien.',
+    'Could not read {name}: {error}':
+        '{name} konnte nicht gelesen werden: {error}',
+    'Data already has a file named {name}.':
+        'In Data gibt es bereits eine Datei namens {name}.',
+    'Find mod files':
+        'Mod-Dateien suchen',
+    "It loads no .dll: the game reads its files as it would an addon's or a patch's.":
+        'Er lädt keine .dll: Das Spiel liest seine Dateien wie die eines Addons oder Patches.',
+    'It loads {dll} into the game every time it starts.':
+        'Er lädt {dll} bei jedem Spielstart ins Spiel.',
+    'Looking inside {name}…':
+        '{name} wird durchsucht…',
+    'NEW!':
+        'NEU!',
+    'That download is not a .dll, .zip or .mpq file.':
+        'Dieser Download ist keine .dll-, .zip- oder .mpq-Datei.',
+    'The archive has a file that would land outside the game folder.':
+        'Das Archiv enthält eine Datei, die außerhalb des Spielordners landen würde.',
+    'The archive has a program in it. EqUpdater installs mods, not programs.':
+        'Das Archiv enthält ein Programm. EqUpdater installiert Mods, keine Programme.',
+    'The archive is empty.':
+        'Das Archiv ist leer.',
+    'The archive is too large to be a mod.':
+        'Das Archiv ist zu groß für einen Mod.',
+    "The archive would replace one of the game's own files in Data.":
+        'Das Archiv würde eine der spieleigenen Dateien in Data ersetzen.',
+    'The latest release has no .dll, .zip or .mpq file to install. An addon with no releases is added in Addons: Add custom git addon.':
+        'Das neueste Release enthält keine .dll-, .zip- oder .mpq-Datei zum Installieren. Ein Addon ohne Releases fügst du unter Addons hinzu: Eigenes Git-Addon hinzufügen.',
+    'and {count} more':
+        'und {count} weitere',
+    '{name} from {source} puts {count} files into the game folder:\n\n{where}\n\n{loads}\n\nA mod can change how the game behaves, and {app} does not check what it does. Only install mods you trust.\n\nInstall it?':
+        '{name} von {source} legt {count} Dateien in den Spielordner:\n\n{where}\n\n{loads}\n\nEin Mod kann das Verhalten des Spiels ändern, und {app} prüft nicht, was er tut. Installiere nur Mods, denen du vertraust.\n\nInstallieren?',
+    'The files {name} put into the game folder are deleted, and it is removed from this list.':
+        'Die Dateien, die {name} in den Spielordner gelegt hat, werden gelöscht, und der Mod wird aus dieser Liste entfernt.',
+    "'{value}' was not found in PATH.":
+        "'{value}' wurde in PATH nicht gefunden.",
+    'Could not launch the game.':
+        'Das Spiel konnte nicht gestartet werden.',
+    'PROTONPATH does not exist:\n{value}':
+        'PROTONPATH existiert nicht:\n{value}',
+    'The Wine prefix is a file, not a folder:\n{value}':
+        'Das Wine-Präfix ist eine Datei, kein Ordner:\n{value}',
+    'The Wine prefix is not a full path:\n{value}':
+        'Das Wine-Präfix ist kein vollständiger Pfad:\n{value}',
+    "The Wine prefix's parent folder does not exist:\n{value}":
+        'Der übergeordnete Ordner des Wine-Präfixes existiert nicht:\n{value}',
+    'The launcher program does not exist or cannot be run:\n{value}':
+        'Das Startprogramm existiert nicht oder kann nicht ausgeführt werden:\n{value}',
+    '{program} could not be started: {error}':
+        '{program} konnte nicht gestartet werden: {error}',
+    '{program} stopped at once (exit code {code}).':
+        '{program} wurde sofort beendet (Exit-Code {code}).',
 }

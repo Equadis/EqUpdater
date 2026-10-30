@@ -15,6 +15,22 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 DLL = b"MZ fake custom mod"
 
 
+def zip_bytes(files: dict) -> bytes:
+    import io
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        for name, data in files.items():
+            zf.writestr(name, data)
+    return buf.getvalue()
+
+
+#: A mod with no DLL: an addon and a sound, in the archive's own top folder.
+ADDON_ZIP = {"CoolMod-2.0/Interface/AddOns/CoolMod/CoolMod.toc": b"## Title",
+             "CoolMod-2.0/Interface/AddOns/CoolMod/CoolMod.lua": b"-- lua",
+             "CoolMod-2.0/Sound/cool.wav": b"RIFF"}
+
+
 class Resp:
     def __init__(self, body):
         self.body = body
@@ -69,7 +85,8 @@ class TestParseLink(unittest.TestCase):
     def test_refused(self):
         for url in ("", "http://github.com/a/b", "https://example.com/a/b",
                     "https://github.com/a/b/blob/main/x.dll",
-                    "https://github.com/a/b/releases/download/v1/x.zip"):
+                    "https://github.com/a/b/releases/download/v1/x.exe",
+                    "https://github.com/a/b/releases/download/v1/x.tar.gz"):
             with self.assertRaises(ValueError, msg=url):
                 self.parse(url)
 
@@ -107,6 +124,55 @@ class CustomModBase(unittest.TestCase):
     def dlls(self):
         with open(os.path.join(self.client, "dlls.txt")) as f:
             return f.read().splitlines()
+
+
+class TestZipPlan(unittest.TestCase):
+
+    def setUp(self):
+        from equpdater import app
+        self.app = app
+
+    def test_the_archives_own_top_folder_is_dropped(self):
+        plan = self.app.mod_zip_plan(list(ADDON_ZIP) + ["CoolMod-2.0/"])
+        self.assertEqual([d for _, d in plan],
+                         ["Interface/AddOns/CoolMod/CoolMod.toc",
+                          "Interface/AddOns/CoolMod/CoolMod.lua",
+                          "Sound/cool.wav"])
+
+    def test_game_folders_are_kept_as_they_are(self):
+        plan = self.app.mod_zip_plan(["Interface/AddOns/A/A.toc",
+                                      "Interface/AddOns/A/A.lua"])
+        self.assertEqual(plan[0][1], "Interface/AddOns/A/A.toc")
+        plan = self.app.mod_zip_plan(["comfyatmos.dll", "comfyatmos.ini"])
+        self.assertEqual([d for _, d in plan], ["comfyatmos.dll", "comfyatmos.ini"])
+
+    def test_refused(self):
+        for names in (["../evil.dll"], ["a/../../evil.dll"], ["/abs.dll"],
+                      ["C:/Windows/x.dll"], ["Mod/WoW.exe"], ["run.bat"], []):
+            with self.assertRaises(ValueError, msg=names):
+                self.app.mod_zip_plan(names)
+
+    def test_the_dll_it_loads(self):
+        dll = self.app.mod_zip_dll
+        self.assertEqual(dll(["comfyatmos.dll", "Interface/AddOns/C/C.toc"]),
+                         "comfyatmos.dll")
+        self.assertEqual(dll(["mods/x.dll"]), "mods/x.dll")
+        self.assertIsNone(dll(["Interface/AddOns/C/C.toc"]))     # none: fine
+        self.assertIsNone(dll(["a.dll", "b.dll"]))           # which? not ours
+        self.assertIsNone(dll(["Interface/AddOns/C/lib.dll"]))   # not loadable
+
+    def test_release_files_dlls_first(self):
+        self.assertEqual(self.app.release_mod_files(release(
+            "Mod-1.0.zip", "b.dll", "notes.txt", "patch-Z.MPQ", "A.DLL")),
+            ["A.DLL", "b.dll", "Mod-1.0.zip", "patch-Z.MPQ"])
+
+    def test_the_pattern_finds_the_next_release(self):
+        import fnmatch
+        pat = self.app.custom_asset_pattern("CoolMod-2.0.zip")
+        self.assertTrue(fnmatch.fnmatch("CoolMod-2.1.zip", pat))
+        self.assertTrue(fnmatch.fnmatch("CoolMod-10.0.zip", pat))
+        self.assertFalse(fnmatch.fnmatch("Other-2.1.zip", pat))
+        self.assertEqual(self.app.custom_asset_pattern("[x]1.zip"), "[[]x]*.zip")
 
 
 class TestRegistry(CustomModBase):
@@ -269,6 +335,93 @@ class TestInstall(CustomModBase):
         self.assertEqual(self.dlls(), ["VanillaHelpers.dll", "mods/OctoLogin.dll"])
 
 
+class TestModWithoutDll(CustomModBase):
+    """A custom mod need not have a DLL: a ZIP of other files, or an MPQ."""
+
+    FILES = ["Interface/AddOns/CoolMod/CoolMod.toc",
+             "Interface/AddOns/CoolMod/CoolMod.lua", "Sound/cool.wav"]
+
+    def add(self, files=None, asset="CoolMod-2.0.zip", dll=None):
+        mid = self.app.add_custom_asset_mod(self.src, asset,
+                                            files or self.FILES, dll)
+        return next(m for m in self.app.MODS_REGISTRY if m["id"] == mid)
+
+    def install(self, mod, names=("CoolMod-2.0.zip",), files=ADDON_ZIP):
+        with mock.patch.object(self.app, "secure_urlopen",
+                               lambda req, **kw: Resp(zip_bytes(files))):
+            return self.app.install_mod(mod, self.client, release(*names))
+
+    def test_added_tracked_and_loaded_again(self):
+        mod = self.add()
+        self.assertEqual(mod["id"], "custom:github_release/someone/coolmod")
+        self.assertIsNone(mod["register_dll"])
+        self.assertEqual(mod["installed_files"], self.FILES)
+        self.assertEqual(mod["name"], "CoolMod")
+        self.assertEqual(self.cfg["custom_mods"][0]["asset"], "CoolMod-*.*.zip")
+        self.app.load_custom_mods({})
+        self.assertEqual(self.app.load_custom_mods(self.cfg), [mod["id"]])
+        with self.assertRaises(ValueError):
+            self.add()                                     # not twice
+        self.app.forget_custom_mod(mod["id"])
+        self.assertEqual(self.cfg["custom_mods"], [])
+
+    def test_unpacked_into_the_game_folder_and_updated(self):
+        mod = self.add()
+        self.assertEqual(self.install(mod), self.FILES)
+        with open(os.path.join(self.client, *self.FILES[1].split("/")), "rb") as f:
+            self.assertEqual(f.read(), b"-- lua")
+        # The next release has another name; the pattern finds it.
+        self.assertEqual(self.install(mod, ("Notes.txt", "CoolMod-2.1.zip")),
+                         self.FILES)
+
+    def test_removed_with_its_emptied_folders(self):
+        mod = self.add()
+        self.cfg["mods"] = {mod["id"]: {"installed_files": self.install(mod)}}
+        keep = os.path.join(self.client, "Interface", "AddOns", "Keep")
+        os.makedirs(keep)
+        self.app.uninstall_mod(mod, self.client)
+        self.assertFalse(os.path.exists(os.path.join(
+            self.client, "Interface", "AddOns", "CoolMod")))
+        self.assertFalse(os.path.exists(os.path.join(self.client, "Sound",
+                                                     "cool.wav")))
+        self.assertTrue(os.path.isdir(keep))               # not ours: kept
+
+    def test_a_zip_with_a_dll_registers_it(self):
+        files = {"comfyatmos.dll": DLL, "comfyatmos.ini": b"[x]",
+                 "Interface/AddOns/ComfyAtmosphere/C.toc": b"## Title"}
+        mod = self.add(list(files), "comfyatmosphere.zip", "comfyatmos.dll")
+        self.assertEqual(mod["register_dll"], "comfyatmos.dll")
+        self.assertEqual(self.app.mod_dll_name(mod), "comfyatmos.dll")
+        self.assertEqual(sorted(self.install(mod, ("comfyatmosphere.zip",), files)),
+                         sorted(files))
+
+    def test_other_mods_files_and_the_games_data_are_refused(self):
+        with self.assertRaises(ValueError):                 # OctoLogin's
+            self.add(["mods/OctoLogin.dll"], "x.zip")
+        mod = self.add()
+        os.makedirs(os.path.join(self.client, "Data"))
+        open(os.path.join(self.client, "Data", "patch.MPQ"), "wb").close()
+        with self.assertRaises(RuntimeError):
+            self.install(mod, files={"Data/patch.MPQ": b"evil"})
+
+    def test_an_mpq_goes_to_data(self):
+        mod = self.add(["Data/patch-Z.mpq"], "patch-Z.mpq")
+        with mock.patch.object(self.app, "secure_urlopen",
+                               lambda req, **kw: Resp(b"MPQ")):
+            written = self.app.install_mod(mod, self.client,
+                                           release("patch-Z.mpq"))
+        self.assertEqual(written, ["Data/patch-Z.mpq"])
+        self.assertTrue(os.path.exists(
+            os.path.join(self.client, "Data", "patch-Z.mpq")))
+
+    def test_dll_mods_are_as_they_were(self):
+        mid = self.app.add_custom_mod(self.src, "CoolMod.dll")
+        self.assertEqual(mid, "custom:coolmod.dll")
+        self.assertEqual(self.cfg["custom_mods"][-1],
+                         {"kind": "github_release", "owner": "someone",
+                          "repo": "CoolMod", "dll": "CoolMod.dll"})
+
+
 from tests.test_app_smoke import HAVE_TK, _close_app  # noqa: E402
 
 
@@ -403,6 +556,34 @@ class TestDialog(unittest.TestCase):
         self.assertEqual(self.updates, [])
         self.assertFalse(self.m.load_config().get("custom_mods"))
         self.assertTrue(dialog.winfo_exists())             # still open
+
+    def test_a_zip_with_no_dll_is_looked_through_and_added(self):
+        a = self.app
+        a._open_custom_mod_dialog()
+        dialog = a._settings_overlay
+        ui = a._custom_mod_ui
+        with mock.patch.object(self.m, "_release_latest",
+                               lambda src, **k: release("CoolMod-2.0.zip")), \
+                mock.patch.object(self.m, "secure_urlopen",
+                                  lambda req, **kw: Resp(zip_bytes(ADDON_ZIP))):
+            ui["url"].set("https://github.com/someone/CoolMod")
+            ui["find"]()
+            self.pump()
+            self.assertEqual(ui["state"]["dlls"], ["CoolMod-2.0.zip"])
+            ui["install"]()
+            self.pump()
+        title, body = self.asked[0]
+        self.assertIn("CoolMod-2.0.zip", title)
+        self.assertIn("Interface/AddOns/CoolMod/", body)
+        self.assertIn("Sound/", body)
+        self.assertIn("loads no .dll", body)
+        self.assertIn("Only install mods you trust", body)
+        self.assertFalse(dialog.winfo_exists())
+        mid = "custom:github_release/someone/coolmod"
+        self.assertEqual(self.updates, [mid])
+        self.assertIn(mid, a._mod_row_vars)
+        a._remove_custom_mod(mid)                  # no dlls.txt line to drop
+        self.assertEqual(self.m.load_config()["custom_mods"], [])
 
     def open_fork(self):
         """The dialog, found and chosen: brues-code's UnitXP_SP3 fork."""

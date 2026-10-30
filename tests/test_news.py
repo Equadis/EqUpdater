@@ -873,6 +873,39 @@ class TestPostLinks(unittest.TestCase):
 
 
 @unittest.skipUnless(HAVE_TK, "no display")
+class TestNewPosts(unittest.TestCase):
+    """NEW! is "since last read" OR "within three days"."""
+
+    def setUp(self):
+        from datetime import datetime, timezone
+        from equpdater import app
+        self.app = app
+        self.day = lambda d: datetime(2026, 10, d, 12,
+                                      tzinfo=timezone.utc).timestamp()
+        self.iso = lambda d: f"2026-10-{d:02d}T08:00:00+00:00"
+
+    def test_either_rule_is_enough(self):
+        new = self.app.news_is_new
+        now = self.day(30)
+        self.assertTrue(new(self.iso(28), self.day(29), now))    # 3 days
+        self.assertFalse(new(self.iso(26), self.day(29), now))   # neither
+        # Four days old, but the launcher was last opened before it.
+        self.assertTrue(new(self.iso(26), self.day(20), now))
+        # Never opened before: only the three days count.
+        self.assertTrue(new(self.iso(28), None, now))
+        self.assertFalse(new(self.iso(20), None, now))
+        self.assertFalse(new("", self.day(1), now))
+        self.assertTrue(new("2026-10-28T08:00:00", None, now))   # no offset
+
+    def test_the_line_goes_under_the_oldest_of_several(self):
+        items = [{"id": str(d), "date": self.iso(d)} for d in (29, 24, 23, 12)]
+        marks = self.app.news_marks(items, self.day(20), self.day(30))
+        self.assertEqual(marks, {"29": (True, False), "24": (True, False),
+                                 "23": (True, True)})
+        one = self.app.news_marks(items, self.day(25), self.day(30))
+        self.assertEqual(one, {"29": (True, False)})
+
+
 class TestAnnouncementsList(unittest.TestCase):
     """The Announcements panel is every announcement, newest first, ten at
     a time, the newest open; each title opens and closes its post. The
@@ -957,7 +990,9 @@ class TestAnnouncementsList(unittest.TestCase):
             text = [k.get("1.0", "end-1c") if isinstance(k, self.m.tk.Text)
                     else k.cget("text") for k in shown
                     if isinstance(k, (self.m.tk.Label, self.m.tk.Text))]
-            rows.append((head[0].cget("text"), head[1].cget("text").endswith("▴"),
+            # The title sits in a row of its own, with the NEW! after it.
+            title = head[0].winfo_children()[0]
+            rows.append((title.cget("text"), head[1].cget("text").endswith("▴"),
                          text[0] if text else ""))
         return rows, buttons
 
@@ -1054,7 +1089,7 @@ class TestAnnouncementsList(unittest.TestCase):
                          if e.winfo_children()
                          and isinstance(e.winfo_children()[0], self.m.tk.Frame)
                          and e.winfo_children()[0].winfo_children()[0]
-                         .cget("text") == "Topic 99")
+                         .winfo_children()[0].cget("text") == "Topic 99")
             body = entry.winfo_children()[1]
             txt = next(w for w in body.winfo_children()
                        if isinstance(w, self.m.tk.Text))
@@ -1123,6 +1158,43 @@ class TestAnnouncementsList(unittest.TestCase):
         st = self.app._ann()
         self.assertEqual(st["rows"], {})
         self.assertIsNone(st["open"])
+
+    def test_new_posts_say_so_with_a_line_under_the_oldest(self):
+        """Posts since the Changelog was last read are NEW!; the oldest of
+        them has the red line under it; the launch's last-read time holds
+        all session (a read moves it on for the next launch only)."""
+        from datetime import datetime, timezone
+        from unittest import mock
+        ts = lambda d: datetime(2026, 10, d, tzinfo=timezone.utc).timestamp()
+        items = [{"id": str(t), "title": f"2026-10-{d:02d}", "author": "Archer",
+                  "date": f"2026-10-{d:02d}T08:00:00+00:00",
+                  "body": "", "html": "", "url": news.topic_url(t)}
+                 for t, d in ((3100, 28), (3087, 24), (3074, 23), (2902, 12))]
+        self.app._news_seen_before["patch"] = ts(20)
+        try:
+            with mock.patch.object(self.m.time, "time", lambda: ts(30)):
+                self.app._patch_open = None
+                self.app._render_patch_notes(items)
+                self.app.update()
+                rows = self.app._acc_lists["patch"]["rows"]
+                self.assertEqual([rows[i]["badge"].winfo_ismapped()
+                                  for i in ("3100", "3087", "3074", "2902")],
+                                 [1, 1, 1, 0])
+                self.assertEqual([rows[i]["divider"].cget("bg")
+                                  for i in ("3100", "3074", "2902")],
+                                 [self.m.C_DIVIDER, self.m.C_NEW,
+                                  self.m.C_DIVIDER])
+                # Read on the 25th: only the 28th is new -- alone, no line.
+                self.app._news_seen_before["patch"] = ts(25)
+                self.app._patch_toggle("3087")
+                self.app.update()
+                self.assertEqual([rows[i]["badge"].winfo_ismapped()
+                                  for i in ("3100", "3087", "3074")], [1, 0, 0])
+                self.assertEqual(rows["3074"]["divider"].cget("bg"),
+                                 self.m.C_DIVIDER)
+        finally:
+            self.app._news_seen_before["patch"] = None
+            self.app._patch_open = None
 
     def test_the_changelog_opens_and_closes(self):
         items = [{"id": str(t), "title": f"2026-10-{d:02d}", "author": "Archer",

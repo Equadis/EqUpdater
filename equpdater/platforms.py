@@ -173,13 +173,16 @@ def child_env(base: dict | None = None) -> dict:
 
 
 def spawn_detached(argv: list, cwd: str | None = None,
-                   env: dict | None = None) -> subprocess.Popen:
+                   env: dict | None = None,
+                   output: str | None = None) -> subprocess.Popen:
     """Start a program that outlives EqUpdater (the game).
 
     Windows: a detached process outside EqUpdater's job, so closing the
     updater -- or the job a launcher put it in -- does not close the game;
     retried without the breakaway when the job does not allow it.
-    Linux: its own session, with the original environment (child_env)."""
+    Linux: its own session, with the original environment (child_env).
+    ``output`` (Linux): a file its output goes to, written afresh, so a
+    runner that gives up at once can say why; otherwise it goes nowhere."""
     if WINDOWS:
         flags = (getattr(subprocess, "DETACHED_PROCESS", 0)
                  | getattr(subprocess, "CREATE_BREAKAWAY_FROM_JOB", 0))
@@ -190,11 +193,17 @@ def spawn_detached(argv: list, cwd: str | None = None,
             flags &= ~getattr(subprocess, "CREATE_BREAKAWAY_FROM_JOB", 0)
             return subprocess.Popen(argv, cwd=cwd, env=env,
                                     creationflags=flags, close_fds=True)
-    return subprocess.Popen(argv, cwd=cwd, env=child_env(env),
-                            stdin=subprocess.DEVNULL,
-                            stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL,
-                            start_new_session=True, close_fds=True)
+    sink = open(output, "wb") if output else subprocess.DEVNULL
+    try:
+        return subprocess.Popen(argv, cwd=cwd, env=child_env(env),
+                                stdin=subprocess.DEVNULL,
+                                stdout=sink,
+                                stderr=subprocess.STDOUT if output
+                                else subprocess.DEVNULL,
+                                start_new_session=True, close_fds=True)
+    finally:
+        if output:
+            sink.close()             # the child has its own copy
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -437,8 +446,9 @@ def parse_env_lines(text) -> tuple:
     trimmed; the value is everything after the first ``=`` exactly as typed,
     spaces and further ``=`` included. Each problem is (line number, reason)
     with reason "no_equals", "bad_name" or "nul" -- every unusable line is
-    reported, never dropped quietly. Nothing here is run or expanded: the
-    values are strings handed to the game's environment."""
+    reported, never dropped quietly. Nothing here is run or expanded: on
+    Linux launch_plan resolves ~, $NAME and quotes (shell_value), and
+    nothing is ever run through a shell."""
     variables, problems = {}, []
     for number, line in enumerate((text or "").splitlines(), start=1):
         if not line.strip():
@@ -454,6 +464,41 @@ def parse_env_lines(text) -> tuple:
         else:
             variables[name] = value
     return variables, problems
+
+
+#: $NAME or ${NAME} in a value.
+_VAR_REF = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))")
+
+
+def unquote_value(value: str) -> str:
+    """``value`` without one matching pair of outer quotes, as a shell
+    would group it: ``"$HOME/Games"`` is $HOME/Games, ``'/a b'`` is /a b.
+    Quotes anywhere else, or unmatched, are part of the value."""
+    s = value.strip()
+    if len(s) >= 2 and s[0] == s[-1] and s[0] in "\"'":
+        return s[1:-1]
+    return value
+
+
+def expand_value(value: str, env: dict) -> str:
+    """``value`` with a leading ~ (or ~user) and every $NAME / ${NAME}
+    resolved from ``env``, in that order, as a shell would -- without one.
+    A name ``env`` does not have is left as typed, so a mistake shows in
+    the error instead of vanishing; $(...) and anything else is literal."""
+    if value == "~" or value.startswith("~/"):
+        value = (env.get("HOME") or os.path.expanduser("~")) + value[1:]
+    elif value.startswith("~"):
+        value = os.path.expanduser(value)
+    return _VAR_REF.sub(lambda m: env.get(m.group(1) or m.group(2), m.group(0)),
+                        value)
+
+
+def shell_value(value: str, env: dict) -> str:
+    """A path or value from the Game launcher's own fields (the Wine
+    prefix, an environment variable) as the player meant it: one pair of
+    outer quotes dropped, then ~ and $NAME resolved (expand_value). A space
+    stays part of the value -- nothing splits it."""
+    return expand_value(unquote_value(value), env)
 
 
 def detect_runner(which=shutil.which) -> tuple:
@@ -501,11 +546,16 @@ def launch_plan(client_dir: str, exe: str, settings: dict | None = None,
             env.update(extra)
         return LaunchPlan([exe], client_dir, env, "windows")
 
+    # Nothing here goes through a shell, so ~, $HOME and quotes would reach
+    # Wine as typed: "$HOME/Games/pfx" with its quotes is no folder at all,
+    # and UMU gives up without a word. They are resolved here instead, each
+    # variable against what the game gets, the lines before it included.
     env = child_env()
     prefix = (settings.get("wine_prefix") or "").strip()
     if prefix:
-        env["WINEPREFIX"] = os.path.expanduser(prefix)
-    env.update(extra)
+        env["WINEPREFIX"] = shell_value(prefix, env)
+    for name, value in extra.items():
+        env[name] = shell_value(value, env)
 
     command = (settings.get("launch_command") or "").strip()
     if command:
@@ -517,8 +567,11 @@ def launch_plan(client_dir: str, exe: str, settings: dict | None = None,
             return LaunchPlan(runner="")
         uses_exe = any("{exe}" in p for p in parts)
         uses_dir = any("{dir}" in p for p in parts)
-        argv = [os.path.expanduser(p.replace("{exe}", exe).replace("{dir}", client_dir))
-                for p in parts]
+        # shlex has already dealt with the quotes; only ~ and $NAME are
+        # left -- resolved before {exe} goes in, so the game's path is
+        # never read as one.
+        argv = [expand_value(p, env).replace("{exe}", exe)
+                .replace("{dir}", client_dir) for p in parts]
         if not uses_exe and not uses_dir:
             argv.append(exe)
         return LaunchPlan(argv, client_dir, env, "custom")
@@ -529,6 +582,45 @@ def launch_plan(client_dir: str, exe: str, settings: dict | None = None,
     if name == "umu-run":
         env.setdefault("GAMEID", "umu-default")
     return LaunchPlan([path, exe], client_dir, env, name)
+
+
+def launch_problems(plan: LaunchPlan, which=shutil.which) -> list:
+    """What would make a Linux launch fail at once, found before it is
+    tried: (reason, value) pairs, reason one of
+
+      "runner_missing"   the command's program is not on PATH
+      "runner_not_file"  its path names nothing that can be run
+      "prefix_relative"  WINEPREFIX is not an absolute path (an
+                         unresolved $NAME shows up as this)
+      "prefix_not_dir"   WINEPREFIX names a file
+      "prefix_parent"    the folder WINEPREFIX would be made in is missing
+      "protonpath_missing"  PROTONPATH names a folder that is not there
+
+    A WINEPREFIX that does not exist yet is fine: Wine makes it. A
+    PROTONPATH without a slash (GE-Proton) is a name UMU downloads, not a
+    path. Windows and an unusable plan have none."""
+    if plan.runner in ("windows", "") or not plan.argv:
+        return []
+    env = plan.env or {}
+    out = []
+    program = plan.argv[0]
+    if "/" in program:
+        if not (os.path.isfile(program) and os.access(program, os.X_OK)):
+            out.append(("runner_not_file", program))
+    elif not which(program):
+        out.append(("runner_missing", program))
+    prefix = env.get("WINEPREFIX")
+    if prefix:
+        if not os.path.isabs(prefix):
+            out.append(("prefix_relative", prefix))
+        elif os.path.exists(prefix) and not os.path.isdir(prefix):
+            out.append(("prefix_not_dir", prefix))
+        elif not os.path.isdir(os.path.dirname(prefix.rstrip("/")) or "/"):
+            out.append(("prefix_parent", prefix))
+    proton = env.get("PROTONPATH")
+    if proton and "/" in proton and not os.path.isdir(proton):
+        out.append(("protonpath_missing", proton))
+    return out
 
 
 # ──────────────────────────────────────────────────────────────────────────────

@@ -617,8 +617,6 @@ STRINGS = {
         'Не удалось прочитать релизы: {error}',
     'Custom mod from {source}.':
         'Свой мод из {source}.',
-    'Find .dll files':
-        'Найти файлы .dll',
     'Install {name}?':
         'Установить {name}?',
     'Latest release: {tag}. Choose the file to install:':
@@ -635,16 +633,66 @@ STRINGS = {
         'Удалить этот свой мод',
     'Remove {name}?':
         'Удалить {name}?',
-    'That download is not a .dll file.':
-        'Эта загрузка не является файлом .dll.',
     'That is not a .dll file name EqUpdater can use.':
         'EqUpdater не может использовать такое имя файла .dll.',
-    'The latest release has no .dll file to install.':
-        'В последнем релизе нет файла .dll для установки.',
     'no release found on OctoWoW Git':
         'релиз на OctoWoW Git не найден',
     '{dll} from {source} will be installed to the mods folder and loaded into the game every time it starts.\n\nA mod runs code inside the game, with the same access to this computer as the game itself. {app} does not check what it does. Only install mods you trust.\n\nInstall it?':
         '{dll} из {source} будет установлен в папку mods и будет загружаться в игру при каждом запуске.\n\nМод выполняет код внутри игры с тем же доступом к этому компьютеру, что и сама игра. {app} не проверяет, что он делает. Устанавливайте только моды, которым доверяете.\n\nУстановить?',
     '{name} is deleted from the mods folder, taken out of dlls.txt and removed from this list.':
         '{name} будет удалён из папки mods и из dlls.txt и убран из этого списка.',
+    'Another mod in the Mods list installs the same files.':
+        'Другой мод из списка модов устанавливает те же файлы.',
+    'Could not read {name}: {error}':
+        'Не удалось прочитать {name}: {error}',
+    'Data already has a file named {name}.':
+        'В Data уже есть файл с именем {name}.',
+    'Find mod files':
+        'Найти файлы мода',
+    "It loads no .dll: the game reads its files as it would an addon's or a patch's.":
+        'Он не загружает .dll: игра читает его файлы, как файлы аддона или патча.',
+    'It loads {dll} into the game every time it starts.':
+        'Он загружает {dll} в игру при каждом запуске.',
+    'Looking inside {name}…':
+        'Просмотр {name}…',
+    'NEW!':
+        'НОВОЕ!',
+    'That download is not a .dll, .zip or .mpq file.':
+        'Эта загрузка не является файлом .dll, .zip или .mpq.',
+    'The archive has a file that would land outside the game folder.':
+        'В архиве есть файл, который оказался бы вне папки игры.',
+    'The archive has a program in it. EqUpdater installs mods, not programs.':
+        'В архиве есть программа. EqUpdater устанавливает моды, а не программы.',
+    'The archive is empty.':
+        'Архив пуст.',
+    'The archive is too large to be a mod.':
+        'Архив слишком велик для мода.',
+    "The archive would replace one of the game's own files in Data.":
+        'Архив заменил бы один из собственных файлов игры в Data.',
+    'The latest release has no .dll, .zip or .mpq file to install. An addon with no releases is added in Addons: Add custom git addon.':
+        'В последнем релизе нет файла .dll, .zip или .mpq для установки. Аддон без релизов добавляется в разделе «Аддоны»: «Добавить свой git-аддон».',
+    'and {count} more':
+        'и ещё {count}',
+    '{name} from {source} puts {count} files into the game folder:\n\n{where}\n\n{loads}\n\nA mod can change how the game behaves, and {app} does not check what it does. Only install mods you trust.\n\nInstall it?':
+        '{name} из {source} помещает {count} файлов в папку игры:\n\n{where}\n\n{loads}\n\nМод может изменить поведение игры, а {app} не проверяет, что он делает. Устанавливайте только моды, которым доверяете.\n\nУстановить?',
+    'The files {name} put into the game folder are deleted, and it is removed from this list.':
+        'Файлы, которые {name} поместил в папку игры, удаляются, и он убирается из этого списка.',
+    "'{value}' was not found in PATH.":
+        "'{value}' не найден в PATH.",
+    'Could not launch the game.':
+        'Не удалось запустить игру.',
+    'PROTONPATH does not exist:\n{value}':
+        'PROTONPATH не существует:\n{value}',
+    'The Wine prefix is a file, not a folder:\n{value}':
+        'Префикс Wine — это файл, а не папка:\n{value}',
+    'The Wine prefix is not a full path:\n{value}':
+        'Префикс Wine — не полный путь:\n{value}',
+    "The Wine prefix's parent folder does not exist:\n{value}":
+        'Родительская папка префикса Wine не существует:\n{value}',
+    'The launcher program does not exist or cannot be run:\n{value}':
+        'Программа запуска не существует или не может быть запущена:\n{value}',
+    '{program} could not be started: {error}':
+        'Не удалось запустить {program}: {error}',
+    '{program} stopped at once (exit code {code}).':
+        '{program} сразу завершился (код выхода {code}).',
 }
