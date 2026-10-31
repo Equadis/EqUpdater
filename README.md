@@ -174,11 +174,21 @@ confirmed, and skips the rest.
 - `dlls.txt` is kept in step and in the right load order, so an enabled mod
   always actually loads.
 - **Custom git mods** (Mods → **+ Add custom git mod**): paste a GitHub,
-  Codeberg or OctoWoW Git repository or release link, pick the `.dll` from
-  its latest release, and EqUpdater installs it to `mods/`, registers it in
-  `dlls.txt`, keeps it updated from that release, and removes it cleanly
-  with ✕. A mod runs code inside the game, so nothing is installed until you
-  confirm a warning saying so — only add mods you trust.
+  Codeberg or OctoWoW Git repository or release link and pick a file from
+  its latest release:
+  - a `.dll` is installed to `mods/` and registered in `dlls.txt`;
+  - a `.zip` is unpacked into the game folder (its own top folder dropped),
+    and a single mod DLL in it is registered in `dlls.txt` -- a mod needs no
+    DLL at all;
+  - an `.mpq` goes to `Data/`.
+
+  It is kept updated from that release (a new version's file name is found
+  too) and removed cleanly with ✕, the folders it emptied included. A ZIP is
+  looked through first and the warning says what goes where; one that would
+  write outside the game folder, carries a program, or overwrites another
+  mod's files or the game's own `Data` files is refused. A mod can change
+  how the game behaves, so nothing is installed until you confirm — only add
+  mods you trust.
 
 ### Addons
 - ★ **Recommended** addons, a wider list of maintained community versions,
@@ -239,6 +249,9 @@ confirmed, and skips the rest.
   each opening to its full patch notes; the newest is open.
 - Links in posts can be clicked, and **Open in Browser ↗** opens the topic
   on the forum.
+- A red **NEW!** marks a post made since you last opened EqUpdater, or in
+  the last three days -- whichever covers more. When several are new, a red
+  line divides them from the older posts.
 - Both are read once at launch, and again when you press refresh.
 - If the forum cannot be read, the News tab says why and keeps the last news
   it received.
