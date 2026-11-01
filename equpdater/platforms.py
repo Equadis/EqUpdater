@@ -27,6 +27,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 WINDOWS = os.name == "nt"
@@ -172,6 +173,43 @@ def child_env(base: dict | None = None) -> dict:
     return env
 
 
+@contextmanager
+def external_dll_search():
+    """Do not pass PyInstaller's private DLL directory to a Windows game.
+
+    The bootloader calls SetDllDirectoryW, which also affects children.
+    In particular a 32-bit game must not resolve DLLs from our 64-bit
+    bundle. Restore the actual previous directory even if creation fails.
+    """
+    if not WINDOWS or not frozen():
+        yield
+        return
+    import ctypes
+    from ctypes import wintypes
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    get_dir = kernel.GetDllDirectoryW
+    get_dir.argtypes = [wintypes.DWORD, wintypes.LPWSTR]
+    get_dir.restype = wintypes.DWORD
+    set_dir = kernel.SetDllDirectoryW
+    set_dir.argtypes = [wintypes.LPCWSTR]
+    set_dir.restype = wintypes.BOOL
+    size = get_dir(0, None)
+    previous = None
+    if size:
+        buf = ctypes.create_unicode_buffer(size)
+        length = get_dir(size, buf)
+        if not length or length >= size:
+            raise OSError("Could not read the DLL search directory")
+        previous = buf.value
+    if not set_dir(None):
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        yield
+    finally:
+        if not set_dir(previous):
+            raise ctypes.WinError(ctypes.get_last_error())
+
+
 def spawn_detached(argv: list, cwd: str | None = None,
                    env: dict | None = None,
                    output: str | None = None) -> subprocess.Popen:
@@ -186,13 +224,18 @@ def spawn_detached(argv: list, cwd: str | None = None,
     if WINDOWS:
         flags = (getattr(subprocess, "DETACHED_PROCESS", 0)
                  | getattr(subprocess, "CREATE_BREAKAWAY_FROM_JOB", 0))
-        try:
-            return subprocess.Popen(argv, cwd=cwd, env=env,
-                                    creationflags=flags, close_fds=True)
-        except OSError:
-            flags &= ~getattr(subprocess, "CREATE_BREAKAWAY_FROM_JOB", 0)
-            return subprocess.Popen(argv, cwd=cwd, env=env,
-                                    creationflags=flags, close_fds=True)
+        with external_dll_search():
+            try:
+                return subprocess.Popen(argv, cwd=cwd, env=env,
+                                        creationflags=flags, close_fds=True)
+            except OSError as e:
+                # Only a job's breakaway refusal merits this retry. Preserve
+                # bad-image (193), missing-file and other launch failures.
+                if getattr(e, "winerror", None) != 5:
+                    raise
+                flags &= ~getattr(subprocess, "CREATE_BREAKAWAY_FROM_JOB", 0)
+                return subprocess.Popen(argv, cwd=cwd, env=env,
+                                        creationflags=flags, close_fds=True)
     sink = open(output, "wb") if output else subprocess.DEVNULL
     try:
         return subprocess.Popen(argv, cwd=cwd, env=child_env(env),
