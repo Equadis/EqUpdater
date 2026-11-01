@@ -6749,7 +6749,8 @@ class EqUpdaterApp(tk.Tk):
             self._log_line(f"\n✗ Tweak patch failed: {e}\n", "err")
 
             def _fail_state():
-                self._status_var.set(tr("Tweaks failed — check the log"))
+                self._status_error(tr("Tweaks failed — check the log"),
+                                   self._show_logs)
                 self._set_btn_update()
             self.after(0, _fail_state)
         # Only now, with WoW.exe written: a restart mid-patch would leave it
@@ -9284,8 +9285,10 @@ class EqUpdaterApp(tk.Tk):
                     if not listed:
                         self._addons_status["addons"].pop(folder, None)
                 if failures:
-                    self._status_var.set(tr("Some addons failed — see the "
-                                            "message for details"))
+                    self._status_error(
+                        tr("Some addons failed — see the message for details"),
+                        lambda f=list(failures), n=len(recs):
+                            self._report_addon_failures(f, n))
                 # Cache-only refresh: the install itself already resolved and
                 # cached the shas — no further API requests are needed.
                 self._addons_verify(remote_checks=False)
@@ -10388,6 +10391,15 @@ class EqUpdaterApp(tk.Tk):
         self._status_var = tk.StringVar(value=tr("Ready to update"))
         text("status", self._status_var, text=self._status_var.get(),
              anchor="nw", fill=C_TEXT)
+        # An error in the status line is a link (see _status_error): any
+        # other text written over it takes the link away again.
+        self._status_action = None
+        self._status_action_text = None
+        self._status_var.trace_add("write", lambda *_a: self._status_changed())
+        sid = self._foot_items["status"]
+        c.tag_bind(sid, "<Enter>", lambda _e: self._status_hover(True))
+        c.tag_bind(sid, "<Leave>", lambda _e: self._status_hover(False))
+        c.tag_bind(sid, "<Button-1>", lambda _e: self._status_click())
 
         # Thin halo frame around the button gives a soft glow that follows
         # the button state (gold for UPDATE, green for PLAY).
@@ -10433,6 +10445,34 @@ class EqUpdaterApp(tk.Tk):
         text("version", text=f"v{UPDATER_VERSION}", anchor="se",
              fill="#6a7690", font=("Courier New", 8))
         self._layout_footer()
+
+    def _status_error(self, text: str, action):
+        """Show an error in the status line as a link: an arrow after it,
+        and a click runs ``action`` -- the log, the message, the tab the
+        text points at."""
+        shown = f"{text} \u2192"
+        self._status_action = action
+        self._status_action_text = shown
+        self._status_var.set(shown)
+
+    def _status_changed(self):
+        if self._status_var.get() != self._status_action_text:
+            self._status_action = None
+            self._status_action_text = None
+            self._status_hover(False)
+
+    def _status_hover(self, inside: bool):
+        lit = inside and self._status_action is not None
+        try:
+            self._bg_canvas.itemconfigure(self._foot_items["status"],
+                                          fill=C_GOLD if lit else C_TEXT)
+            self._bg_canvas.configure(cursor="hand2" if lit else "")
+        except tk.TclError:
+            pass
+
+    def _status_click(self):
+        if self._status_action is not None:
+            self._status_action()
 
     def _layout_footer(self):
         """Place the footer from the current font's line height, so a larger
@@ -11853,7 +11893,8 @@ class EqUpdaterApp(tk.Tk):
             return
         if self._mods_have_errors():
             self._set_btn_busy(tr("PLAY"))
-            self._status_var.set(tr("Mod errors — check MODS tab"))
+            self._status_error(tr("Mod errors — check MODS tab"),
+                               lambda: self._switch_tab("MODS"))
         else:
             self._set_btn_play()
             self._status_var.set(tr("Everything up to date!"))
@@ -12106,7 +12147,8 @@ class EqUpdaterApp(tk.Tk):
                 self._maybe_install_default_addons()
         else:
             self._client_ready = False
-            self._status_var.set(tr("Update failed — check the log"))
+            self._status_error(tr("Update failed — check the log"),
+                               self._show_logs)
             self._draw_progress(0.0)
             self._set_btn_update()
 

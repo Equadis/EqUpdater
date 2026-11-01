@@ -853,6 +853,25 @@ class TestAnimatedBackgroundSetting(unittest.TestCase):
         self.assertEqual(self.app._bg_canvas.itemcget(
             self.app._foot_items["status"], "text"), "status text")
 
+    def test_an_error_in_the_status_line_is_a_link(self):
+        """An error ends in an arrow and a click opens what it names; the
+        next status written over it is plain text again."""
+        a, item = self.app, self.app._foot_items["status"]
+        opened = []
+        a._status_error("Tweaks failed — check the log",
+                        lambda: opened.append(1))
+        self.assertEqual(a._bg_canvas.itemcget(item, "text"),
+                         "Tweaks failed — check the log \u2192")
+        a._status_hover(True)
+        self.assertEqual(a._bg_canvas.itemcget(item, "fill"), self.m.C_GOLD)
+        a._status_click()
+        self.assertEqual(opened, [1])
+        a._status_var.set("Applying tweaks…")
+        self.assertEqual(a._bg_canvas.itemcget(item, "fill"), self.m.C_TEXT)
+        a._status_click()
+        self.assertEqual(opened, [1])
+        a._status_hover(False)
+
     def test_both_assets_ship(self):
         root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         for name in (self.branding.BACKGROUND_STATIC,
