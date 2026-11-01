@@ -6,6 +6,7 @@ WINDOWS/LINUX flags and mocking what it would call -- subprocess, PATH,
 """
 
 import os
+import ctypes
 import shutil
 import sys
 import tempfile
@@ -15,6 +16,56 @@ from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+
+
+class TestExternalDllSearch(unittest.TestCase):
+    def test_bundle_directory_is_cleared_for_child_and_restored_on_failure(self):
+        from equpdater import platforms
+        kernel = mock.Mock()
+        previous = r"C:\Temp\_MEItest"
+
+        def get_dir(size, buf):
+            if not size:
+                return len(previous) + 1
+            buf.value = previous
+            return len(previous)
+
+        kernel.GetDllDirectoryW.side_effect = get_dir
+        kernel.SetDllDirectoryW.return_value = True
+        with mock.patch.object(platforms, "WINDOWS", True), \
+                mock.patch.object(platforms, "frozen", return_value=True), \
+                mock.patch.object(ctypes, "WinDLL", return_value=kernel, create=True):
+            with self.assertRaisesRegex(OSError, "bad image"):
+                with platforms.external_dll_search():
+                    kernel.SetDllDirectoryW.assert_called_once_with(None)
+                    raise OSError("bad image")
+        self.assertEqual(kernel.SetDllDirectoryW.call_args_list,
+                         [mock.call(None), mock.call(previous)])
+
+    def test_bad_image_is_not_retried_as_a_job_error(self):
+        from equpdater import platforms
+        error = OSError("bad image")
+        error.winerror = 193
+        with mock.patch.object(platforms, "WINDOWS", True), \
+                mock.patch.object(platforms, "frozen", return_value=False), \
+                mock.patch.object(platforms.subprocess, "Popen", side_effect=error) as spawn:
+            with self.assertRaises(OSError) as caught:
+                platforms.spawn_detached([r"C:\Games\VanillaFixes.exe"])
+        self.assertIs(caught.exception, error)
+        self.assertEqual(spawn.call_count, 1)
+
+    def test_breakaway_refusal_still_retries(self):
+        from equpdater import platforms
+        error = OSError("access denied")
+        error.winerror = 5
+        child = object()
+        with mock.patch.object(platforms, "WINDOWS", True), \
+                mock.patch.object(platforms, "frozen", return_value=False), \
+                mock.patch.object(platforms.subprocess, "CREATE_BREAKAWAY_FROM_JOB", 0x1000000, create=True), \
+                mock.patch.object(platforms.subprocess, "Popen", side_effect=[error, child]) as spawn:
+            self.assertIs(platforms.spawn_detached(["game.exe"]), child)
+        self.assertTrue(spawn.call_args_list[0].kwargs["creationflags"] & 0x1000000)
+        self.assertFalse(spawn.call_args_list[1].kwargs["creationflags"] & 0x1000000)
 
 
 def modules():
