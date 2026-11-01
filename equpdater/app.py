@@ -7524,11 +7524,16 @@ class EqUpdaterApp(tk.Tk):
                 enabled = True
 
             installed_ver = state.get("installed_version")
-            is_installed  = (bool(installed_ver) and
-                             mod_installed_files_present(mod, client_dir))
+            # Adopted mods can have real files but no known release version.
+            # Version knowledge governs updates, never presence/removal.
+            is_installed = mod_installed_files_present(mod, client_dir)
+            owned = bool(state.get("managed", bool(installed_ver)))
+            has_tracked_files = any(
+                os.path.exists(os.path.join(client_dir, rel))
+                for rel in state.get("installed_files", []))
 
             needs_install   = enabled and not is_installed
-            needs_uninstall = not enabled and is_installed
+            needs_uninstall = not enabled and owned and has_tracked_files
 
             # **Never install over files nobody gave us.** A discovered mod is
             # recorded unmanaged, enabled, and with no version -- which reads
@@ -7537,7 +7542,6 @@ class EqUpdaterApp(tk.Tk):
             # user's own DLL. Adoption is the way in, not this. A record that
             # carries an error was ours when the install failed, so a retry
             # may still finish the job.
-            owned = bool(state.get("managed", bool(installed_ver)))
             if (needs_install and not force and not owned
                     and not state.get("error")
                     and mod_files_on_disk(mod, client_dir)):
