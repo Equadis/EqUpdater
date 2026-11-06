@@ -725,4 +725,8 @@ STRINGS = {
         "a fonte não tem nenhuma versão publicada",
     "version unknown":
         "versão desconhecida",
+    "Default — {file}":
+        "Padrão — {file}",
+    "No launch files found":
+        "Nenhum arquivo de inicialização encontrado",
 }

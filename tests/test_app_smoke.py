@@ -19,6 +19,7 @@ import textwrap
 import threading
 import time
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -430,6 +431,116 @@ class TestAppStarts(unittest.TestCase):
                     app._close_settings()
                 app._font_choice_var.set("arial")
                 app._change_font_choice()
+
+    def launch_menu_folder(self):
+        folder = tempfile.mkdtemp(prefix="equ-play-")
+        self.addCleanup(shutil.rmtree, folder, True)
+        for name in ("VanillaFixes.exe", "WoW.exe", "Unrelated.exe"):
+            with open(os.path.join(folder, name), "wb") as f:
+                f.write(b"x")
+        with open(os.path.join(folder, "Launch.bat"), "wb") as f:
+            f.write(b'start "" VanillaFixes.exe')
+        app = self.app
+        before = app._game_path.get()
+        self.addCleanup(app._game_path.set, before)
+        self.addCleanup(app._close_launch_menu)
+        self.addCleanup(self.app_mod.update_config,
+                        lambda c: c.pop("launch_default", None))
+        app._game_path.set(folder)
+        return folder
+
+    def launch_menu_reads(self):
+        """(heading, {file name: checked}) as drawn."""
+        inner = self.app._launch_menu.winfo_children()[0]
+        heading, boxes = None, {}
+        for w in inner.winfo_children():
+            if isinstance(w, self.app_mod.tk.Checkbutton):
+                var = self.app.getvar(str(w.cget("variable")))
+                boxes[w.cget("text").strip()] = bool(int(var))
+            elif isinstance(w, self.app_mod.tk.Label):
+                heading = w.cget("text")
+        return heading, boxes
+
+    def test_the_play_list_chooses_what_starts(self):
+        app = self.app
+        folder = self.launch_menu_folder()
+        app._set_btn_play()
+        self.assertGreater(app._upd_btn._split_w, 0)
+        app._toggle_launch_menu()
+        app.update()
+        heading, boxes = self.launch_menu_reads()
+        self.assertEqual(heading, "Default — VanillaFixes.exe")
+        self.assertEqual(boxes, {"VanillaFixes.exe": True, "WoW.exe": False,
+                                 "Launch.bat": False})
+
+        # One at a time, and it is saved.
+        app._choose_launch_default("Launch.bat")
+        app.update()
+        heading, boxes = self.launch_menu_reads()
+        self.assertEqual(heading, "Default — Launch.bat")
+        self.assertEqual(sorted(k for k, v in boxes.items() if v), ["Launch.bat"])
+        self.assertEqual(self.app_mod.load_config()["launch_default"],
+                         "Launch.bat")
+
+        # The choice is what starts, the way that file has to start.
+        with mock.patch.object(self.app_mod.platforms, "spawn_detached") as spawn:
+            app._launch_game()
+        self.assertEqual(spawn.call_count, 1)
+        if self.app_mod.platforms.WINDOWS:
+            self.assertEqual(spawn.call_args.args[0][-1], ".\\Launch.bat")
+            self.assertTrue(spawn.call_args.kwargs["console"])
+        self.assertEqual(spawn.call_args.kwargs["cwd"], folder)
+        app._refresh_ready_state()
+
+        # Its file goes: the next one stands in, and the list says so. When
+        # it comes back, so does the choice.
+        app._set_btn_play()
+        app._open_launch_menu()
+        os.remove(os.path.join(folder, "Launch.bat"))
+        app._refresh_launch_menu()
+        app.update()
+        heading, boxes = self.launch_menu_reads()
+        self.assertEqual(heading, "Default — VanillaFixes.exe")
+        self.assertNotIn("Launch.bat", boxes)
+        with open(os.path.join(folder, "Launch.bat"), "wb") as f:
+            f.write(b"WoW.exe")
+        app._refresh_launch_menu()
+        self.assertEqual(self.launch_menu_reads()[0], "Default — Launch.bat")
+
+    def test_the_play_list_follows_the_game_folder(self):
+        app = self.app
+        folder = self.launch_menu_folder()
+        app._set_btn_play()
+        app._open_launch_menu()
+        self.assertIn("WoW.exe", self.launch_menu_reads()[1])
+        empty = tempfile.mkdtemp(prefix="equ-play-empty-")
+        self.addCleanup(shutil.rmtree, empty, True)
+        app._game_path.set(empty)
+        app._refresh_launch_menu()
+        heading, boxes = self.launch_menu_reads()
+        self.assertEqual(boxes, {})
+        self.assertEqual(heading, self.app_mod.tr("No launch files found"))
+
+    def test_the_play_list_closes_and_only_play_has_an_arrow(self):
+        app = self.app
+        self.launch_menu_folder()
+        app._set_btn_play()
+        app._toggle_launch_menu()
+        self.assertIsNotNone(app._launch_menu)
+        app._toggle_launch_menu()
+        self.assertIsNone(app._launch_menu)
+
+        app._open_launch_menu()
+        app._launch_menu_outside(mock.Mock(widget=app._bg_canvas))
+        self.assertIsNone(app._launch_menu)
+
+        app._open_launch_menu()
+        app._set_btn_update()
+        self.assertIsNone(app._launch_menu)
+        self.assertEqual(app._upd_btn._split_w, 0)
+        app._set_btn_busy("x")
+        self.assertEqual(app._upd_btn._split_w, 0)
+        app._refresh_ready_state()
 
 
 @unittest.skipUnless(HAVE_TK, "no display")

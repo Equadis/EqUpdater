@@ -158,6 +158,11 @@ confirmed, and skips the rest.
   EqUpdater's own folder, so an EqUpdater update can never touch the game.
 - Downloads always use verified HTTPS, under Wine too; certificate checks
   are never switched off.
+- **Choose what PLAY starts**: the arrow on the left of PLAY lists
+  `VanillaFixes.exe`, `WoW.exe` and any `.bat` or `.cmd` script in the game
+  folder that starts one of them. Check one to make it the default. Starting
+  `WoW.exe` directly leaves out every mod in `dlls.txt`, so `VanillaFixes.exe`
+  stays the default until you choose otherwise.
 
 ### DLL mods
 - VanillaFixes, ClassicAPI, Nampower, SuperWoW, UnitXP_SP3, VanillaHelpers,
@@ -173,6 +178,13 @@ confirmed, and skips the rest.
   recognises them.
 - `dlls.txt` is kept in step and in the right load order, so an enabled mod
   always actually loads.
+- **Mods adopted from another launcher, OctoLauncher included**: a mod's
+  version is recorded only when its files match a published release exactly.
+  Otherwise the row reads **version unknown**, and it is never replaced
+  automatically. Click it to replace the files with the latest release, after
+  a warning and a backup, or untick the mod and Apply to remove it. **can't
+  check** means the mod's source did not answer; click it to try again. If a
+  replacement fails, your current files are put back.
 - **Custom git mods** (Mods → **+ Add custom git mod**): paste a GitHub,
   Codeberg or OctoWoW Git repository or release link and pick a file from
   its latest release:

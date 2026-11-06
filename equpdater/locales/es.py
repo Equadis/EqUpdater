@@ -724,4 +724,8 @@ STRINGS = {
         "la fuente no tiene ninguna versión publicada",
     "version unknown":
         "versión desconocida",
+    "Default — {file}":
+        "Predeterminado — {file}",
+    "No launch files found":
+        "No se encontraron archivos de inicio",
 }

@@ -725,4 +725,8 @@ STRINGS = {
         "来源没有已发布的版本",
     "version unknown":
         "版本未知",
+    "Default — {file}":
+        "默认 — {file}",
+    "No launch files found":
+        "未找到启动文件",
 }

@@ -174,7 +174,8 @@ def child_env(base: dict | None = None) -> dict:
 
 def spawn_detached(argv: list, cwd: str | None = None,
                    env: dict | None = None,
-                   output: str | None = None) -> subprocess.Popen:
+                   output: str | None = None,
+                   console: bool = False) -> subprocess.Popen:
     """Start a program that outlives EqUpdater (the game).
 
     Windows: a detached process outside EqUpdater's job, so closing the
@@ -182,9 +183,13 @@ def spawn_detached(argv: list, cwd: str | None = None,
     retried without the breakaway when the job does not allow it.
     Linux: its own session, with the original environment (child_env).
     ``output`` (Linux): a file its output goes to, written afresh, so a
-    runner that gives up at once can say why; otherwise it goes nowhere."""
+    runner that gives up at once can say why; otherwise it goes nowhere.
+    ``console`` (Windows): give it a window of its own. A batch script may
+    print a problem or wait at PAUSE, and with no window nobody could see
+    that or answer it."""
     if WINDOWS:
-        flags = (getattr(subprocess, "DETACHED_PROCESS", 0)
+        flags = (getattr(subprocess, "CREATE_NEW_CONSOLE" if console
+                         else "DETACHED_PROCESS", 0)
                  | getattr(subprocess, "CREATE_BREAKAWAY_FROM_JOB", 0))
         try:
             return subprocess.Popen(argv, cwd=cwd, env=env,
@@ -425,6 +430,8 @@ class LaunchPlan:
     cwd: str = ""
     env: dict | None = None
     runner: str = ""
+    #: Windows: a batch script, which gets a console window (spawn_detached).
+    console: bool = False
     #: (line, reason) for each unusable line in the player's environment
     #: variables (parse_env_lines). Any at all and the game is not started.
     env_problems: list = field(default_factory=list)
@@ -518,11 +525,73 @@ def detect_runner(which=shutil.which) -> tuple:
     return "", ""
 
 
+#: The programs that are the game, the loader first: it is what PLAY starts
+#: until the player chooses otherwise, because starting WoW.exe directly
+#: leaves out every mod in dlls.txt.
+GAME_EXE = "WoW.exe"
+LAUNCH_PROGRAMS = (LOADER_EXE, GAME_EXE)
+
+#: Names a batch script may have to be offered. It goes to cmd.exe by name, and
+#: cmd reads & ^ % ! ( ) @ and quotes as syntax, even inside a file name.
+_LAUNCH_SCRIPT_NAME = re.compile(r"^[\w .+\-]+\.(?:bat|cmd)$", re.IGNORECASE)
+_LAUNCH_SCRIPT_MAX = 256 * 1024
+
+
+def is_launch_script(path: str) -> bool:
+    return path.lower().endswith((".bat", ".cmd"))
+
+
+def _script_starts_the_game(path: str) -> bool:
+    """Whether a batch script names the game or its loader. That is what
+    separates a launch script from the game folder's other scripts."""
+    try:
+        with open(path, "rb") as f:
+            text = f.read(_LAUNCH_SCRIPT_MAX).lower()
+    except OSError:
+        return False
+    return any(p.lower().encode() in text for p in LAUNCH_PROGRAMS)
+
+
+def launch_options(client_dir: str) -> list:
+    """What PLAY can start in this game folder, as file names spelled as
+    they are on disk: the loader, the game, then batch scripts that start one
+    of them. Only the folder itself is looked in, and no other program is
+    offered: installers and mods' own tools are not the game."""
+    try:
+        with os.scandir(client_dir) as it:
+            names = [e.name for e in it if e.is_file()]
+    except OSError:
+        return []
+    by_lower = {n.lower(): n for n in names}
+    programs = [by_lower[p.lower()] for p in LAUNCH_PROGRAMS
+                if p.lower() in by_lower]
+    scripts = sorted(
+        (n for n in names if _LAUNCH_SCRIPT_NAME.match(n)
+         and _script_starts_the_game(os.path.join(client_dir, n))),
+        key=str.lower)
+    return programs + scripts
+
+
+def resolve_launch_target(options: list, saved: str | None = None) -> str | None:
+    """The one place that says what PLAY starts: the saved default while it
+    is there, else the first option. The saved name is not overwritten by
+    this -- a mod update removes VanillaFixes.exe for a moment, and the
+    choice should still stand when it is back."""
+    if saved:
+        for name in options:
+            if name.lower() == saved.lower():
+                return name
+    return options[0] if options else None
+
+
 def launch_plan(client_dir: str, exe: str, settings: dict | None = None,
                 which=shutil.which) -> LaunchPlan:
-    """How to start ``exe`` (the client's WoW.exe or VanillaFixes.exe).
+    """How to start ``exe``: the client's WoW.exe or VanillaFixes.exe, or a
+    batch script from launch_options.
 
-    Windows: the executable itself. Linux, in order:
+    Windows: the executable itself, or cmd.exe for a script: by name, from
+    the game folder, so that a & in the folder's path is never read as
+    syntax. Linux, in order, for scripts too (Wine runs .bat files):
       1. the player's launch command (Settings -> Game launcher). "{exe}" in
          it is replaced by the executable's path and "{dir}" by the client
          folder; with neither, the path is added at the end;
@@ -544,6 +613,13 @@ def launch_plan(client_dir: str, exe: str, settings: dict | None = None,
         if extra:
             env = child_env()
             env.update(extra)
+        if is_launch_script(exe):
+            return LaunchPlan(
+                # ".\\": with NoDefaultCurrentDirectoryInExePath set, cmd does
+                # not look in the current folder for a bare name.
+                [os.environ.get("ComSpec") or "cmd.exe", "/d", "/c",
+                 ".\\" + os.path.basename(exe)],
+                client_dir, env, "windows", console=True)
         return LaunchPlan([exe], client_dir, env, "windows")
 
     # Nothing here goes through a shell, so ~, $HOME and quotes would reach

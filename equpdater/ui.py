@@ -812,12 +812,19 @@ class GradientButton(tk.Canvas):
         self._enabled = True
         self._hover = False
         self._pressed = False
+        # A strip at the left edge that is its own button (set_split).
+        self._split_w = 0
+        self._split_command = None
+        self._split_hover = False
+        self._split_pressed = False
         self.bind("<Enter>", lambda e: self._set_hover(True))
         self.bind("<Leave>", lambda e: self._leave())
-        self.bind("<ButtonPress-1>", lambda e: self._press())
+        self.bind("<Motion>", self._motion)
+        self.bind("<ButtonPress-1>", lambda e: self._press(e))
         self.bind("<ButtonRelease-1>", lambda e: self._release(e))
         self.bind("<space>", lambda e: self.invoke())
         self.bind("<Return>", lambda e: self.invoke())
+        self.bind("<Down>", lambda e: self._invoke_split())
         self.bind("<FocusIn>", lambda e: self._paint())
         self.bind("<FocusOut>", lambda e: self._paint())
         self._paint()
@@ -846,6 +853,27 @@ class GradientButton(tk.Canvas):
     def refresh(self) -> None:
         self._paint()
 
+    def set_split(self, width: int = 0, command=None) -> None:
+        """Give the left ``width`` pixels their own arrow and command; the
+        rest of the button keeps its own. 0 takes the strip away."""
+        self._split_w = int(width)
+        self._split_command = command
+        self._split_hover = self._split_pressed = False
+        self._paint()
+
+    def _in_split(self, x: int) -> bool:
+        return bool(self._split_w) and x < self._split_w
+
+    def _invoke_split(self) -> None:
+        if self._enabled and self._split_w and self._split_command:
+            self._split_command()
+
+    def _motion(self, event) -> None:
+        inside = self._in_split(event.x)
+        if inside != self._split_hover:
+            self._split_hover = inside
+            self._paint()
+
     def invoke(self) -> None:
         if self._enabled and self._command:
             self._command()
@@ -857,21 +885,29 @@ class GradientButton(tk.Canvas):
     def _leave(self) -> None:
         self._hover = False
         self._pressed = False
+        self._split_hover = self._split_pressed = False
         self._paint()
 
-    def _press(self) -> None:
+    def _press(self, event=None) -> None:
         if self._enabled:
-            self._pressed = True
+            if event is not None and self._in_split(event.x):
+                self._split_pressed = True
+            else:
+                self._pressed = True
             self._paint()
 
     def _release(self, event) -> None:
         if not self._enabled:
             return
         inside = 0 <= event.x <= self._width_px and 0 <= event.y <= self._height_px
-        was_pressed = self._pressed
-        self._pressed = False
+        was_pressed, was_split = self._pressed, self._split_pressed
+        self._pressed = self._split_pressed = False
         self._paint()
-        if was_pressed and inside:
+        # A press counts where it began and ended on the same part: sliding
+        # off the arrow onto PLAY must not start the game.
+        if was_split and inside and self._in_split(event.x):
+            self._invoke_split()
+        elif was_pressed and inside and not self._in_split(event.x):
             self.invoke()
 
     def _paint(self) -> None:
@@ -894,6 +930,13 @@ class GradientButton(tk.Canvas):
         for y in range(1, self._height_px - 1):
             t = (y - 1) / max(1, inner_h - 1)
             self.create_line(1, y, self._width_px - 1, y, fill=_mix(top, bottom, t))
+        if self._split_w and self._enabled and (self._split_hover
+                                                or self._split_pressed):
+            lit = "#000000" if self._split_pressed else "#ffffff"
+            for y in range(1, self._height_px - 1):
+                t = (y - 1) / max(1, inner_h - 1)
+                self.create_line(1, y, self._split_w, y,
+                                 fill=_mix(_mix(top, bottom, t), lit, .14))
         self.create_rectangle(0, 0, self._width_px - 1, self._height_px - 1,
                               outline=border, width=1)
         if self.focus_get() is self and self._enabled:
@@ -901,5 +944,16 @@ class GradientButton(tk.Canvas):
                                   outline=_mix(border, "#ffffff", .35), width=1)
         yoff = 1 if self._pressed and self._enabled else 0
         font = self._font_factory() if self._font_factory else None
-        self.create_text(self._width_px // 2, self._height_px // 2 + yoff,
+        self.create_text((self._split_w + self._width_px) // 2,
+                         self._height_px // 2 + yoff,
                          text=self._text, fill=fg, font=font)
+        if self._split_w:
+            self.create_line(self._split_w, 1, self._split_w,
+                             self._height_px - 1, fill=border)
+            # Drawn, not a glyph: the same arrow in every font and at any
+            # scale.
+            half = max(3, self._split_w // 4)
+            cx, cy = self._split_w // 2, self._height_px // 2
+            self.create_polygon(cx - half, cy - half // 2, cx + half,
+                                cy - half // 2, cx, cy + half - half // 2,
+                                fill=fg, outline=fg)

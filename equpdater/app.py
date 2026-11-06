@@ -11855,10 +11855,13 @@ class EqUpdaterApp(tk.Tk):
         self._upd_btn.set_text(tr("PLAY"))
         self._upd_btn.set_palette(PLAY_GRADIENT)
         self._upd_btn.set_enabled(True)
+        self._upd_btn.set_split(self._px(16), self._toggle_launch_menu)
         self._btn_glow.configure(bg="#29472c")
 
     def _set_btn_update(self):
         self._btn_mode = "update"
+        self._upd_btn.set_split()
+        self._close_launch_menu()
         self._upd_btn.set_text(tr("UPDATE"))
         self._upd_btn.set_palette(UPDATE_GRADIENT)
         self._upd_btn.set_enabled(True)
@@ -11866,6 +11869,8 @@ class EqUpdaterApp(tk.Tk):
 
     def _set_btn_busy(self, label="…"):
         self._btn_mode = "busy"
+        self._upd_btn.set_split()
+        self._close_launch_menu()
         self._upd_btn.set_text(label)
         self._upd_btn.set_palette(BUSY_GRADIENT)
         self._upd_btn.set_enabled(False)
@@ -11880,6 +11885,7 @@ class EqUpdaterApp(tk.Tk):
         """Recompute the footer status/button after an operation finishes.
         PLAY is only offered when the client files are up to date AND no mod
         is in an error state — otherwise the button stays grey and inactive."""
+        self._refresh_launch_menu()
         # Never re-enable PLAY while addons are actively installing — this
         # guards against a stray call during the mods→addons setup chain or a
         # post-install verify flipping the button back on mid-download.
@@ -11900,7 +11906,114 @@ class EqUpdaterApp(tk.Tk):
             self._status_var.set(tr("Everything up to date!"))
         self._refresh_update_all_btn()
 
+    # ── what PLAY starts ─────────────────────────────────────────────────────
+
+    def _launch_target(self, client_dir: str) -> str | None:
+        """The file PLAY starts in this folder, looked up on disk each time:
+        a game-folder change or a mod install needs nothing else to notice."""
+        return platforms.resolve_launch_target(
+            platforms.launch_options(client_dir),
+            load_config().get("launch_default"))
+
+    def _toggle_launch_menu(self):
+        if getattr(self, "_launch_menu", None) is not None:
+            self._close_launch_menu()
+        else:
+            self._open_launch_menu()
+
+    def _close_launch_menu(self):
+        menu = getattr(self, "_launch_menu", None)
+        self._launch_menu = None
+        if menu is not None:
+            try:
+                menu.destroy()
+            except tk.TclError:
+                pass
+
+    def _open_launch_menu(self):
+        """The arrow's list: which file is the default, and a checkbox for
+        each file PLAY could start. Drawn in the window rather than a popup
+        window, so it scales with the rest and needs no focus from the
+        window manager."""
+        self._close_launch_menu()
+        client = self._game_path.get().strip()
+        options = platforms.launch_options(client)
+        target = platforms.resolve_launch_target(
+            options, load_config().get("launch_default"))
+
+        bd = tk.Frame(self, bg=C_PANEL_BDR)
+        self._launch_menu = bd
+        bd.vars = []
+        inner = tk.Frame(bd, bg=C_PANEL)
+        inner.pack(padx=self._px(1), pady=self._px(1))
+        tk.Label(inner, font=self._font(10, bold=True), fg=C_GOLD, bg=C_PANEL,
+                 anchor="w",
+                 text=(tr("Default — {file}", file=target) if target
+                       else tr("No launch files found"))
+                 ).pack(fill="x", padx=self._px(10),
+                        pady=(self._px(7), self._px(5)))
+        if options:
+            tk.Frame(inner, bg=C_DIVIDER, height=self._px(1)).pack(fill="x")
+        for name in options:
+            var = tk.BooleanVar(value=name == target)
+            bd.vars.append(var)     # dropped, the box forgets its state
+            tk.Checkbutton(inner, variable=var, text=" " + name, anchor="w",
+                           font=self._font(10), bg=C_PANEL,
+                           activebackground=C_PANEL, fg=C_TEXT,
+                           activeforeground=C_GOLD_LT, selectcolor=C_PANEL,
+                           highlightthickness=0, bd=0, relief="flat",
+                           cursor="hand2",
+                           command=lambda n=name: self._choose_launch_default(n)
+                           ).pack(fill="x", padx=self._px(8), pady=self._px(2))
+        tk.Frame(inner, bg=C_PANEL, height=self._px(5)).pack()
+
+        # Above the button and the status line over it, left edges in line.
+        self.update_idletasks()
+        btn = self._upd_btn
+        x = btn.winfo_rootx() - self.winfo_rootx()
+        status = self._bg_canvas.bbox(self._foot_items["status"])
+        top = (self._bg_canvas.winfo_rooty() - self.winfo_rooty() + status[1]
+               if status else btn.winfo_rooty() - self.winfo_rooty())
+        y = top - bd.winfo_reqheight() - self._px(4)
+        bd.place(x=x, y=max(0, y))
+        bd.lift()
+        if not getattr(self, "_launch_menu_bound", False):
+            self._launch_menu_bound = True
+            self.bind("<Button-1>", self._launch_menu_outside, add="+")
+            self.bind("<Escape>", lambda _e: self._close_launch_menu(), add="+")
+            self.bind("<Configure>", self._launch_menu_resized, add="+")
+
+    def _launch_menu_outside(self, event):
+        """A click anywhere else closes the list. The button decides for
+        itself: its arrow toggles the list, and PLAY closes it on release."""
+        menu = getattr(self, "_launch_menu", None)
+        if menu is None or event.widget is self._upd_btn:
+            return
+        if not str(event.widget).startswith(str(menu)):
+            self._close_launch_menu()
+
+    def _launch_menu_resized(self, event):
+        if event.widget is self:
+            size = (event.width, event.height)
+            if size != getattr(self, "_launch_menu_size", size):
+                self._close_launch_menu()
+            self._launch_menu_size = size
+
+    def _choose_launch_default(self, name: str):
+        """Check one and it is the default; the one before it unchecks. The
+        checked one stays checked: there is always a default."""
+        self._cfg = update_config(
+            lambda c: c.__setitem__("launch_default", name))
+        self._log_line(f"PLAY now starts {name}.\n", "acct")
+        self._open_launch_menu()
+
+    def _refresh_launch_menu(self):
+        """Files may have come or gone while the list was open."""
+        if getattr(self, "_launch_menu", None) is not None:
+            self._open_launch_menu()
+
     def _btn_click(self):
+        self._close_launch_menu()
         if self._btn_mode == "play":
             self._launch_game()
         elif self._btn_mode == "update":
@@ -11931,21 +12044,23 @@ class EqUpdaterApp(tk.Tk):
         # any install this updater did not perform itself - and falling back
         # to WoW.exe in those cases launches the game with *none* of the
         # dlls.txt mods loaded, silently. Whether the loader is actually there
-        # is the thing that matters.
-        vf_exe       = os.path.join(client_dir, "VanillaFixes.exe")
-        vf_installed = os.path.exists(vf_exe)
+        # is the thing that matters. Unless the player chose otherwise, it is
+        # what starts.
+        exe_lbl = self._launch_target(client_dir) or platforms.GAME_EXE
+        exe     = os.path.join(client_dir, exe_lbl)
+        vf_installed = os.path.exists(os.path.join(client_dir,
+                                                   platforms.LOADER_EXE))
 
-        if vf_installed:
-            exe     = vf_exe
-            exe_lbl = "VanillaFixes.exe"
-        else:
-            exe     = os.path.join(client_dir, "WoW.exe")
-            exe_lbl = "WoW.exe"
-            if os.path.exists(_dlls_txt_path(client_dir)):
+        if os.path.exists(_dlls_txt_path(client_dir)):
+            if not vf_installed:
                 self._log_line(
                     "VanillaFixes.exe is missing, so the mods listed in "
                     "dlls.txt will NOT load. Install VanillaFixes from the "
                     "Mods tab.\n", "err")
+            elif exe_lbl.lower() == platforms.GAME_EXE.lower():
+                self._log_line(
+                    "Starting WoW.exe directly, as chosen: the mods listed "
+                    "in dlls.txt will not load.\n", "acct")
 
         if not os.path.exists(exe):
             self._log_line(f"{exe_lbl} not found at: {exe}\n", "err")
@@ -12014,7 +12129,8 @@ class EqUpdaterApp(tk.Tk):
                 pass
         try:
             proc = platforms.spawn_detached(plan.argv, cwd=plan.cwd,
-                                            env=plan.env, output=output)
+                                            env=plan.env, output=output,
+                                            console=plan.console)
         except OSError as e:
             self._launch_failed(
                 tr("{program} could not be started: {error}",
