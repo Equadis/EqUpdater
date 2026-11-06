@@ -114,6 +114,13 @@ def _by_version(c: Component) -> tuple:
     return Action.SKIP_UNVERIFIABLE, Status.UNVERIFIABLE
 
 
+#: Why a plan reads "unable to verify", in Plan.detail["cause"]: the source
+#: could not be asked, or both versions are known and cannot be ordered.
+#: The row says different things for the two, and offers different ways out.
+CAUSE_LOOKUP = "lookup"
+CAUSE_UNORDERABLE = "unorderable"
+
+
 def _by_ancestry(c: Component) -> tuple:
     a = c.ancestry
     if a is Ancestry.REMOTE_AHEAD:
@@ -192,8 +199,10 @@ def plan(c: Component) -> Plan:
     if c.lookup_failed:
         # Could not reach the source. An error resolving the latest version
         # must never be the reason files get replaced.
-        return made(Action.SKIP_UNVERIFIABLE, Status.UNVERIFIABLE,
-                    N_("could not determine the latest version"))
+        p = made(Action.SKIP_UNVERIFIABLE, Status.UNVERIFIABLE,
+                 N_("could not determine the latest version"))
+        p.detail["cause"] = CAUSE_LOOKUP
+        return p
 
     if c.ancestry is not None:
         action, status = _by_ancestry(c)
@@ -204,10 +213,17 @@ def plan(c: Component) -> Plan:
             action, status = Action.SKIP_UP_TO_DATE, Status.UP_TO_DATE
         else:
             action, status = Action.SKIP_UNVERIFIABLE, Status.UNVERIFIABLE
+    elif not c.installed_version and c.remote_version:
+        # The latest release is known; the installed one is not. Nothing to
+        # order, and no grounds to replace files that may be newer or custom.
+        # An explicit, confirmed reinstall is the way out -- never a sweep.
+        return made(Action.SKIP_VERSION_UNKNOWN, Status.VERSION_UNKNOWN)
     else:
         action, status = _by_version(c)
 
     p = made(action, status)
+    if status is Status.UNVERIFIABLE:
+        p.detail["cause"] = CAUSE_UNORDERABLE
     if action is Action.UPDATE:
         p.reason = N_("a newer version is available")
     return p

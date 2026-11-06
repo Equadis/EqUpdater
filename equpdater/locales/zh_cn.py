@@ -251,8 +251,6 @@ STRINGS = {
     "The installed files are gone. Reinstall to put them back.": "已安装的文件不见了。重新安装即可恢复。",
     "The installed version is newer than the one the configured source offers. EqUpdater will not replace it.":
         "已安装的版本比设定来源提供的更新。EqUpdater 不会替换它。",
-    "The latest version could not be determined, so nothing is replaced.":
-        "无法确定最新版本，因此不会替换任何内容。",
     "The link must start with https://": "链接必须以 https:// 开头",
     "The source could not be checked, so nothing is replaced.": "无法检查来源，因此不会替换任何内容。",
     "The source publishes no checksum, so EqUpdater cannot prove this file is its copy. Replace installs the source's copy, keeps yours as a .bak file, and tracks updates from then on.":
@@ -402,7 +400,6 @@ STRINGS = {
     "retry": "重试",
     "the forum page could not be read": "无法读取论坛页面",
     "the forum topic could not be read": "无法读取论坛帖子",
-    "the repository version": "仓库中的版本",
     "unknown": "未知",
     "unknown source": "未知来源",
     "up to date": "已是最新",
@@ -696,4 +693,36 @@ STRINGS = {
         '无法启动 {program}：{error}',
     '{program} stopped at once (exit code {code}).':
         '{program} 立即退出了（退出代码 {code}）。',
+    "Click to replace them with {version}, after a warning. Untick the mod and Apply to remove it.":
+        "点击可在警告后替换为 {version}。取消勾选此模组并应用即可移除。",
+    "Could not check the latest release: {reason}.":
+        "无法检查最新版本：{reason}。",
+    "EqUpdater cannot tell which version is installed now. If yours is newer, or a custom build, this replaces it with an older one.":
+        "EqUpdater 无法判断当前安装的版本。如果你的版本更新或是自定义版本，它将被替换为较旧的版本。",
+    "EqUpdater looks after these files but cannot tell which version they are, so it does not update them automatically.":
+        "EqUpdater 管理这些文件，但无法判断其版本，因此不会自动更新。",
+    "If the download fails, they stay as they are.":
+        "如果下载失败，它们将保持原样。",
+    "Nothing is changed. Click to check again.":
+        "未做任何更改。点击可重新检查。",
+    "The installed version and the one the source offers cannot be put in order, so nothing is replaced automatically.":
+        "已安装的版本与来源提供的版本无法比较先后，因此不会自动替换。",
+    "Update failed: {reason}. Your current files were kept.":
+        "更新失败：{reason}。已保留当前文件。",
+    "can't check":
+        "无法检查",
+    "installed version is unknown":
+        "已安装的版本未知",
+    "its latest release ({tag}) has no file matching {pattern}":
+        "其最新版本（{tag}）没有与 {pattern} 匹配的文件",
+    "the download did not contain the mod's files":
+        "下载内容不包含该模组的文件",
+    "the download does not match the checksum its release publishes":
+        "下载内容与其版本发布的校验和不符",
+    "the source did not answer":
+        "来源没有响应",
+    "the source has no published release":
+        "来源没有已发布的版本",
+    "version unknown":
+        "版本未知",
 }

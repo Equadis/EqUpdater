@@ -53,6 +53,12 @@ class Status(Enum):
     # lookup failed. Never grounds for replacing anything.
     UNVERIFIABLE = "Unable to verify"
 
+    # Managed files are here, but nothing says which release they are: an
+    # adopted mod whose files match no published release. The latest release
+    # may be known perfectly well; it is the *local* side that is missing, so
+    # this is not a lookup problem and must not be worded as one.
+    VERSION_UNKNOWN = "Version unknown"
+
     IGNORED = "Ignored"
     DISABLED = "Disabled"
     MISSING_FILES = "Missing files"
@@ -80,6 +86,7 @@ class Action(Enum):
     SKIP_SOURCE_CHANGED = N_("configured source differs from the installed one")
     SKIP_DIVERGED = N_("local and remote histories have diverged")
     SKIP_UNVERIFIABLE = N_("cannot determine which is newer")
+    SKIP_VERSION_UNKNOWN = N_("installed version is unknown")
     REQUIRES_CONFIRMATION = N_("needs explicit confirmation")
     ERROR = N_("error")
 

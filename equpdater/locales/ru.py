@@ -250,8 +250,6 @@ STRINGS = {
     "The installed files are gone. Reinstall to put them back.": "Установленные файлы пропали. Переустановите, чтобы их вернуть.",
     "The installed version is newer than the one the configured source offers. EqUpdater will not replace it.":
         "Установленная версия новее той, что предлагает выбранный источник. EqUpdater не будет её заменять.",
-    "The latest version could not be determined, so nothing is replaced.":
-        "Не удалось определить последнюю версию, поэтому ничего не заменяется.",
     "The link must start with https://": "Ссылка должна начинаться с https://",
     "The source could not be checked, so nothing is replaced.": "Не удалось проверить источник, поэтому ничего не заменяется.",
     "The source publishes no checksum, so EqUpdater cannot prove this file is its copy. Replace installs the source's copy, keeps yours as a .bak file, and tracks updates from then on.":
@@ -401,7 +399,6 @@ STRINGS = {
     "retry": "повторить",
     "the forum page could not be read": "не удалось прочитать страницу форума",
     "the forum topic could not be read": "не удалось прочитать тему форума",
-    "the repository version": "версию из репозитория",
     "unknown": "неизвестно",
     "unknown source": "неизвестный источник",
     "up to date": "актуально",
@@ -695,4 +692,36 @@ STRINGS = {
         'Не удалось запустить {program}: {error}',
     '{program} stopped at once (exit code {code}).':
         '{program} сразу завершился (код выхода {code}).',
+    "Click to replace them with {version}, after a warning. Untick the mod and Apply to remove it.":
+        "Нажмите, чтобы заменить их на {version} (после предупреждения). Чтобы удалить мод, снимите флажок и примените.",
+    "Could not check the latest release: {reason}.":
+        "Не удалось проверить последний выпуск: {reason}.",
+    "EqUpdater cannot tell which version is installed now. If yours is newer, or a custom build, this replaces it with an older one.":
+        "EqUpdater не может определить установленную версию. Если ваша новее или это особая сборка, она будет заменена более старой.",
+    "EqUpdater looks after these files but cannot tell which version they are, so it does not update them automatically.":
+        "EqUpdater управляет этими файлами, но не может определить их версию, поэтому не обновляет их автоматически.",
+    "If the download fails, they stay as they are.":
+        "Если загрузка не удастся, они останутся без изменений.",
+    "Nothing is changed. Click to check again.":
+        "Ничего не изменено. Нажмите, чтобы проверить снова.",
+    "The installed version and the one the source offers cannot be put in order, so nothing is replaced automatically.":
+        "Установленную версию и версию из источника нельзя сравнить, поэтому ничего не заменяется автоматически.",
+    "Update failed: {reason}. Your current files were kept.":
+        "Ошибка обновления: {reason}. Текущие файлы сохранены.",
+    "can't check":
+        "нет проверки",
+    "installed version is unknown":
+        "установленная версия неизвестна",
+    "its latest release ({tag}) has no file matching {pattern}":
+        "в последнем выпуске ({tag}) нет файла, подходящего под {pattern}",
+    "the download did not contain the mod's files":
+        "в загрузке нет файлов мода",
+    "the download does not match the checksum its release publishes":
+        "загрузка не совпадает с опубликованной контрольной суммой",
+    "the source did not answer":
+        "источник не ответил",
+    "the source has no published release":
+        "у источника нет опубликованных выпусков",
+    "version unknown":
+        "версия неизвестна",
 }

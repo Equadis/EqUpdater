@@ -42,7 +42,7 @@ from functools import cache
 import tkinter as tk
 from tkinter import filedialog
 
-from . import branding, gamepaths, i18n, logindoctor, mpq, platforms
+from . import branding, gamepaths, i18n, logindoctor, mpq, octolauncher, platforms
 from .i18n import N_, tr
 from .config import (APP_DATA_DIR, BACKUP_DIR, CONFIG_FILE, bootstrap_config,
                      ensure_dir, load_config, new_addon_record,
@@ -51,7 +51,7 @@ from .gitcompare import (GIT_HOSTS, Ancestry, ancestry, canonical_repo_url,
                          forge_named, repo_ref, same_repo,
                          short as short_sha, split_repo_url)
 from .hashing import files_hash, folder_hash
-from .planner import (Component, plan, skipped_notably,
+from .planner import (CAUSE_LOOKUP, Component, plan, skipped_notably,
                       updatable)
 from .states import Action, Plan, Status
 from .news import (ANNOUNCEMENTS_FORUM_ID, CHANGELOG_FORUM_ID,
@@ -1975,11 +1975,39 @@ def _slim_release(rel: dict) -> dict:
     so the persisted cache stays small."""
     return {
         "tag_name": rel.get("tag_name"),
+        # `digest` is GitHub's published SHA-256 of the file ("sha256:..."),
+        # absent elsewhere and on older releases. It lets a download be
+        # checked, and a file on disk be matched to a release unread.
         "assets": [{"name": a.get("name"),
                     "size": a.get("size", 0),
-                    "browser_download_url": a.get("browser_download_url")}
+                    "browser_download_url": a.get("browser_download_url"),
+                    "digest": a.get("digest")}
                    for a in rel.get("assets", [])],
     }
+
+
+#: What the last latest-release lookup of each mod came to, for the row's
+#: tooltip and the log: {mod_id: {"outcome", "reason", "tag", "at"}}.
+#: Outcomes: "cached" (a recent enough answer was reused), "fetched",
+#: "failed" (the source could not be asked; `reason` says why), "no-asset" (a
+#: release exists but carries no file this mod installs) and "pinned" (a
+#: fixed download, no release feed to ask).
+MOD_LOOKUPS: dict = {}
+
+
+def _note_lookup(mid: str, outcome: str, reason: str | None = None,
+                 tag: str | None = None):
+    MOD_LOOKUPS[mid] = {"outcome": outcome, "reason": reason, "tag": tag,
+                        "at": time.time()}
+
+
+def release_asset(mod: dict, rel: dict | None) -> dict | None:
+    """The file in ``rel`` this mod installs, or None."""
+    if not rel:
+        return None
+    src = mod["source"]
+    return _pick_asset(rel.get("assets", []), src.get("asset_pattern") or "*",
+                       src.get("prefer_no"))
 
 
 def _fetch_release_cached(mod: dict, force: bool = False,
@@ -1989,24 +2017,76 @@ def _fetch_release_cached(mod: dict, force: bool = False,
     an entry younger than ``max_age`` seconds is used as it is.
 
     A failed lookup returns None, never the old entry, so the row says it
-    could not check rather than presenting a stale release as current."""
+    could not check rather than presenting a stale release as current. Nor
+    is a failure cached: the next look asks again. Either way the outcome
+    and its reason land in MOD_LOOKUPS.
+
+    A release without a file this mod installs is no answer either: its tag
+    would read as an update that cannot then be downloaded."""
     src  = mod["source"]
     kind = src["kind"]
     if kind not in RELEASE_KINDS:
         return None
     mid = mod["id"]
     now = time.time()
+    rel, outcome = None, "fetched"
     if not force:
         entry = load_config().get("mod_release_cache", {}).get(mid)
         if entry and (now - entry.get("timestamp", 0)) < max_age:
-            return entry.get("release")
-    rel = _release_latest(src)
+            rel, outcome = entry.get("release"), "cached"
     if rel is None:
+        try:
+            rel = _release_latest(src, raise_errors=True)
+        except Exception as e:
+            _note_lookup(mid, "failed", tr(str(e)))
+            return None
+        if rel is None:
+            _note_lookup(mid, "failed", tr("the source has no published release"))
+            return None
+        rel = _slim_release(rel)
+        update_config(lambda c: c.setdefault("mod_release_cache", {}).__setitem__(
+            mid, {"timestamp": now, "release": rel}))
+    tag = _release_version(mod, rel)
+    if release_asset(mod, rel) is None:
+        _note_lookup(mid, "no-asset",
+                     tr("its latest release ({tag}) has no file matching "
+                        "{pattern}", tag=tag, pattern=src.get("asset_pattern")),
+                     tag)
         return None
-    rel = _slim_release(rel)
-    update_config(lambda c: c.setdefault("mod_release_cache", {}).__setitem__(
-        mid, {"timestamp": now, "release": rel}))
+    _note_lookup(mid, outcome, tag=tag)
     return rel
+
+
+def mod_source_label(mod: dict) -> str:
+    """Where a mod comes from, for the log: host and owner/repository, or
+    the pinned file. Never a URL with anything in it but the path."""
+    src = mod["source"]
+    kind = src["kind"]
+    if kind in RELEASE_KINDS:
+        host = {"github_release": "GitHub", "codeberg_release": "Codeberg"}.get(
+            kind, src.get("forge") or "git")
+        return f"{host} {src.get('owner')}/{src.get('repo')}"
+    name = urlsplit(src.get("url") or "").path.rsplit("/", 1)[-1]
+    return f"pinned download {name} ({src.get('pinned_version') or '?'})"
+
+
+def mod_lookup_line(mod: dict, state: dict | None = None) -> str:
+    """One diagnostic line: which mod, from where, what the latest-release
+    lookup came to and why, and what is known about the installed copy."""
+    look = MOD_LOOKUPS.get(mod["id"]) or {}
+    line = (f"{mod['name']} [{mod['id']}] from {mod_source_label(mod)}: "
+            f"latest release {look.get('outcome') or 'not checked'}")
+    if look.get("tag"):
+        line += f" ({look['tag']})"
+    if look.get("reason"):
+        line += f" - {look['reason']}"
+    if state is not None:
+        ver = state.get("installed_version")
+        line += "; installed version " + (
+            f"{ver}" + (f" ({state['version_evidence']})"
+                        if state.get("version_evidence") else "")
+            if ver else "unknown")
+    return line
 
 
 def fetch_mod_latest_version_cached(mod: dict, force: bool = False,
@@ -2015,11 +2095,127 @@ def fetch_mod_latest_version_cached(mod: dict, force: bool = False,
     src  = mod["source"]
     kind = src["kind"]
     if kind in ("direct_file", "direct_tar"):
+        _note_lookup(mod["id"], "pinned", tag=src.get("pinned_version"))
         return src.get("pinned_version")
     rel = _fetch_release_cached(mod, force=force, max_age=max_age)
     if rel:
         return _release_version(mod, rel)
     return None
+
+
+def _sha256_file(path: str) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _check_digest(asset: dict, data: bytes):
+    """Refuse a download that is not the file its release publishes."""
+    digest = (asset or {}).get("digest") or ""
+    if digest.startswith("sha256:") and \
+            hashlib.sha256(data).hexdigest() != digest[7:].lower():
+        raise RuntimeError(N_("the download does not match the checksum its "
+                              "release publishes"))
+
+
+def release_by_tag(src: dict, tag: str) -> dict | None:
+    """One named release of a release-based source, slimmed; None when it
+    does not exist or the source cannot be asked."""
+    from urllib.parse import quote
+    t = quote(tag, safe="")
+    owner, repo = src.get("owner"), src.get("repo")
+    kind = src["kind"]
+    if kind == "github_release":
+        url = f"{GITHUB_API}/repos/{owner}/{repo}/releases/tags/{t}"
+    elif kind == "codeberg_release":
+        url = f"https://codeberg.org/api/v1/repos/{owner}/{repo}/releases/tags/{t}"
+    elif kind == "gitea_release":
+        forge = forge_named(src.get("forge") or "")
+        if forge is None or forge.kind != "gitea":
+            return None
+        url = f"{forge.api}/repos/{owner}/{repo}/releases/tags/{t}"
+    else:
+        return None
+    try:
+        return _slim_release(_api_json(url))
+    except Exception:
+        return None
+
+
+def identify_installed_release(mod: dict, files: list, client_dir: str,
+                               rel: dict | None = None) -> bool:
+    """Whether the files on disk are exactly what installing this mod from
+    ``rel`` (or from its pinned download) writes: same names, same bytes.
+
+    The only evidence that names an installed release. A fingerprint taken
+    at adoption says the files have not changed since; it says nothing about
+    which release they were. A version some other tool wrote down is a hint
+    of which release to compare with, not an answer (see octolauncher.py).
+
+    A single file whose release publishes its SHA-256 is compared without a
+    download. Anything else is installed into a scratch folder, compared
+    and thrown away -- the game folder is not touched."""
+    files = [f for f in files or [] if f]
+    src = mod["source"]
+    if not files or (src["kind"] in RELEASE_KINDS and not rel):
+        return False
+    try:
+        local = {f.lower(): _sha256_file(os.path.join(client_dir, f))
+                 for f in files}
+    except OSError:
+        return False
+    asset = release_asset(mod, rel) if rel else None
+    if src["kind"] in RELEASE_KINDS and asset is None:
+        return False
+    digest = (asset or {}).get("digest") or ""
+    if (asset and len(files) == 1 and src.get("extract_map") is None
+            and not src.get("extract_all") and digest.startswith("sha256:")
+            and (src.get("dest") or asset["name"]).lower() == files[0].lower()):
+        return digest[7:].lower() == local[files[0].lower()]
+    import tempfile
+    staging = os.path.join(APP_DATA_DIR, "staging")
+    ensure_dir(staging)
+    scratch = tempfile.mkdtemp(prefix="identify-", dir=staging)
+    try:
+        log(f"  Comparing {mod['name']} with its published files...")
+        written = install_mod(dict(mod), scratch, release=rel)
+        theirs = {w.lower(): _sha256_file(os.path.join(scratch, w))
+                  for w in written}
+        return bool(theirs) and theirs == local
+    except Exception as e:
+        log(f"  Could not compare {mod['name']}: {describe_install_error(e)}")
+        return False
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+
+
+def _stash_mod_files(client_dir: str, rels: list) -> str:
+    """Copy a mod's files aside before they are replaced, so a download or
+    install that fails part-way can put them back."""
+    import tempfile
+    staging = os.path.join(APP_DATA_DIR, "staging")
+    ensure_dir(staging)
+    stash = tempfile.mkdtemp(prefix="replace-", dir=staging)
+    for rel in rels:
+        dest = os.path.join(stash, rel)
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        shutil.copy2(os.path.join(client_dir, rel), dest)
+    return stash
+
+
+def _restore_mod_files(client_dir: str, stash: str, rels: list) -> bool:
+    try:
+        for rel in rels:
+            dest = os.path.join(client_dir, rel)
+            os.makedirs(os.path.dirname(dest) or client_dir, exist_ok=True)
+            shutil.copy2(os.path.join(stash, rel), dest)
+        return True
+    except OSError as e:
+        log(f"  Could not put the previous files back: {e}. "
+            f"A copy is in {stash}")
+        return False
 
 
 def install_mod(mod: dict, client_dir: str, release: dict | None = None) -> list:
@@ -2049,6 +2245,7 @@ def install_mod(mod: dict, client_dir: str, release: dict | None = None) -> list
         with secure_urlopen(req, timeout=120,
                             allowed_hosts=ALLOWED_DOWNLOAD_HOSTS) as r:
             data = r.read()
+        _check_digest(asset, data)
         if src.get("extract_all"):
             written.extend(_install_mod_zip(mod, data, client_dir))
         elif src.get("extract_map") is None:
@@ -2097,6 +2294,7 @@ def install_mod(mod: dict, client_dir: str, release: dict | None = None) -> list
         with secure_urlopen(req, timeout=120,
                             allowed_hosts=ALLOWED_DOWNLOAD_HOSTS) as r:
             data = r.read()
+        _check_digest(asset, data)
 
         if src.get("extract_all"):
             written.extend(_install_mod_zip(mod, data, client_dir))
@@ -2800,6 +2998,14 @@ def remove_dll(client_dir: str, name: str):
         _write_dlls_txt(client_dir, lines)
 
 
+def mod_has_files(state: dict) -> bool:
+    """Whether a record says EqUpdater looks after files for this mod --
+    installed or adopted, version known or not. Version knowledge decides
+    updates; it never decides whether the mod is there."""
+    return bool(state.get("installed_version")
+                or (state.get("managed") and state.get("installed_files")))
+
+
 def mod_installed_files_present(mod: dict, client_dir: str) -> bool:
     cfg   = load_config()
     state = cfg.get("mods", {}).get(mod["id"], {})
@@ -2907,10 +3113,11 @@ def mod_component(mod: dict, state: dict, live: dict | None,
         ignore_updates=bool(state.get("ignore_updates", False)),
         files_present=present,
         installed_version=installed_ver,
-        # A pinned source offers no version to compare with; saying so is
-        # what makes the row read "version not tracked" rather than pretending
-        # the pinned copy is current.
-        remote_version=remote_ver if checkable else installed_ver,
+        # A pinned source has no newer release to offer: a known copy is
+        # compared with itself. An unknown one is compared with the pinned
+        # version, which is what a reinstall would put there.
+        remote_version=(remote_ver if checkable else
+                        installed_ver or mod["source"].get("pinned_version")),
         recorded_hash=recorded_hash, current_hash=current_hash,
         lookup_failed=lookup_failed,
         error=state.get("error"),
@@ -3100,6 +3307,7 @@ ADDON_STATUS_NAMES = {
     Status.DIFFERENT_SOURCE: "differentSource",
     Status.DIVERGED:         "diverged",
     Status.UNVERIFIABLE:     "unverifiable",
+    Status.VERSION_UNKNOWN:  "unverifiable",
     Status.IGNORED:          "ignored",
     Status.ERROR:            "invalid",
     Status.MISSING_FILES:    "invalid",
@@ -6792,10 +7000,8 @@ class EqUpdaterApp(tk.Tk):
                     continue
 
                 if live is not None and "ver_label" in refs:
-                    # Installed mods show their installed version; others
-                    # show the latest available.
-                    ver = state.get("installed_version") or live.get("latest_version") or tr("unknown")
-                    refs["ver_label"].configure(text=f"  {ver}")
+                    refs["ver_label"].configure(
+                        text=f"  {self._mod_version_text(state, live)}")
 
                 # Checkbox always reflects config only — never a registry default.
                 # A mod only shows checked if it's actually recorded as installed.
@@ -6806,7 +7012,7 @@ class EqUpdaterApp(tk.Tk):
                         refs["ignore"].set(state.get("ignore_updates", False))
 
                 has_error = bool(state.get("error"))
-                installed = bool(state.get("installed_version"))
+                installed = mod_has_files(state)
                 if "name_label" in refs:
                     refs["name_label"].configure(
                         fg=C_ERR if has_error else (C_MOD_HL if installed else C_TEXT))
@@ -6814,11 +7020,7 @@ class EqUpdaterApp(tk.Tk):
                     refs["desc_label"].configure(
                         fg=C_TEXT if state.get("enabled", False) else C_TEXT_DIM)
                 if "error_label" in refs:
-                    if has_error:
-                        refs["error_label"].configure(text=f"  \u26a0  {tr(state['error'])}")
-                        refs["error_label"].pack(fill="x", pady=(0, self._px(4)))
-                    else:
-                        refs["error_label"].pack_forget()
+                    self._show_mod_problem(refs["error_label"], state)
 
                 if "update_label" in refs:
                     self._style_mod_action_label(refs["update_label"],
@@ -6843,15 +7045,14 @@ class EqUpdaterApp(tk.Tk):
             state = mods_cfg.get(mid, {})
             live  = next((m for m in self._mods_state if m["id"] == mid), {})
 
-            # Installed mods show their installed version; others show latest.
-            latest_ver  = state.get("installed_version") or live.get("latest_version") or tr("unknown")
+            latest_ver  = self._mod_version_text(state, live)
             # Checkbox reflects only what's actually recorded in config — never
             # a registry default. Pending (not-yet-applied) UI changes still
             # win so an in-progress toggle survives a background re-render.
             enabled     = self._mod_pending_state.get(mid, {}).get("enabled", state.get("enabled", False))
             ignore_upd  = state.get("ignore_updates", False)
             essential   = mod.get("essential", False)
-            installed   = bool(state.get("installed_version"))
+            installed   = mod_has_files(state)
             # Installed mods are highlighted green; the name is neutral text
             # otherwise (error state overrides to red in the refresh paths).
             name_col    = C_MOD_HL if installed else C_TEXT
@@ -6946,14 +7147,12 @@ class EqUpdaterApp(tk.Tk):
                                   justify="left", anchor="w")
             desc_label.pack(side="left", fill="x", expand=True)
 
-            existing_err = state.get("error")
             error_label = tk.Label(container, text="",
                                    font=self._font(9), fg=C_ERR,
                                    bg=C_PANEL, anchor="w", padx=self._px(16))
-            if existing_err:
+            if state.get("error"):
                 name_label.configure(fg=C_ERR)
-                error_label.configure(text=f"  \u26a0  {tr(existing_err)}")
-                error_label.pack(fill="x", pady=(0, self._px(4)))
+            self._show_mod_problem(error_label, state)
 
             divider = tk.Frame(self._mods_inner, bg=C_DIVIDER, height=self._px(1))
             divider.pack(fill="x", pady=(self._px(2), 0))
@@ -6973,13 +7172,156 @@ class EqUpdaterApp(tk.Tk):
         for mod in MODS_REGISTRY:
             try:
                 v = fetch_mod_latest_version_cached(mod, max_age=max_age)
-            except Exception:
+            except Exception as e:
+                _note_lookup(mod["id"], "failed", tr(str(e)))
                 v = None
             if v:
                 state.append({"id": mod["id"], "latest_version": v})
         self._mods_state = state
+        client = load_config().get("out_dir") or ""
+        try:
+            self._identify_unversioned_mods(client)
+        except Exception as e:
+            log(f"Could not identify installed mod versions: {e}")
+        self._log_mod_diagnostics()
         self.after(0, self._render_mod_rows)
         self.after(0, self._refresh_mods_badge)
+
+    def _identify_unversioned_mods(self, client_dir: str, force: bool = False,
+                                   only: str | None = None) -> list:
+        """Name the release of mods whose files are here but whose version is
+        not -- adopted or discovered ones, OctoLauncher's included -- by exact
+        file match only (identify_installed_release). Records the version
+        when one matches; otherwise leaves "unknown", which is the truth.
+
+        Compared with: the latest release, and the version OctoLauncher
+        wrote down when it is another one. A comparison's answer is kept per
+        release and fingerprint, so files are downloaded to compare once,
+        not on every start. Returns the names identified."""
+        if not client_dir or not os.path.isdir(client_dir):
+            return []
+        cfg = load_config()
+        mods_cfg = cfg.get("mods", {})
+        cache = cfg.get("mod_identify_cache", {})
+        hints = None
+        found, seen = {}, {}
+        for mod in MODS_REGISTRY:
+            mid = mod["id"]
+            st = mods_cfg.get(mid) or {}
+            files = st.get("installed_files") or []
+            if only is not None and mid != only:
+                continue
+            if (st.get("installed_version") or not files or st.get("error")
+                    or not (st.get("managed") or st.get("discovered"))):
+                continue
+            if not all(os.path.exists(os.path.join(client_dir, f))
+                       for f in files):
+                continue
+            fp = files_hash(client_dir, files)
+            src = mod["source"]
+            candidates = []
+            if src["kind"] in RELEASE_KINDS:
+                rel = _fetch_release_cached(mod)
+                if rel:
+                    candidates.append((_release_version(mod, rel), rel))
+                if hints is None:
+                    hints = octolauncher.version_hints(client_dir, MODS_REGISTRY)
+                hint = hints.get(mid)
+                if (hint and src.get("version_from") != "asset"
+                        and all(hint != v for v, _ in candidates)):
+                    candidates.append((hint, None))
+            elif src.get("pinned_version"):
+                candidates.append((src["pinned_version"], None))
+            for ver, rel in candidates:
+                key = f"{ver}|{fp}"
+                known = (cache.get(mid) or {}).get(key)
+                if known is not None and not force:
+                    match = known
+                else:
+                    if rel is None and src["kind"] in RELEASE_KINDS:
+                        rel = release_by_tag(src, ver)
+                        if rel is None:
+                            continue        # not answerable now; ask again later
+                    match = identify_installed_release(mod, files, client_dir, rel)
+                    seen.setdefault(mid, {})[key] = match
+                if match:
+                    found[mid] = (ver, fp)
+                    break
+
+        if not found and not seen:
+            return []
+
+        def _merge(c):
+            mods = c.setdefault("mods", {})
+            for mid, (ver, fp) in found.items():
+                rec = mods.get(mid)
+                if not rec or rec.get("installed_version"):
+                    continue
+                rec["installed_version"] = ver
+                rec["version_evidence"] = "files match the published release"
+                # The files are that release, byte for byte: the strongest
+                # baseline there is for telling later edits apart.
+                rec["content_hash"] = fp
+                rec["hash_baseline"] = "release"
+            ident = c.setdefault("mod_identify_cache", {})
+            for mid, answers in seen.items():
+                kept = dict(ident.get(mid) or {})
+                kept.update(answers)
+                ident[mid] = dict(list(kept.items())[-6:])
+        self._cfg = update_config(_merge)
+        names = []
+        for mid, (ver, _fp) in found.items():
+            mod = next(m for m in MODS_REGISTRY if m["id"] == mid)
+            names.append(mod["name"])
+            log(f"{mod['name']}: the installed files are release {ver}, "
+                f"byte for byte - version recorded.")
+        return names
+
+    def _log_mod_diagnostics(self):
+        """Say, once per check, why a mod that is here cannot be updated
+        automatically: no answer from its source, or no known version."""
+        mods_cfg = load_config().get("mods", {})
+        lines = []
+        for mod in MODS_REGISTRY:
+            st = mods_cfg.get(mod["id"]) or {}
+            if not st.get("installed_files"):
+                continue
+            look = MOD_LOOKUPS.get(mod["id"]) or {}
+            if (look.get("outcome") in ("failed", "no-asset")
+                    or not st.get("installed_version")):
+                lines.append("  " + mod_lookup_line(mod, st))
+        if lines:
+            log("\nMods that cannot be checked or updated automatically:")
+            for line in lines:
+                log(line)
+
+    def _mod_version_text(self, state: dict, live: dict | None) -> str:
+        """The version beside a mod's name: what is installed, "unknown"
+        when files are here and their release is not known, and the latest
+        release only for a mod that is not installed. The latest release is
+        never shown as if it were the installed one."""
+        if state.get("installed_version"):
+            return state["installed_version"]
+        if state.get("installed_files"):
+            return tr("unknown")
+        return (live or {}).get("latest_version") or tr("unknown")
+
+    def _show_mod_problem(self, label, state: dict):
+        """The line under a mod row: an install that failed (red; PLAY waits
+        for it), or an update that failed with the old files kept (it does
+        not hold PLAY back -- the mod still works)."""
+        if state.get("error"):
+            label.configure(text=f"  \u26a0  {tr(state['error'])}", fg=C_ERR)
+        elif state.get("update_error"):
+            label.configure(
+                text="  \u26a0  " + tr("Update failed: {reason}. Your current "
+                                       "files were kept.",
+                                       reason=tr(state["update_error"])),
+                fg=C_GOLD)
+        else:
+            label.pack_forget()
+            return
+        label.pack(fill="x", pady=(0, self._px(4)))
 
     def _mod_plans(self) -> dict:
         """Every mod's decision, keyed by id.
@@ -7176,8 +7518,13 @@ class EqUpdaterApp(tk.Tk):
                                   "EqUpdater installed. Automatic updates "
                                   "are held back.")),
         Status.UNVERIFIABLE:     (N_("can't verify"), "info",
-                                  N_("The latest version could not be "
-                                  "determined, so nothing is replaced.")),
+                                  N_("The installed version and the one the "
+                                  "source offers cannot be put in order, so "
+                                  "nothing is replaced automatically.")),
+        Status.VERSION_UNKNOWN:  (N_("version unknown"), "recover",
+                                  N_("EqUpdater looks after these files but "
+                                  "cannot tell which version they are, so it "
+                                  "does not update them automatically.")),
         Status.DIFFERENT_SOURCE: (N_("other source"), "info",
                                   N_("Installed from a different repository "
                                   "than the one now configured.")),
@@ -7218,15 +7565,44 @@ class EqUpdaterApp(tk.Tk):
                         version=p.remote))
         elif p.status is Status.MODIFIED:
             tip = tip + "\n\n" + tr("Right-click to replace them anyway.")
+        elif p.status is Status.UNVERIFIABLE and \
+                p.detail.get("cause") == CAUSE_LOOKUP:
+            # The source did not answer. Not the files' fault, and not the
+            # same thing as an unknown version: say why, and offer to ask
+            # again.
+            look = MOD_LOOKUPS.get(mod["id"]) or {}
+            text, mode = tr("can't check"), "retry"
+            tip = (tr("Could not check the latest release: {reason}.",
+                      reason=look.get("reason")
+                      or tr("the source did not answer"))
+                   + "\n\n" + tr("Nothing is changed. Click to check again."))
+        elif p.status is Status.UNVERIFIABLE:
+            tip = (tr("Installed {local}; the configured source offers "
+                      "{remote}.", local=p.local, remote=p.remote)
+                   + " " + tip + "\n\n"
+                   + tr("Right-click to install {version} anyway.",
+                        version=p.remote))
+        elif p.status is Status.VERSION_UNKNOWN:
+            tip = (tip + "\n\n"
+                   + tr("Click to replace them with {version}, after a "
+                        "warning. Untick the mod and Apply to remove it.",
+                        version=p.remote))
+        elif p.status is Status.MISSING_FILES and not p.local:
+            # Some files are gone and nothing says which build the rest are:
+            # putting the set back means writing over them, so it asks first.
+            mode = "recover"
 
-        colour = {"act": C_GOLD, "adopt": C_MOD_HL}.get(mode, C_TEXT_DIM)
+        colour = {"act": C_GOLD, "adopt": C_MOD_HL, "recover": C_GOLD,
+                  "retry": C_GOLD}.get(mode, C_TEXT_DIM)
         lbl._base = colour
         # An informational label does not brighten under the cursor. Looking
         # interactive is a promise, and there is nothing here to click.
-        lbl._hover = {"act": C_GOLD_LT, "adopt": C_GOLD_LT}.get(mode, colour)
+        lbl._hover = {"act": C_GOLD_LT, "adopt": C_GOLD_LT,
+                      "recover": C_GOLD_LT, "retry": C_GOLD_LT}.get(mode, colour)
         lbl._mode = mode
         lbl.configure(text=text, fg=colour,
-                      cursor="hand2" if mode in ("act", "adopt") else "arrow")
+                      cursor="hand2" if mode in ("act", "adopt", "recover",
+                                                 "retry") else "arrow")
         self._set_tooltip(lbl, tip)
         lbl.pack(side="right", padx=(self._px(2), self._px(8)))
 
@@ -7243,6 +7619,42 @@ class EqUpdaterApp(tk.Tk):
             self._adopt_mod(mod_id)
         elif mode == "act":
             self._update_mod(mod_id)
+        elif mode == "recover":
+            self._mod_force_replace(mod_id)
+        elif mode == "retry":
+            self._mod_recheck(mod_id)
+
+    def _mod_recheck(self, mod_id: str, force: bool = True):
+        """Ask the mod's source again, now, past the cache -- and compare the
+        installed files with what it publishes. Changes nothing on disk."""
+        mod = next((m for m in MODS_REGISTRY if m["id"] == mod_id), None)
+        if not mod:
+            return
+        client = self._game_path.get().strip()
+        self._log_line(f"\nChecking {mod['name']} again...\n", "acct")
+
+        def work():
+            try:
+                v = fetch_mod_latest_version_cached(mod, force=force)
+            except Exception as e:
+                _note_lookup(mod_id, "failed", tr(str(e)))
+                v = None
+            try:
+                self._identify_unversioned_mods(client, force=force, only=mod_id)
+            except Exception as e:
+                log(f"  Could not compare {mod['name']}: {e}")
+            st = load_config().get("mods", {}).get(mod_id)
+            log("  " + mod_lookup_line(mod, st))
+
+            def done():
+                self._mods_state = [m for m in self._mods_state
+                                    if m["id"] != mod_id]
+                if v:
+                    self._mods_state.append({"id": mod_id, "latest_version": v})
+                self._render_mod_rows()
+                self._refresh_mods_badge()
+            self.after(0, done)
+        threading.Thread(target=work, daemon=True).start()
 
     def _adopt_mod(self, mod_id: str):
         """Hand a discovered DLL over to EqUpdater, with consent.
@@ -7286,6 +7698,9 @@ class EqUpdaterApp(tk.Tk):
                        f"{branding.APP_NAME}.\n", "acct")
         self._render_mod_rows()
         self._refresh_mods_badge()
+        # Which release is it? Only an exact match with a published release
+        # can say; until one does, the row reads "version unknown".
+        self._mod_recheck(mod_id, force=False)
 
     def _update_mod(self, mod_id: str):
         """Download and install the newest release of a single mod (the
@@ -7526,14 +7941,26 @@ class EqUpdaterApp(tk.Tk):
             installed_ver = state.get("installed_version")
             # Adopted mods can have real files but no known release version.
             # Version knowledge governs updates, never presence/removal.
-            is_installed = mod_installed_files_present(mod, client_dir)
+            tracked = state.get("installed_files") or []
+            on_disk = [rel for rel in tracked
+                       if os.path.exists(os.path.join(client_dir, rel))]
+            is_installed = bool(tracked) and len(on_disk) == len(tracked)
             owned = bool(state.get("managed", bool(installed_ver)))
-            has_tracked_files = any(
-                os.path.exists(os.path.join(client_dir, rel))
-                for rel in state.get("installed_files", []))
+            explicit = force or only_mod_id == mid
 
             needs_install   = enabled and not is_installed
-            needs_uninstall = not enabled and owned and has_tracked_files
+            needs_uninstall = not enabled and owned and bool(on_disk)
+
+            # Some files are gone and some are not. Putting the set back
+            # writes over the rest -- fine for EqUpdater's own install of a
+            # known version, not for an adopted copy nobody has identified.
+            # That waits for the row's reinstall, which asks first.
+            if (needs_install and on_disk and not explicit
+                    and not (installed_ver and state.get("installed_by"))):
+                needs_install = False
+                log("")
+                log(f"{mod['name']}: some files are missing and the installed "
+                    f"version is unknown - not reinstalled automatically.")
 
             # **Never install over files nobody gave us.** A discovered mod is
             # recorded unmanaged, enabled, and with no version -- which reads
@@ -7577,6 +8004,16 @@ class EqUpdaterApp(tk.Tk):
 
             needs_update = enabled and is_installed and (
                 decision.will_update or (force and latest_ver is not None))
+
+            # Asked to replace, with nothing to replace with: say so, and
+            # keep what is here. Never a silent no-op.
+            if force and enabled and is_installed and latest_ver is None:
+                look = MOD_LOOKUPS.get(mid) or {}
+                reason = look.get("reason") or tr("the source did not answer")
+                log("")
+                log(f"{mod['name']}: not replaced - could not check the latest "
+                    f"release ({reason}).")
+                mods_cfg.setdefault(mid, dict(state))["update_error"] = reason
 
             # Anything that looked like it wanted updating and deliberately
             # was not gets said out loud. A silent skip is indistinguishable
@@ -7624,10 +8061,20 @@ class EqUpdaterApp(tk.Tk):
                       else tr("Removing {name}…", name=mod["name"]))
             self.after(0, lambda t=status: self._status_var.set(t))
 
+            # Files that are here and about to be written over are copied
+            # aside first, so a download or install that fails part-way
+            # leaves the mod as it was instead of half gone.
+            stash, touched, keep_stash = None, False, False
             try:
+                if (needs_install or needs_update) and on_disk:
+                    stash = _stash_mod_files(client_dir, on_disk)
+                touched = True
                 if needs_install:
                     log(f"\nInstalling {mod['name']} {latest_ver}...")
                     written = install_mod(mod, client_dir, release=mod_release)
+                    if not written:
+                        raise RuntimeError(N_("the download did not contain "
+                                              "the mod's files"))
                     if mod.get("register_dll"):
                         add_dll(client_dir, mod["register_dll"])
                     resolved_ver = mod.pop("_resolved_version", None) or latest_ver or "unknown"
@@ -7661,9 +8108,13 @@ class EqUpdaterApp(tk.Tk):
                     log(f"  \u2713 {mod['name']} uninstalled.")
 
                 elif needs_update:
-                    log(f"\nUpdating {mod['name']} {installed_ver} \u2192 {latest_ver}...")
+                    log(f"\nUpdating {mod['name']} "
+                        f"{installed_ver or tr('unknown')} \u2192 {latest_ver}...")
                     uninstall_mod(mod, client_dir)
                     written = install_mod(mod, client_dir, release=mod_release)
+                    if not written:
+                        raise RuntimeError(N_("the download did not contain "
+                                              "the mod's files"))
                     if mod.get("register_dll"):
                         add_dll(client_dir, mod["register_dll"])
                     mods_cfg[mid] = new_mod_record(
@@ -7680,9 +8131,35 @@ class EqUpdaterApp(tk.Tk):
             except Exception as e:
                 err = describe_install_error(e)
                 log(f"  \u2717 {mod['name']}: {err}")
-                mods_cfg[mid] = new_mod_record(managed=False, enabled=False)
-                mods_cfg[mid]["ignore_updates"] = ignore_upd
-                mods_cfg[mid]["error"] = err
+                kept = bool(on_disk) and not needs_uninstall and (
+                    not touched or (stash is not None and
+                                    _restore_mod_files(client_dir, stash,
+                                                       on_disk)))
+                if kept:
+                    # The mod is as it was: same files, same record, and the
+                    # failure noted beside it -- the mod still works, so this
+                    # does not hold PLAY back.
+                    rec = dict(state)
+                    rec.update(enabled=enabled, ignore_updates=ignore_upd,
+                               update_error=err)
+                    mods_cfg[mid] = rec
+                    log(f"  Your previous {mod['name']} files were kept.")
+                elif on_disk:
+                    # Could not put them back. The record keeps naming the
+                    # files, so they are not lost from view, and the error
+                    # holds PLAY until it is dealt with. The copy stays where
+                    # the log says it is.
+                    rec = dict(state)
+                    rec["error"] = err
+                    mods_cfg[mid] = rec
+                    keep_stash = True
+                else:
+                    mods_cfg[mid] = new_mod_record(managed=False, enabled=False)
+                    mods_cfg[mid]["ignore_updates"] = ignore_upd
+                    mods_cfg[mid]["error"] = err
+            finally:
+                if stash is not None and not keep_stash:
+                    shutil.rmtree(stash, ignore_errors=True)
 
         # Merge just the "mods" key into the current on-disk config (which
         # other threads may have written to during this long install), rather
@@ -7714,16 +8191,16 @@ class EqUpdaterApp(tk.Tk):
                 if not refs:
                     continue
                 has_error   = bool(state.get("error"))
-                installed   = bool(state.get("installed_version"))
+                installed   = mod_has_files(state)
 
                 if mid not in self._mod_pending_state:
                     refs["enabled"].set(state.get("enabled", False))
                     refs["ignore"].set(state.get("ignore_updates", False))
 
                 live = next((m for m in self._mods_state if m["id"] == mid), {})
-                ver  = state.get("installed_version") or live.get("latest_version") or tr("unknown")
                 if "ver_label" in refs:
-                    refs["ver_label"].configure(text=f"  {ver}")
+                    refs["ver_label"].configure(
+                        text=f"  {self._mod_version_text(state, live)}")
 
                 if "name_label" in refs:
                     refs["name_label"].configure(
@@ -7734,12 +8211,7 @@ class EqUpdaterApp(tk.Tk):
                         fg=C_TEXT if state.get("enabled", False) else C_TEXT_DIM)
 
                 if "error_label" in refs:
-                    if has_error:
-                        refs["error_label"].configure(
-                            text=f"  \u26a0  {state['error']}")
-                        refs["error_label"].pack(fill="x", pady=(0, self._px(4)))
-                    else:
-                        refs["error_label"].pack_forget()
+                    self._show_mod_problem(refs["error_label"], state)
 
                 if "update_label" in refs:
                     self._style_mod_action_label(refs["update_label"],
@@ -11292,7 +11764,19 @@ class EqUpdaterApp(tk.Tk):
         state = load_config().get("mods", {}).get(mod_id, {})
         live = next((m for m in self._mods_state if m["id"] == mod_id), None)
         decision = mod_plan(mod, state, live, client)
-        remote = decision.remote or tr("the repository version")
+        if (decision.status is Status.UNVERIFIABLE
+                and decision.detail.get("cause") == CAUSE_LOOKUP) \
+                or not decision.remote:
+            # Nothing to install: the source has not said what its release
+            # is. Replacing files with "whatever downloads" is not a repair.
+            look = MOD_LOOKUPS.get(mod_id) or {}
+            messagebox.showinfo(
+                tr("Replace {name}?", name=mod["name"]),
+                tr("Could not check the latest release: {reason}.",
+                   reason=look.get("reason") or tr("the source did not answer"))
+                + "\n\n" + tr("Nothing is changed. Click to check again."))
+            return
+        remote = decision.remote
 
         note = ""
         if decision.status is Status.LOCAL_NEWER:
@@ -11302,13 +11786,18 @@ class EqUpdaterApp(tk.Tk):
         elif decision.status is Status.MODIFIED:
             note = "\n\n" + tr("The files here differ from the ones EqUpdater "
                                "installed.")
+        elif not decision.local:
+            note = "\n\n" + tr("EqUpdater cannot tell which version is "
+                               "installed now. If yours is newer, or a custom "
+                               "build, this replaces it with an older one.")
 
         if not messagebox.askokcancel(
                 tr("Replace {name}?", name=mod["name"]),
                 tr("Install {version} over the copy already here.",
                    version=remote) + note + "\n\n"
                 + tr("The current files are backed up to {backups} first.",
-                     backups=BACKUP_DIR)):
+                     backups=BACKUP_DIR) + " "
+                + tr("If the download fails, they stay as they are.")):
             return
 
         for rel in (state.get("installed_files")

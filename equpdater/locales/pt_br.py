@@ -251,8 +251,6 @@ STRINGS = {
     "The installed files are gone. Reinstall to put them back.": "Os arquivos instalados sumiram. Reinstale para recuperá-los.",
     "The installed version is newer than the one the configured source offers. EqUpdater will not replace it.":
         "A versão instalada é mais recente que a oferecida pela fonte configurada. O EqUpdater não vai substituí-la.",
-    "The latest version could not be determined, so nothing is replaced.":
-        "Não foi possível determinar a versão mais recente, então nada é substituído.",
     "The link must start with https://": "O link precisa começar com https://",
     "The source could not be checked, so nothing is replaced.": "Não foi possível verificar a fonte, então nada é substituído.",
     "The source publishes no checksum, so EqUpdater cannot prove this file is its copy. Replace installs the source's copy, keeps yours as a .bak file, and tracks updates from then on.":
@@ -402,7 +400,6 @@ STRINGS = {
     "retry": "tentar de novo",
     "the forum page could not be read": "não foi possível ler a página do fórum",
     "the forum topic could not be read": "não foi possível ler o tópico do fórum",
-    "the repository version": "a versão do repositório",
     "unknown": "desconhecida",
     "unknown source": "fonte desconhecida",
     "up to date": "atualizado",
@@ -696,4 +693,36 @@ STRINGS = {
         'Não foi possível iniciar {program}: {error}',
     '{program} stopped at once (exit code {code}).':
         '{program} fechou imediatamente (código de saída {code}).',
+    "Click to replace them with {version}, after a warning. Untick the mod and Apply to remove it.":
+        "Clique para substituí-los por {version}, após um aviso. Desmarque o mod e aplique para removê-lo.",
+    "Could not check the latest release: {reason}.":
+        "Não foi possível verificar a versão mais recente: {reason}.",
+    "EqUpdater cannot tell which version is installed now. If yours is newer, or a custom build, this replaces it with an older one.":
+        "O EqUpdater não consegue saber qual versão está instalada. Se a sua for mais nova ou uma compilação própria, ela será substituída por uma mais antiga.",
+    "EqUpdater looks after these files but cannot tell which version they are, so it does not update them automatically.":
+        "O EqUpdater gerencia estes arquivos, mas não consegue saber qual é a versão deles, por isso não os atualiza automaticamente.",
+    "If the download fails, they stay as they are.":
+        "Se o download falhar, eles continuam como estão.",
+    "Nothing is changed. Click to check again.":
+        "Nada é alterado. Clique para verificar novamente.",
+    "The installed version and the one the source offers cannot be put in order, so nothing is replaced automatically.":
+        "A versão instalada e a oferecida pela fonte não podem ser comparadas, por isso nada é substituído automaticamente.",
+    "Update failed: {reason}. Your current files were kept.":
+        "Falha na atualização: {reason}. Seus arquivos atuais foram mantidos.",
+    "can't check":
+        "não foi possível verificar",
+    "installed version is unknown":
+        "a versão instalada é desconhecida",
+    "its latest release ({tag}) has no file matching {pattern}":
+        "a versão mais recente ({tag}) não tem nenhum arquivo correspondente a {pattern}",
+    "the download did not contain the mod's files":
+        "o download não continha os arquivos do mod",
+    "the download does not match the checksum its release publishes":
+        "o download não corresponde à soma de verificação publicada",
+    "the source did not answer":
+        "a fonte não respondeu",
+    "the source has no published release":
+        "a fonte não tem nenhuma versão publicada",
+    "version unknown":
+        "versão desconhecida",
 }

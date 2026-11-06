@@ -15,6 +15,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 class TestReleaseFreshness(unittest.TestCase):
 
+    ASSET = {"name": "ClassicAPI.dll", "size": 1,
+             "browser_download_url": "https://github.com/x"}
+
     def setUp(self):
         from equpdater import app
         self.app = app
@@ -32,7 +35,7 @@ class TestReleaseFreshness(unittest.TestCase):
         ]
         for p in self.patches:
             p.start()
-        self.answer = {"tag_name": "v1.16.0", "assets": []}
+        self.answer = {"tag_name": "v1.16.0", "assets": [self.ASSET]}
 
     def tearDown(self):
         for p in self.patches:
@@ -45,7 +48,7 @@ class TestReleaseFreshness(unittest.TestCase):
     def cache(self, tag, age):
         self.cfg["mod_release_cache"] = {"ClassicAPI": {
             "timestamp": time.time() - age,
-            "release": {"tag_name": tag, "assets": []}}}
+            "release": {"tag_name": tag, "assets": [self.ASSET]}}}
 
     def version(self, **kw):
         return self.app.fetch_mod_latest_version_cached(self.mod, **kw)
