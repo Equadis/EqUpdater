@@ -39,7 +39,7 @@ program on Windows and the Linux one on Linux (PyInstaller builds for the
 platform it runs on). The release artifacts are made from those builds:
 
 - Windows: ``--setup`` packs the folder build into one installer,
-  dist/EqUpdater-vX.Y.Z-Windows.exe (equpdater/installer.py), which installs
+  dist/EqUpdater-vX.Y.Z-Windows-Installer.exe (equpdater/installer.py), which installs
   it to %LOCALAPPDATA%\\Programs\\EqUpdater and starts it. The player runs a
   single file; the app itself stays a folder build.
 - Linux: tools/build_appimage.py wraps the folder build, a pinned static
@@ -73,6 +73,8 @@ ICON = os.path.join(HERE, "icon.ico")
 ICON_PNG = os.path.join(HERE, "icon.png")
 BACKGROUNDS = [os.path.join(HERE, branding.BACKGROUND_STATIC),
                os.path.join(HERE, branding.BACKGROUND_ANIMATED)]
+DISCORD_ICON = os.path.join(HERE, branding.DISCORD_ICON)
+COFFEE_ICON = os.path.join(HERE, branding.COFFEE_ICON)
 FONTS_DIR = os.path.join(HERE, "fonts")
 # The frozen build starts at the top-level launcher, not at the package's
 # __main__: PyInstaller runs its entry script as `__main__` with no parent
@@ -149,7 +151,8 @@ def explain_antivirus_interruption() -> None:
 
 
 def release_name(platform_tag: str, ext: str) -> str:
-    """EqUpdater-v2.1.0-Windows.exe, EqUpdater-v2.1.0-Linux-x86_64.AppImage."""
+    """EqUpdater-v2.1.0-Windows-Installer.exe,
+    EqUpdater-v2.1.0-Linux-x86_64.AppImage."""
     return f"{NAME}-v{branding.APP_VERSION}-{platform_tag}{ext}"
 
 
@@ -164,7 +167,7 @@ def build_setup(app_folder: str) -> str:
             for name in files:
                 path = os.path.join(folder, name)
                 zf.write(path, os.path.relpath(path, app_folder))
-    name = release_name("Windows", "")
+    name = release_name("Windows-Installer", "")
     cmd = [sys.executable, "-m", "PyInstaller", "--onefile", "--windowed",
            "--name", name, "--noconfirm",
            "--distpath", DIST, "--workpath", os.path.join(WORK, "setup"),
@@ -248,6 +251,9 @@ def main() -> None:
     for background in BACKGROUNDS:
         if os.path.exists(background):
             cmd += ["--add-data", background + os.pathsep + "."]
+    for icon in (DISCORD_ICON, COFFEE_ICON):
+        if os.path.exists(icon):
+            cmd += ["--add-data", icon + os.pathsep + "."]
     if os.path.isdir(FONTS_DIR):
         cmd += ["--add-data", FONTS_DIR + os.pathsep + "fonts"]
 

@@ -13,7 +13,7 @@ STRINGS = {
     "ADD CUSTOM GIT ADDON": "添加自定义 GIT 插件",
     "ADDONS": "插件",
     "ANNOUNCEMENTS": "公告",
-    "API rate limit exceeded — try again in 1 hour": "超出 API 请求限制——请 1 小时后再试",
+    "API rate limit exceeded – try again in 1 hour": "超出 API 请求限制——请 1 小时后再试",
     "AVAILABLE": "可安装",
     "Add custom git addon": "添加自定义 git 插件",
     "Add game folder to Defender exclusions": "将游戏文件夹添加到 Defender 排除项",
@@ -30,17 +30,14 @@ STRINGS = {
     "Allows game sounds to play in the background.": "游戏在后台时仍播放声音。",
     "Animated background": "动态背景",
     "Announcements": "公告",
-    "Anything listed under “not being changed” stays exactly as it is. Each one can still be dealt with individually from its own tab.":
-        "“不做更改”下列出的内容将保持原样。每一项仍可在其所在的标签页中单独处理。",
     "Apply": "应用",
     "Applying tweaks…": "正在应用优化…",
     "Applying…": "正在应用…",
     "Apr": "4月",
     "Aug": "8月",
     "Auto Loot": "自动拾取",
-    "Blocked by antivirus — open Settings (⚙) → 'Add game folder to Defender exclusions', then retry":
+    "Blocked by antivirus – open Settings (⚙) → 'Add game folder to Defender exclusions', then retry":
         "被杀毒软件拦截——请打开设置（⚙）→“将游戏文件夹添加到 Defender 排除项”，然后重试",
-    "Buy Me a Coffee": "请我喝杯咖啡",
     "By {author}": "作者：{author}",
     "CAMERA": "镜头",
     "CHANGELOG": "更新日志",
@@ -55,7 +52,6 @@ STRINGS = {
     "Close the game first": "请先关闭游戏",
     "Conflicting mods": "模组冲突",
     "Could not derive addon folder name.": "无法确定插件文件夹名称。",
-    "Could not reach the addon's source": "无法连接插件的来源",
     "Could not resolve remote commit": "无法确定远程提交",
     "DOWNLOAD MIRROR": "下载服务器",
     "DXVK mod first launch": "DXVK 模组首次启动",
@@ -64,8 +60,8 @@ STRINGS = {
     "Different revision": "版本不同",
     "Different source": "来源不同",
     "Differs from source": "与来源不同",
-    "Distance at which nameplates are visible. [0 - 41]": "姓名板可见的距离。[0 - 41]",
-    "Downloaded archive is corrupted (possibly blocked by antivirus) — retry, or use Settings (⚙) → 'Add game folder to Defender exclusions'":
+    "Distance at which nameplates are visible. [0–41]": "姓名板可见的距离。[\u0001–\u0002]",
+    "Downloaded archive is corrupted (possibly blocked by antivirus) – retry, or use Settings (⚙) → 'Add game folder to Defender exclusions'":
         "下载的压缩包已损坏（可能被杀毒软件拦截）——请重试，或使用设置（⚙）→“将游戏文件夹添加到 Defender 排除项”",
     "Downloading addons…": "正在下载插件…",
     "Downloading mods…": "正在下载模组…",
@@ -77,8 +73,6 @@ STRINGS = {
     "Enable this mod only if the game doesn't detect your monitor's native resolution.\n\nVanillaMultiMonitorFix may interfere with correct resolution detection. By default, it's recommended to first try launching the game with DXVK, which may fix the resolution detection issue.\n\nEnable VanillaMultiMonitorFix only if you're actually experiencing resolution issues.":
         "仅当游戏无法识别显示器的原生分辨率时才启用此模组。\n\nVanillaMultiMonitorFix 可能会干扰分辨率的正确识别。建议先尝试用 DXVK 启动游戏，这可能就能解决分辨率识别问题。\n\n仅在确实遇到分辨率问题时才启用 VanillaMultiMonitorFix。",
     "Enables Vulkan-based rendering for improved performance.": "启用基于 Vulkan 的渲染以提升性能。",
-    "EqUpdater did not install this pack and does not know where it came from, so it cannot check it for updates. Link its source below; linking changes no files.":
-        "EqUpdater 没有安装此资源包，也不知道它的来源，因此无法检查更新。请在下方关联其来源；关联不会更改任何文件。",
     "Essential mod": "核心模组",
     "Every tweak goes back to its default value, and WoW.exe is patched with the defaults now.":
         "所有优化项都将恢复默认值，并立即用默认值修补 WoW.exe。",
@@ -100,23 +94,19 @@ STRINGS = {
     "GENERAL": "常规",
     "GRAPHICS": "图形",
     "Language": "语言",
-    "Language selection for both in-game and EqUpdater Client.":
-        "同时设置游戏和 EqUpdater 客户端的语言。",
+    "The language of the game and of EqUpdater.": "同时设置游戏和 EqUpdater 客户端的语言。",
     "Game folder changed": "游戏文件夹已更改",
-    "Grass and small rocks rendering distance. [0 - 300]": "草和小石块的渲染距离。[0 - 300]",
+    "How far grass and small rocks are drawn. [0–300]": "草和小石块的渲染距离。[\u0001–\u0002]",
     "Ground Clutter Distance": "地面细节距离",
     "INSTALLED": "已安装",
-    "INSTALLED MANUALLY": "手动安装",
     "Iceland": "冰岛",
     "Ignore speech.mpq": "忽略 speech.mpq",
     "Ignore updates": "忽略更新",
     "Ignored": "已忽略",
-    "Ignores verification and updates for speech.mpq, allowing custom speech sounds":
-        "跳过 speech.mpq 的校验和更新，以便使用自定义语音",
+    "Ignores verification and updates for speech.mpq, allowing custom speech sounds.": "跳过 speech.mpq 的校验和更新，以便使用自定义语音",
     "Increases the maximum supported texture resolution and improves memory allocation.":
         "提高支持的最大纹理分辨率，并改进内存分配。",
-    "Initial shader compilation may cause temporary in-game stuttering during the first launch. This is a normal process while the game builds its shader cache.\n\nUsers with AMD GPUs experiencing stability issues can switch to DXVK 2.5.3":
-        "首次启动时，着色器编译可能导致游戏暂时卡顿。这是游戏建立着色器缓存时的正常现象。\n\n使用 AMD 显卡且遇到稳定性问题的用户可以改用 DXVK 2.5.3",
+    "Initial shader compilation may cause temporary in-game stuttering during the first launch. This is a normal process while the game builds its shader cache.\n\nUsers with AMD GPUs experiencing stability issues can switch to DXVK 2.5.3.": "首次启动时，着色器编译可能导致游戏暂时卡顿。这是游戏建立着色器缓存时的正常现象。\n\n使用 AMD 显卡且遇到稳定性问题的用户可以改用 DXVK 2.5.3",
     "Install": "安装",
     "Install essential mods": "安装核心模组",
     "Install essential mods?": "安装核心模组？",
@@ -129,7 +119,6 @@ STRINGS = {
         "安装自与当前设定不同的仓库。",
     "Installed from a different repository than the one now recommended. Switching forks is a choice, not an update.":
         "安装自与当前推荐不同的仓库。切换分支是一种选择，而不是更新。",
-    "Installed manually": "手动安装",
     "Installed {local}; the configured source offers {remote}.": "已安装 {local}；设定的来源提供 {remote}。",
     "Installing {name}…": "正在安装 {name}…",
     "Installing…": "正在安装…",
@@ -139,7 +128,7 @@ STRINGS = {
     "Jul": "7月",
     "Jun": "6月",
     "LINK TEXTURE PACK SOURCE": "关联材质包来源",
-    "Launching...": "正在启动…",
+    "Launching…": "正在启动…",
     "Let {app} update this addon from {source}. Your current files are not changed now.":
         "让 {app} 从 {source} 更新此插件。你当前的文件现在不会被更改。",
     "Link": "关联",
@@ -157,13 +146,12 @@ STRINGS = {
     "Manage": "托管",
     "Manage {name} with {app}?": "用 {app} 托管 {name}？",
     "Mar": "3月",
-    "Matches the pack its source publishes.": "与来源发布的资源包一致。",
-    "Maximum camera zoom-out distance. [50 - 100]": "镜头最远拉远距离。[50 - 100]",
+    "Maximum camera zoom-out distance. [50–100]": "镜头最远拉远距离。[\u0001–\u0002]",
     "May": "5月",
     "Minimize {app} on game launch": "启动游戏时最小化 {app}",
     "Missing .toc file": "缺少 .toc 文件",
     "Missing dependencies: {names}": "缺少依赖：{names}",
-    "Mod errors — check MODS tab": "模组出错——请查看模组标签页",
+    "Mod errors – check the MODS tab": "模组出错——请查看模组标签页",
     "Modified locally": "本地已修改",
     "Mods marked with {star} are essential": "标有 {star} 的模组为核心模组",
     "Moving bubbles behind the window. Off shows a still image and uses less CPU.":
@@ -174,10 +162,7 @@ STRINGS = {
     "No changelog entries available.": "暂无更新日志。",
     "No1600x1200 mod may cause the game to crash on launch on some systems.\n\nVanillaMultiMonitorFix is the recommended resolution fix. Use No1600x1200 only if VanillaMultiMonitorFix doesn't solve your problem.\n\nEnable No1600x1200 anyway?":
         "在某些系统上，No1600x1200 模组可能导致游戏启动时崩溃。\n\n推荐使用 VanillaMultiMonitorFix 修复分辨率。仅当 VanillaMultiMonitorFix 无法解决问题时才使用 No1600x1200。\n\n仍要启用 No1600x1200 吗？",
-    "Not being changed:": "不做更改：",
-    "Not linked": "未关联",
     "Not versioned": "无版本",
-    "Nothing can be safely updated right now.": "目前没有可以安全更新的内容。",
     "Nothing here.": "这里没有内容。",
     "Nothing to update · {count} held back": "无需更新 · 暂缓 {count} 项",
     "Nov": "11月",
@@ -210,13 +195,11 @@ STRINGS = {
     "Reset": "重置",
     "Reset tweaks?": "重置优化项？",
     "Restart {app}?": "重启 {app}？",
-    "Reverses the auto-loot behavior to always auto-loot.": "反转自动拾取行为，始终自动拾取。",
     "Right-click to install {version} anyway.": "右键单击可仍然安装 {version}。",
     "Right-click to replace them anyway.": "右键单击可仍然替换它们。",
     "SESSION LOG": "会话日志",
     "SETTINGS": "设置",
     "SOUND": "声音",
-    "SUPPORT ME": "支持我",
     "Select game client folder": "选择游戏客户端文件夹",
     "Sep": "9月",
     "Show logs": "查看日志",
@@ -226,23 +209,19 @@ STRINGS = {
     "Source not confirmed": "来源未确认",
     "Source: not linked": "来源：未关联",
     "Source: {source}": "来源：{source}",
-    "Stop managing this addon. The files stay exactly where they are; {app} simply stops offering updates for it.":
-        "停止托管此插件。文件保持原样；{app} 只是不再为它提供更新。",
     "Switch source for {name}?": "切换 {name} 的来源？",
     "TROUBLESHOOTING": "故障排除",
     "TWEAKS": "优化",
-    "Terrain and world objects rendering distance. [100 - 10,000]": "地形和世界物体的渲染距离。[100 - 10,000]",
+    "How far terrain and world objects are drawn. [100–10,000]": "地形和世界物体的渲染距离。[\u0001–\u0002]",
     "Texture packs can be linked to a GitHub, Codeberg or OctoWoW Git repository, or to dl.octowow.st.":
         "材质包可以关联到 GitHub、Codeberg 或 OctoWoW Git 仓库，或 dl.octowow.st。",
     "That download is not an .mpq file.": "该下载不是 .mpq 文件。",
     "The current files are backed up to {backups} first.": "会先将当前文件备份到 {backups}。",
     "The files here differ from the ones EqUpdater installed.": "这里的文件与 EqUpdater 安装的不同。",
-    "The installed commit and the remote one do not contain each other - another branch, a fork, or rebased history.":
-        "已安装的提交与远程提交互不包含——可能是其他分支、分叉或改写过的历史。",
+    "The installed commit and the remote one do not contain each other – another branch, a fork, or rebased history.": "已安装的提交与远程提交互不包含——可能是其他分支、分叉或改写过的历史。",
     "The installed commit is ahead of the source's. EqUpdater will not roll it back.":
         "已安装的提交比来源的更新。EqUpdater 不会回退它。",
-    "The installed copy came from different history - another branch or fork. Its contents may differ substantially.":
-        "已安装的版本来自不同的历史——其他分支或分叉。内容可能有很大差异。",
+    "The installed copy came from different history – another branch or fork. Its contents may differ substantially.": "已安装的版本来自不同的历史——其他分支或分叉。内容可能有很大差异。",
     "The installed copy is NEWER than the source's. Replacing it is a downgrade.":
         "已安装的版本比来源的更新。替换它将是降级。",
     "The source has a different version, but whether it is newer or older than yours could not be checked.":
@@ -263,21 +242,15 @@ STRINGS = {
         "自 EqUpdater 安装或关联以来，此文件已被更改。自动更新已暂缓。",
     "This is a DOWNGRADE: {local} is installed and {remote} is what the source offers.":
         "这是降级：已安装 {local}，而来源提供的是 {remote}。",
-    "This is not the file its source publishes now. An MPQ carries no version, so it could be older, newer or edited - it is left alone. Replace installs the source's copy and keeps yours as a .bak file.":
-        "这不是来源当前发布的文件。MPQ 没有版本号，因此它可能更旧、更新或被修改过——它将保持原样。“替换”会安装来源的版本，并将你的文件保留为 .bak 文件。",
-    "Tweaks failed — check the log": "优化失败——请查看日志",
+    "This is not the file its source publishes now. An MPQ carries no version, so it could be older, newer or edited – it is left alone. Replace installs the source's copy and keeps yours as a .bak file.": "这不是来源当前发布的文件。MPQ 没有版本号，因此它可能更旧、更新或被修改过——它将保持原样。“替换”会安装来源的版本，并将你的文件保留为 .bak 文件。",
+    "Tweaks failed – check the log": "优化失败——请查看日志",
     "UPDATE": "更新",
-    "UPDATE ALL": "全部更新",
     "URL must be https from an allowed host.": "地址必须是 https，且来自允许的站点。",
     "Unable to verify": "无法验证",
-    "Unlink": "取消关联",
-    "Up to date": "已是最新",
     "Update": "更新",
-    "Update All": "全部更新",
     "Update all": "全部更新",
     "Update available!": "有可用更新！",
-    "Update failed — check the log": "更新失败——请查看日志",
-    "Updates to install: {count}": "将安装的更新：{count}",
+    "Update failed – check the log": "更新失败——请查看日志",
     "Updating game files…": "正在更新游戏文件…",
     "Updating {name}…": "正在更新 {name}…",
     "Updating…": "正在更新…",
@@ -304,8 +277,7 @@ STRINGS = {
         "自动：未找到。请安装 Wine，或设置启动命令。",
     "Environment variables":
         "环境变量",
-    "Optional. One NAME=value per line, given only to the game when PLAY starts it - for example DXVK_HUD=fps.":
-        "可选。每行一个 NAME=值，仅在 PLAY 启动游戏时传给游戏，例如 DXVK_HUD=fps。",
+    "Optional. One NAME=value per line, given only to the game when PLAY starts it – for example DXVK_HUD=fps.": "可选。每行一个 NAME=值，仅在 PLAY 启动游戏时传给游戏，例如 DXVK_HUD=fps。",
     "Line {line}: write it as NAME=value.":
         "第 {line} 行：请写成 NAME=值 的形式。",
     "Line {line}: a name starts with a letter or _ and has only letters, digits and _.":
@@ -319,8 +291,7 @@ STRINGS = {
         "选择最先响应的 OctoWoW 登录服务器和延迟最低的世界服务器。其设置和日志位于 mods 文件夹中。",
     "Sound Channels":
         "声音通道",
-    "How many sounds can play at once. More keeps sounds from cutting out in busy fights. [12 - 64]":
-        "可同时播放的声音数量。数值越大，激烈战斗中声音越不容易中断。[12 - 64]",
+    "How many sounds can play at once. More keeps sounds from cutting out in busy fights. [12–64]": "可同时播放的声音数量。数值越大，激烈战斗中声音越不容易中断。[\u0001–\u0002]",
     "OctoLogin":
         "OctoLogin",
     "dlls.txt lists {entry}, but the file is missing":
@@ -408,20 +379,19 @@ STRINGS = {
     "updates ignored": "已忽略更新",
     "{app} can install these client mods:\n\n{mods}\n\nThey are DLLs the game loads at start-up, downloaded from each mod's own release page. Nothing is installed unless you say yes.\n\nYou can change this later in Settings → Install essential mods, or pick mods one at a time on the MODS tab.\n\nInstall them now?":
         "{app} 可以安装以下客户端模组：\n\n{mods}\n\n它们是游戏启动时加载的 DLL，从各模组自己的发布页面下载。除非你同意，否则不会安装任何内容。\n\n你之后可以在 设置 → 安装核心模组 中更改，或在模组标签页中逐个选择。\n\n现在安装吗？",
-    "{app} did not install this and will not change it.": "{app} 没有安装它，也不会更改它。",
     "{app} downloads the game with aria2c, the same tool the official launcher uses.\n\nYou may be asked to allow aria2c through the firewall. You can safely reject the request, but download speeds may be slightly lower.\n\nThis message is shown only once.":
         "{app} 使用 aria2c 下载游戏，这也是官方启动器使用的工具。\n\n防火墙可能会询问是否允许 aria2c。你可以放心拒绝，但下载速度可能会稍慢。\n\n此消息只显示一次。",
     "{app} list ({file})": "{app} 列表（{file}）",
     "{app} restarts to show its text in the language you chose.\n\nRestart now?":
         "{app} 将重启，以所选语言显示界面文字。\n\n现在重启吗？",
-    "{app} — Logs": "{app} — 日志",
+    "{app} – Logs": "{app} – 日志",
     "{description} Suggested for your display: {value}.": "{description} 你的显示器建议值：{value}。",
     "{error} · showing cached content": "{error} · 正在显示缓存内容",
     "{file} will be replaced with the copy from:\n    {source}\n\nYour current file is not deleted. It is renamed to\n    {file}.<date>.bak\nin the Data folder, where the game ignores it. Rename it back to undo.\n\nReplace it?":
         "{file} 将被替换为来自以下来源的版本：\n    {source}\n\n你当前的文件不会被删除，而是在 Data 文件夹中重命名为\n    {file}.<日期>.bak\n游戏会忽略它。改回原名即可撤销。\n\n要替换吗？",
     "{font} (not installed)": "{font}（未安装）",
     "{name} ({file}) from the {app} list": "{app} 列表中的 {name}（{file}）",
-    "{name} and {other} both affect the game's resolution detection and can't be used together — only one can be active at a time.\n\nVanillaMultiMonitorFix is recommended if you experience resolution issues in the game.\n\nReplace {other} with {name}?":
+    "{name} and {other} both affect the game's resolution detection and can't be used together – only one can be active at a time.\n\nVanillaMultiMonitorFix is recommended if you experience resolution issues in the game.\n\nReplace {other} with {name}?":
         "{name} 和 {other} 都会影响游戏的分辨率识别，不能同时使用——同一时间只能启用一个。\n\n如果游戏中出现分辨率问题，推荐使用 VanillaMultiMonitorFix。\n\n用 {name} 替换 {other} 吗？",
     "{name} is already installed and {app} did not install it.\n\nManaging it means {app} may offer updates for it from the configured source. Your current files are not changed now, and a newer local build will still never be replaced automatically.\n\nManage it?":
         "{name} 已安装，但不是由 {app} 安装的。\n\n托管后，{app} 可以从设定的来源为它提供更新。你当前的文件现在不会被更改，较新的本地版本也永远不会被自动替换。\n\n要托管吗？",
@@ -563,16 +533,16 @@ STRINGS = {
         '磁盘空间不足，无法写入插件文件。',
     'Open the log for details?':
         '打开日志查看详情？',
-    'Some addons failed — see the message for details':
-        '部分插件失败——详情见提示',
+    'Some addons failed – see the message for details':
+        "部分插件失败——详情见提示",
     'The AddOns folder exists twice with different copies of this addon. Choose which to keep, then try again.':
         'AddOns 文件夹存在两份，且该插件的副本不同。请选择保留哪一份，然后重试。',
     "The addon's address is not on an allowed git host.":
         '该插件的地址不在允许的 git 托管站点上。',
     'The file from {host} is not a valid addon archive. Try again later.':
         '来自 {host} 的文件不是有效的插件压缩包。请稍后重试。',
-    "The files were blocked or removed while being written — usually antivirus. Open Settings (⚙) → 'Add game folder to Defender exclusions', then retry.":
-        '文件在写入时被拦截或删除——通常是杀毒软件所致。请打开设置 (⚙) →“将游戏文件夹加入 Defender 排除项”，然后重试。',
+    "The files were blocked or removed while being written – usually antivirus. Open Settings (⚙) → 'Add game folder to Defender exclusions', then retry.":
+        "文件在写入时被拦截或删除——通常是杀毒软件所致。请打开设置 (⚙) →“将游戏文件夹加入 Defender 排除项”，然后重试。",
     'The installed copy was left as it was.':
         '已安装的版本保持不变。',
     'The other {n} finished.':
@@ -627,8 +597,6 @@ STRINGS = {
         '粘贴该模组仓库或发行版的链接。',
     'RELEASE LINK':
         '发行版链接',
-    'Remove this custom mod':
-        '移除此自定义模组',
     'Remove {name}?':
         '移除 {name}？',
     'That is not a .dll file name EqUpdater can use.':
@@ -693,8 +661,7 @@ STRINGS = {
         '无法启动 {program}：{error}',
     '{program} stopped at once (exit code {code}).':
         '{program} 立即退出了（退出代码 {code}）。',
-    "Click to replace them with {version}, after a warning. Untick the mod and Apply to remove it.":
-        "点击可在警告后替换为 {version}。取消勾选此模组并应用即可移除。",
+    "Click to replace them with {version}. You are asked first.": "点击可在警告后替换为 {version}。取消勾选此模组并应用即可移除。",
     "Could not check the latest release: {reason}.":
         "无法检查最新版本：{reason}。",
     "EqUpdater cannot tell which version is installed now. If yours is newer, or a custom build, this replaces it with an older one.":
@@ -725,8 +692,149 @@ STRINGS = {
         "来源没有已发布的版本",
     "version unknown":
         "版本未知",
-    "Default — {file}":
-        "默认 — {file}",
+    "Default – {file}":
+        "默认 – {file}",
     "No launch files found":
         "未找到启动文件",
+    "Open repository in browser":
+        "在浏览器中打开仓库",
+    "API rate limit reached until {time}":
+        "API 速率限制已达上限，直到 {time}",
+    "Could not check the addon's source: {reason}. Your installed files are not changed.":
+        "无法检查此插件的来源：{reason}。已安装的文件未被更改。",
+    "the source lists no commits":
+        "来源中没有提交",
+    "On: looting takes everything, and Shift opens the loot window. Off: looting opens the window, and Shift takes everything. This wins over addons with an auto-loot of their own.":
+        "开启：拾取时自动拿走全部物品，按住 Shift 打开拾取窗口。关闭：拾取时打开窗口，按住 Shift 拿走全部物品。此设置优先于自带自动拾取的插件。",
+    "Cancel":
+        "取消",
+    "Check for new evidence":
+        "检查新证据",
+    "Checking for new evidence…":
+        "正在检查新证据…",
+    "Confirmed problems":
+        "已确认的问题",
+    "Coverage":
+        "覆盖范围",
+    "Crash report":
+        "崩溃报告",
+    "Deep check":
+        "深度检查",
+    "Duration":
+        "时长",
+    "Export support ZIP…":
+        "导出支持 ZIP…",
+    "Final outcome unavailable":
+        "最终结果不可用",
+    "Folder scan":
+        "文件夹扫描",
+    "GAME DIAGNOSTICS":
+        "游戏诊断",
+    "Game Diagnostics…":
+        "游戏诊断…",
+    "Handed to another program; the result cannot be verified":
+        "已交给其他程序；无法验证结果",
+    "Include MPQ archives":
+        "包含 MPQ 档案",
+    "Information":
+        "信息",
+    "Last launch":
+        "上次启动",
+    "Launch":
+        "启动",
+    "Launch blocked before anything started":
+        "在任何程序启动前被阻止",
+    "Launch history":
+        "启动记录",
+    "Launch with diagnostics":
+        "带诊断启动",
+    "No game folder is set.":
+        "未设置游戏文件夹。",
+    "No launch has been recorded yet.":
+        "尚无启动记录。",
+    "Not included:":
+        "不包含：",
+    "Observed loaded":
+        "观察到已加载",
+    "Possible conflicts":
+        "可能的冲突",
+    "Reading the client manifest…":
+        "正在读取客户端清单…",
+    "Recently changed launch files":
+        "最近更改的启动文件",
+    "Route":
+        "启动方式",
+    "Saved to {path}":
+        "已保存到 {path}",
+    "Scan OctoWoW folder":
+        "扫描 OctoWoW 文件夹",
+    "Scanning…":
+        "正在扫描…",
+    "Show last scan":
+        "显示上次扫描",
+    "Still being observed":
+        "仍在观察",
+    "Stopping…":
+        "正在停止…",
+    "The launcher exited, and WoW.exe was never observed":
+        "启动器已退出，始终未观察到 WoW.exe",
+    "The launcher is running, and WoW.exe was not observed":
+        "启动器正在运行，未观察到 WoW.exe",
+    "The launcher started and exited with an error":
+        "启动器已启动并因错误退出",
+    "The launcher started and reported a problem":
+        "启动器已启动并报告了问题",
+    "The report could not be written: {error}":
+        "无法写入报告：{error}",
+    "The scan stopped early; the results cover what it reached.":
+        "扫描提前停止；结果仅涵盖已扫描的部分。",
+    "This report will contain:":
+        "此报告将包含：",
+    "This starts the game once with extra logging, for this launch only. Your settings are not changed.":
+        "这会以额外日志启动一次游戏，仅限本次启动。你的设置不会改变。",
+    "Timeline":
+        "时间线",
+    "What happened after you pressed PLAY, a check of the game folder, and a report you can send for help.":
+        "按下“开始游戏”后发生了什么、游戏文件夹检查，以及可发送以寻求帮助的报告。",
+    "WoW.exe closed before its startup could be confirmed":
+        "WoW.exe 在确认启动前已关闭",
+    "WoW.exe closed normally":
+        "WoW.exe 已正常关闭",
+    "WoW.exe closed with an error code":
+        "WoW.exe 以错误代码关闭",
+    "WoW.exe closed; how it ended is not known":
+        "WoW.exe 已关闭；结束方式未知",
+    "WoW.exe crashed":
+        "WoW.exe 已崩溃",
+    "WoW.exe is running":
+        "WoW.exe 正在运行",
+    "Writing the report…":
+        "正在写入报告…",
+    "Your user name, folder paths and passwords are removed. Nothing is sent anywhere: you choose who gets the file.":
+        "你的用户名、文件夹路径和密码都会被移除。不会发送任何内容：由你决定把文件交给谁。",
+    "Manage what is already installed?": "管理已安装的内容?",
+    "Manage all ({count})": "全部管理({count})",
+    "{app} found {mods} mods and {addons} addons it did not install, from OctoLauncher or by hand.\n\nManaging them means {app} can update and remove them. Your current files are not changed now. Anything it cannot prove is safe to update stays as it is until you choose, and a build newer than the source's is never replaced automatically.\n\nManage them all?": "{app} 发现了 {mods} 个模组和 {addons} 个插件不是由它安装的,来自 OctoLauncher 或手动安装。\n\n交由它管理后,{app} 可以更新和移除它们。你现在的文件不会改变。无法证明可以安全更新的内容会保持原样,直到你决定;比来源更新的版本绝不会被自动替换。\n\n全部管理?",
+    "Discord": "Discord",
+    "Update all addons and mods (1 update available)": "更新所有插件和模组(有 1 个可用更新)",
+    "Update all addons and mods ({count} updates available)": "更新所有插件和模组(有 {count} 个可用更新)",
+    "Anything listed under “not being changed” stays exactly as it is. Each one can still be dealt with individually from its own tab.": "“不做更改”下列出的内容将保持原样。每一项仍可在其所在的标签页中单独处理。",
+    "Not being changed:": "不做更改：",
+    "Nothing can be safely updated right now.": "目前没有可以安全更新的内容。",
+    "Update all": "全部更新",
+    "Updates to install: {count}": "将安装的更新：{count}",
+    "Add the game folder to Defender exclusions?": "将游戏文件夹添加到 Defender 排除项?",
+    "Donate through Ko-Fi!": "通过 Ko-Fi 捐助!",
+    "Download from repository": "从仓库下载",
+    "Show less": "收起",
+    "Show more": "展开更多",
+    "Stop managing. Your files are kept.": "停止管理。你的文件会保留。",
+    "Uninstall": "卸载",
+    "Uninstall {name}?": "卸载 {name}?",
+    "{file} is deleted from the game's Data folder.": "{file} 将从游戏的 Data 文件夹中删除。",
+    "{name}'s files are deleted from the game folder and it is taken out of dlls.txt.": "{name} 的文件将从游戏文件夹中删除,并从 dlls.txt 中移除。",
+    "Try again": "重试",
+    "EqUpdater will not replace it.": "EqUpdater 不会替换它。",
+    "EqUpdater did not install this pack and does not know where it came from, so it cannot check it for updates. Linking its source changes no files.": "EqUpdater 没有安装此包,也不知道它的来源,因此无法检查更新。关联来源不会更改任何文件。",
+    "INSTALLED LOCALLY": "本地安装",
 }

@@ -12,7 +12,7 @@ STRINGS = {
     "ADD CUSTOM GIT ADDON": "EIGENES GIT-ADDON HINZUFÜGEN",
     "ADDONS": "ADDONS",
     "ANNOUNCEMENTS": "ANKÜNDIGUNGEN",
-    "API rate limit exceeded — try again in 1 hour": "API-Limit überschritten – versuche es in 1 Stunde erneut",
+    "API rate limit exceeded – try again in 1 hour": "API-Limit überschritten – versuche es in 1 Stunde erneut",
     "AVAILABLE": "VERFÜGBAR",
     "Add custom git addon": "Eigenes Git-Addon hinzufügen",
     "Add game folder to Defender exclusions": "Spielordner zu den Defender-Ausnahmen hinzufügen",
@@ -29,17 +29,14 @@ STRINGS = {
     "Allows game sounds to play in the background.": "Spielsounds werden auch im Hintergrund abgespielt.",
     "Animated background": "Animierter Hintergrund",
     "Announcements": "Ankündigungen",
-    "Anything listed under “not being changed” stays exactly as it is. Each one can still be dealt with individually from its own tab.":
-        "Alles unter „Wird nicht geändert“ bleibt genau so, wie es ist. Jeder Eintrag kann weiterhin einzeln auf seinem eigenen Tab bearbeitet werden.",
     "Apply": "Übernehmen",
     "Applying tweaks…": "Tweaks werden angewendet…",
     "Applying…": "Wird übernommen…",
     "Apr": "Apr.",
     "Aug": "Aug.",
     "Auto Loot": "Automatisch plündern",
-    "Blocked by antivirus — open Settings (⚙) → 'Add game folder to Defender exclusions', then retry":
+    "Blocked by antivirus – open Settings (⚙) → 'Add game folder to Defender exclusions', then retry":
         "Vom Virenschutz blockiert – öffne Einstellungen (⚙) → „Spielordner zu den Defender-Ausnahmen hinzufügen“ und versuche es erneut",
-    "Buy Me a Coffee": "Spendier mir einen Kaffee",
     "By {author}": "Von {author}",
     "CAMERA": "KAMERA",
     "CHANGELOG": "ÄNDERUNGEN",
@@ -54,7 +51,6 @@ STRINGS = {
     "Close the game first": "Schließe zuerst das Spiel",
     "Conflicting mods": "Unverträgliche Mods",
     "Could not derive addon folder name.": "Der Addon-Ordnername konnte nicht ermittelt werden.",
-    "Could not reach the addon's source": "Die Quelle des Addons war nicht erreichbar",
     "Could not resolve remote commit": "Der entfernte Commit konnte nicht ermittelt werden",
     "DOWNLOAD MIRROR": "DOWNLOAD-SERVER",
     "DXVK mod first launch": "Erster Start mit der DXVK-Mod",
@@ -63,8 +59,8 @@ STRINGS = {
     "Different revision": "Andere Revision",
     "Different source": "Andere Quelle",
     "Differs from source": "Weicht von der Quelle ab",
-    "Distance at which nameplates are visible. [0 - 41]": "Entfernung, bis zu der Namensplaketten sichtbar sind. [0 - 41]",
-    "Downloaded archive is corrupted (possibly blocked by antivirus) — retry, or use Settings (⚙) → 'Add game folder to Defender exclusions'":
+    "Distance at which nameplates are visible. [0–41]": "Entfernung, bis zu der Namensplaketten sichtbar sind. [0 – 41]",
+    "Downloaded archive is corrupted (possibly blocked by antivirus) – retry, or use Settings (⚙) → 'Add game folder to Defender exclusions'":
         "Das heruntergeladene Archiv ist beschädigt (möglicherweise vom Virenschutz blockiert) – versuche es erneut oder nutze Einstellungen (⚙) → „Spielordner zu den Defender-Ausnahmen hinzufügen“",
     "Downloading addons…": "Addons werden heruntergeladen…",
     "Downloading mods…": "Mods werden heruntergeladen…",
@@ -76,8 +72,6 @@ STRINGS = {
     "Enable this mod only if the game doesn't detect your monitor's native resolution.\n\nVanillaMultiMonitorFix may interfere with correct resolution detection. By default, it's recommended to first try launching the game with DXVK, which may fix the resolution detection issue.\n\nEnable VanillaMultiMonitorFix only if you're actually experiencing resolution issues.":
         "Aktiviere diese Mod nur, wenn das Spiel die native Auflösung deines Monitors nicht erkennt.\n\nVanillaMultiMonitorFix kann die korrekte Erkennung der Auflösung stören. Es wird empfohlen, das Spiel zuerst mit DXVK zu starten, was das Problem mit der Auflösungserkennung beheben kann.\n\nAktiviere VanillaMultiMonitorFix nur, wenn du tatsächlich Probleme mit der Auflösung hast.",
     "Enables Vulkan-based rendering for improved performance.": "Aktiviert Vulkan-basiertes Rendering für bessere Leistung.",
-    "EqUpdater did not install this pack and does not know where it came from, so it cannot check it for updates. Link its source below; linking changes no files.":
-        "EqUpdater hat dieses Paket nicht installiert und weiß nicht, woher es stammt, und kann daher nicht nach Updates suchen. Verknüpfe unten seine Quelle; das Verknüpfen ändert keine Dateien.",
     "Essential mod": "Wichtige Mod",
     "Every tweak goes back to its default value, and WoW.exe is patched with the defaults now.":
         "Alle Tweaks werden auf ihre Standardwerte zurückgesetzt, und WoW.exe wird jetzt mit den Standardwerten gepatcht.",
@@ -99,23 +93,19 @@ STRINGS = {
     "GENERAL": "ALLGEMEIN",
     "GRAPHICS": "GRAFIK",
     "Language": "Sprache",
-    "Language selection for both in-game and EqUpdater Client.":
-        "Sprachauswahl für das Spiel und den EqUpdater-Client.",
+    "The language of the game and of EqUpdater.": "Sprachauswahl für das Spiel und den EqUpdater-Client.",
     "Game folder changed": "Spielordner geändert",
-    "Grass and small rocks rendering distance. [0 - 300]": "Darstellungsentfernung für Gras und kleine Steine. [0 - 300]",
+    "How far grass and small rocks are drawn. [0–300]": "Darstellungsentfernung für Gras und kleine Steine. [0 – 300]",
     "Ground Clutter Distance": "Bodendetail-Entfernung",
     "INSTALLED": "INSTALLIERT",
-    "INSTALLED MANUALLY": "MANUELL INSTALLIERT",
     "Iceland": "Island",
     "Ignore speech.mpq": "speech.mpq ignorieren",
     "Ignore updates": "Updates ignorieren",
     "Ignored": "Ignoriert",
-    "Ignores verification and updates for speech.mpq, allowing custom speech sounds":
-        "Überspringt Prüfung und Updates von speech.mpq, damit eigene Sprachausgaben möglich sind",
+    "Ignores verification and updates for speech.mpq, allowing custom speech sounds.": "Überspringt Prüfung und Updates von speech.mpq, damit eigene Sprachausgaben möglich sind",
     "Increases the maximum supported texture resolution and improves memory allocation.":
         "Erhöht die maximal unterstützte Texturauflösung und verbessert die Speicherverwaltung.",
-    "Initial shader compilation may cause temporary in-game stuttering during the first launch. This is a normal process while the game builds its shader cache.\n\nUsers with AMD GPUs experiencing stability issues can switch to DXVK 2.5.3":
-        "Beim ersten Start kann das Kompilieren der Shader vorübergehend zu Rucklern im Spiel führen. Das ist normal, während das Spiel seinen Shader-Cache aufbaut.\n\nWer mit einer AMD-Grafikkarte Stabilitätsprobleme hat, kann zu DXVK 2.5.3 wechseln",
+    "Initial shader compilation may cause temporary in-game stuttering during the first launch. This is a normal process while the game builds its shader cache.\n\nUsers with AMD GPUs experiencing stability issues can switch to DXVK 2.5.3.": "Beim ersten Start kann das Kompilieren der Shader vorübergehend zu Rucklern im Spiel führen. Das ist normal, während das Spiel seinen Shader-Cache aufbaut.\n\nWer mit einer AMD-Grafikkarte Stabilitätsprobleme hat, kann zu DXVK 2.5.3 wechseln",
     "Install": "Installieren",
     "Install essential mods": "Wichtige Mods installieren",
     "Install essential mods?": "Wichtige Mods installieren?",
@@ -128,7 +118,6 @@ STRINGS = {
         "Aus einem anderen Repository installiert als dem jetzt eingestellten.",
     "Installed from a different repository than the one now recommended. Switching forks is a choice, not an update.":
         "Aus einem anderen Repository installiert als dem jetzt empfohlenen. Ein Wechsel des Forks ist eine Entscheidung, kein Update.",
-    "Installed manually": "Manuell installiert",
     "Installed {local}; the configured source offers {remote}.": "Installiert ist {local}; die eingestellte Quelle bietet {remote}.",
     "Installing {name}…": "{name} wird installiert…",
     "Installing…": "Installiere…",
@@ -138,7 +127,7 @@ STRINGS = {
     "Jul": "Juli",
     "Jun": "Juni",
     "LINK TEXTURE PACK SOURCE": "QUELLE DES TEXTURPAKETS VERKNÜPFEN",
-    "Launching...": "Wird gestartet…",
+    "Launching…": "Wird gestartet…",
     "Let {app} update this addon from {source}. Your current files are not changed now.":
         "{app} dieses Addon aus {source} aktualisieren lassen. Deine aktuellen Dateien werden jetzt nicht geändert.",
     "Link": "Verknüpfen",
@@ -156,13 +145,12 @@ STRINGS = {
     "Manage": "Verwalten",
     "Manage {name} with {app}?": "{name} mit {app} verwalten?",
     "Mar": "März",
-    "Matches the pack its source publishes.": "Entspricht dem Paket, das die Quelle veröffentlicht.",
-    "Maximum camera zoom-out distance. [50 - 100]": "Maximaler Kamera-Zoomabstand. [50 - 100]",
+    "Maximum camera zoom-out distance. [50–100]": "Maximaler Kamera-Zoomabstand. [50 – 100]",
     "May": "Mai",
     "Minimize {app} on game launch": "{app} beim Spielstart minimieren",
     "Missing .toc file": ".toc-Datei fehlt",
     "Missing dependencies: {names}": "Fehlende Abhängigkeiten: {names}",
-    "Mod errors — check MODS tab": "Mod-Fehler – siehe Tab MODS",
+    "Mod errors – check the MODS tab": "Mod-Fehler – siehe Tab MODS",
     "Modified locally": "Lokal geändert",
     "Mods marked with {star} are essential": "Mit {star} markierte Mods sind wichtig",
     "Moving bubbles behind the window. Off shows a still image and uses less CPU.":
@@ -173,10 +161,7 @@ STRINGS = {
     "No changelog entries available.": "Keine Änderungen vorhanden.",
     "No1600x1200 mod may cause the game to crash on launch on some systems.\n\nVanillaMultiMonitorFix is the recommended resolution fix. Use No1600x1200 only if VanillaMultiMonitorFix doesn't solve your problem.\n\nEnable No1600x1200 anyway?":
         "Die Mod No1600x1200 kann auf manchen Systemen das Spiel beim Start abstürzen lassen.\n\nVanillaMultiMonitorFix ist die empfohlene Lösung für die Auflösung. Nutze No1600x1200 nur, wenn VanillaMultiMonitorFix dein Problem nicht löst.\n\nNo1600x1200 trotzdem aktivieren?",
-    "Not being changed:": "Wird nicht geändert:",
-    "Not linked": "Nicht verknüpft",
     "Not versioned": "Ohne Version",
-    "Nothing can be safely updated right now.": "Im Moment kann nichts gefahrlos aktualisiert werden.",
     "Nothing here.": "Hier ist nichts.",
     "Nothing to update · {count} held back": "Nichts zu aktualisieren · {count} zurückgehalten",
     "Nov": "Nov.",
@@ -209,13 +194,11 @@ STRINGS = {
     "Reset": "Zurücksetzen",
     "Reset tweaks?": "Tweaks zurücksetzen?",
     "Restart {app}?": "{app} neu starten?",
-    "Reverses the auto-loot behavior to always auto-loot.": "Kehrt das automatische Plündern um, sodass immer automatisch geplündert wird.",
     "Right-click to install {version} anyway.": "Rechtsklick, um {version} trotzdem zu installieren.",
     "Right-click to replace them anyway.": "Rechtsklick, um sie trotzdem zu ersetzen.",
     "SESSION LOG": "SITZUNGSPROTOKOLL",
     "SETTINGS": "EINSTELLUNGEN",
     "SOUND": "SOUND",
-    "SUPPORT ME": "UNTERSTÜTZE MICH",
     "Select game client folder": "Ordner des Spielclients auswählen",
     "Sep": "Sep.",
     "Show logs": "Protokoll anzeigen",
@@ -225,23 +208,19 @@ STRINGS = {
     "Source not confirmed": "Quelle nicht bestätigt",
     "Source: not linked": "Quelle: nicht verknüpft",
     "Source: {source}": "Quelle: {source}",
-    "Stop managing this addon. The files stay exactly where they are; {app} simply stops offering updates for it.":
-        "Dieses Addon nicht mehr verwalten. Die Dateien bleiben genau, wo sie sind; {app} bietet nur keine Updates mehr dafür an.",
     "Switch source for {name}?": "Quelle für {name} wechseln?",
     "TROUBLESHOOTING": "FEHLERBEHEBUNG",
     "TWEAKS": "TWEAKS",
-    "Terrain and world objects rendering distance. [100 - 10,000]": "Darstellungsentfernung für Gelände und Weltobjekte. [100 - 10.000]",
+    "How far terrain and world objects are drawn. [100–10,000]": "Darstellungsentfernung für Gelände und Weltobjekte. [100 – 10.000]",
     "Texture packs can be linked to a GitHub, Codeberg or OctoWoW Git repository, or to dl.octowow.st.":
         "Texturpakete lassen sich mit einem GitHub-, Codeberg- oder OctoWoW-Git-Repository oder mit dl.octowow.st verknüpfen.",
     "That download is not an .mpq file.": "Dieser Download ist keine .mpq-Datei.",
     "The current files are backed up to {backups} first.": "Die aktuellen Dateien werden zuerst in {backups} gesichert.",
     "The files here differ from the ones EqUpdater installed.": "Die Dateien hier weichen von denen ab, die EqUpdater installiert hat.",
-    "The installed commit and the remote one do not contain each other - another branch, a fork, or rebased history.":
-        "Der installierte und der entfernte Commit enthalten einander nicht – ein anderer Branch, ein Fork oder eine umgeschriebene Historie.",
+    "The installed commit and the remote one do not contain each other – another branch, a fork, or rebased history.": "Der installierte und der entfernte Commit enthalten einander nicht – ein anderer Branch, ein Fork oder eine umgeschriebene Historie.",
     "The installed commit is ahead of the source's. EqUpdater will not roll it back.":
         "Der installierte Commit ist neuer als der der Quelle. EqUpdater setzt ihn nicht zurück.",
-    "The installed copy came from different history - another branch or fork. Its contents may differ substantially.":
-        "Die installierte Version stammt aus einer anderen Historie – einem anderen Branch oder Fork. Ihr Inhalt kann sich stark unterscheiden.",
+    "The installed copy came from different history – another branch or fork. Its contents may differ substantially.": "Die installierte Version stammt aus einer anderen Historie – einem anderen Branch oder Fork. Ihr Inhalt kann sich stark unterscheiden.",
     "The installed copy is NEWER than the source's. Replacing it is a downgrade.":
         "Die installierte Version ist NEUER als die der Quelle. Sie zu ersetzen ist ein Downgrade.",
     "The source has a different version, but whether it is newer or older than yours could not be checked.":
@@ -262,21 +241,15 @@ STRINGS = {
         "Diese Datei wurde geändert, seit EqUpdater sie installiert oder verknüpft hat. Automatische Updates werden zurückgehalten.",
     "This is a DOWNGRADE: {local} is installed and {remote} is what the source offers.":
         "Das ist ein DOWNGRADE: Installiert ist {local}, die Quelle bietet {remote}.",
-    "This is not the file its source publishes now. An MPQ carries no version, so it could be older, newer or edited - it is left alone. Replace installs the source's copy and keeps yours as a .bak file.":
-        "Das ist nicht die Datei, die ihre Quelle jetzt veröffentlicht. Eine MPQ hat keine Version, sie kann also älter, neuer oder bearbeitet sein – sie bleibt unverändert. „Ersetzen“ installiert die Version der Quelle und behält deine als .bak-Datei.",
-    "Tweaks failed — check the log": "Tweaks fehlgeschlagen – siehe Protokoll",
+    "This is not the file its source publishes now. An MPQ carries no version, so it could be older, newer or edited – it is left alone. Replace installs the source's copy and keeps yours as a .bak file.": "Das ist nicht die Datei, die ihre Quelle jetzt veröffentlicht. Eine MPQ hat keine Version, sie kann also älter, neuer oder bearbeitet sein – sie bleibt unverändert. „Ersetzen“ installiert die Version der Quelle und behält deine als .bak-Datei.",
+    "Tweaks failed – check the log": "Tweaks fehlgeschlagen – siehe Protokoll",
     "UPDATE": "UPDATE",
-    "UPDATE ALL": "ALLE UPDATES",
     "URL must be https from an allowed host.": "Die URL muss https sein und von einem erlaubten Host stammen.",
     "Unable to verify": "Nicht überprüfbar",
-    "Unlink": "Verknüpfung lösen",
-    "Up to date": "Aktuell",
     "Update": "Aktualisieren",
-    "Update All": "Alle aktualisieren",
     "Update all": "Alle aktualisieren",
     "Update available!": "Update verfügbar!",
-    "Update failed — check the log": "Update fehlgeschlagen – siehe Protokoll",
-    "Updates to install: {count}": "Zu installierende Updates: {count}",
+    "Update failed – check the log": "Update fehlgeschlagen – siehe Protokoll",
     "Updating game files…": "Spieldateien werden aktualisiert…",
     "Updating {name}…": "{name} wird aktualisiert…",
     "Updating…": "Aktualisiere…",
@@ -303,8 +276,7 @@ STRINGS = {
         "Automatisch: nichts gefunden. Installiere Wine oder lege einen Startbefehl fest.",
     "Environment variables":
         "Umgebungsvariablen",
-    "Optional. One NAME=value per line, given only to the game when PLAY starts it - for example DXVK_HUD=fps.":
-        "Optional. Eine Zeile pro NAME=Wert; nur das Spiel erhält sie, wenn PLAY es startet – zum Beispiel DXVK_HUD=fps.",
+    "Optional. One NAME=value per line, given only to the game when PLAY starts it – for example DXVK_HUD=fps.": "Optional. Eine Zeile pro NAME=Wert; nur das Spiel erhält sie, wenn PLAY es startet – zum Beispiel DXVK_HUD=fps.",
     "Line {line}: write it as NAME=value.":
         "Zeile {line}: Schreibe sie als NAME=Wert.",
     "Line {line}: a name starts with a letter or _ and has only letters, digits and _.":
@@ -318,8 +290,7 @@ STRINGS = {
         "Wählt den OctoWoW-Anmeldeserver, der zuerst antwortet, und den Weltserver mit dem niedrigsten Ping. Einstellungen und Protokoll liegen im Ordner mods.",
     "Sound Channels":
         "Soundkanäle",
-    "How many sounds can play at once. More keeps sounds from cutting out in busy fights. [12 - 64]":
-        "Wie viele Sounds gleichzeitig abgespielt werden können. Mehr verhindert, dass Sounds in hektischen Kämpfen abbrechen. [12 - 64]",
+    "How many sounds can play at once. More keeps sounds from cutting out in busy fights. [12–64]": "Wie viele Sounds gleichzeitig abgespielt werden können. Mehr verhindert, dass Sounds in hektischen Kämpfen abbrechen. [12 – 64]",
     "OctoLogin":
         "OctoLogin",
     "dlls.txt lists {entry}, but the file is missing":
@@ -407,20 +378,19 @@ STRINGS = {
     "updates ignored": "Updates ignoriert",
     "{app} can install these client mods:\n\n{mods}\n\nThey are DLLs the game loads at start-up, downloaded from each mod's own release page. Nothing is installed unless you say yes.\n\nYou can change this later in Settings → Install essential mods, or pick mods one at a time on the MODS tab.\n\nInstall them now?":
         "{app} kann diese Client-Mods installieren:\n\n{mods}\n\nEs sind DLLs, die das Spiel beim Start lädt, heruntergeladen von der Release-Seite der jeweiligen Mod. Es wird nichts installiert, solange du nicht zustimmst.\n\nDu kannst das später unter Einstellungen → Wichtige Mods installieren ändern oder Mods einzeln auf dem Tab MODS auswählen.\n\nJetzt installieren?",
-    "{app} did not install this and will not change it.": "{app} hat dies nicht installiert und wird es nicht ändern.",
     "{app} downloads the game with aria2c, the same tool the official launcher uses.\n\nYou may be asked to allow aria2c through the firewall. You can safely reject the request, but download speeds may be slightly lower.\n\nThis message is shown only once.":
         "{app} lädt das Spiel mit aria2c herunter, demselben Werkzeug, das der offizielle Launcher verwendet.\n\nMöglicherweise wirst du gefragt, ob aria2c durch die Firewall darf. Du kannst die Anfrage bedenkenlos ablehnen, der Download ist dann aber eventuell etwas langsamer.\n\nDieser Hinweis wird nur einmal angezeigt.",
     "{app} list ({file})": "{app}-Liste ({file})",
     "{app} restarts to show its text in the language you chose.\n\nRestart now?":
         "{app} startet neu, um seine Texte in der gewählten Sprache anzuzeigen.\n\nJetzt neu starten?",
-    "{app} — Logs": "{app} – Protokoll",
+    "{app} – Logs": "{app} – Protokoll",
     "{description} Suggested for your display: {value}.": "{description} Empfohlen für deinen Bildschirm: {value}.",
     "{error} · showing cached content": "{error} · zwischengespeicherte Inhalte werden angezeigt",
     "{file} will be replaced with the copy from:\n    {source}\n\nYour current file is not deleted. It is renamed to\n    {file}.<date>.bak\nin the Data folder, where the game ignores it. Rename it back to undo.\n\nReplace it?":
         "{file} wird ersetzt durch die Version aus:\n    {source}\n\nDeine aktuelle Datei wird nicht gelöscht. Sie wird umbenannt in\n    {file}.<Datum>.bak\nim Ordner Data, wo das Spiel sie ignoriert. Benenne sie zurück, um das rückgängig zu machen.\n\nErsetzen?",
     "{font} (not installed)": "{font} (nicht installiert)",
     "{name} ({file}) from the {app} list": "{name} ({file}) aus der {app}-Liste",
-    "{name} and {other} both affect the game's resolution detection and can't be used together — only one can be active at a time.\n\nVanillaMultiMonitorFix is recommended if you experience resolution issues in the game.\n\nReplace {other} with {name}?":
+    "{name} and {other} both affect the game's resolution detection and can't be used together – only one can be active at a time.\n\nVanillaMultiMonitorFix is recommended if you experience resolution issues in the game.\n\nReplace {other} with {name}?":
         "{name} und {other} beeinflussen beide die Auflösungserkennung des Spiels und können nicht zusammen verwendet werden – nur eine von beiden kann aktiv sein.\n\nBei Problemen mit der Auflösung im Spiel wird VanillaMultiMonitorFix empfohlen.\n\n{other} durch {name} ersetzen?",
     "{name} is already installed and {app} did not install it.\n\nManaging it means {app} may offer updates for it from the configured source. Your current files are not changed now, and a newer local build will still never be replaced automatically.\n\nManage it?":
         "{name} ist bereits installiert, aber nicht von {app}.\n\nWenn {app} es verwaltet, kann es Updates aus der eingestellten Quelle anbieten. Deine aktuellen Dateien werden jetzt nicht geändert, und eine neuere lokale Version wird nie automatisch ersetzt.\n\nVerwalten?",
@@ -562,7 +532,7 @@ STRINGS = {
         'Nicht genug Speicherplatz für die Addon-Dateien.',
     'Open the log for details?':
         'Protokoll mit Details öffnen?',
-    'Some addons failed — see the message for details':
+    'Some addons failed – see the message for details':
         'Einige Addons sind fehlgeschlagen – Details in der Meldung',
     'The AddOns folder exists twice with different copies of this addon. Choose which to keep, then try again.':
         'Den AddOns-Ordner gibt es zweimal mit unterschiedlichen Kopien dieses Addons. Wähle, welche behalten wird, und versuche es erneut.',
@@ -570,7 +540,7 @@ STRINGS = {
         'Die Adresse des Addons liegt nicht auf einem erlaubten Git-Host.',
     'The file from {host} is not a valid addon archive. Try again later.':
         'Die Datei von {host} ist kein gültiges Addon-Archiv. Versuche es später erneut.',
-    "The files were blocked or removed while being written — usually antivirus. Open Settings (⚙) → 'Add game folder to Defender exclusions', then retry.":
+    "The files were blocked or removed while being written – usually antivirus. Open Settings (⚙) → 'Add game folder to Defender exclusions', then retry.":
         'Die Dateien wurden beim Schreiben blockiert oder entfernt – meist durch einen Virenscanner. Öffne Einstellungen (⚙) → „Spielordner zu den Defender-Ausnahmen hinzufügen“ und versuche es erneut.',
     'The installed copy was left as it was.':
         'Die installierte Version wurde nicht verändert.',
@@ -626,8 +596,6 @@ STRINGS = {
         'Füge einen Link zum Repository oder Release des Mods ein.',
     'RELEASE LINK':
         'RELEASE-LINK',
-    'Remove this custom mod':
-        'Diesen eigenen Mod entfernen',
     'Remove {name}?':
         '{name} entfernen?',
     'That is not a .dll file name EqUpdater can use.':
@@ -692,8 +660,7 @@ STRINGS = {
         '{program} konnte nicht gestartet werden: {error}',
     '{program} stopped at once (exit code {code}).':
         '{program} wurde sofort beendet (Exit-Code {code}).',
-    "Click to replace them with {version}, after a warning. Untick the mod and Apply to remove it.":
-        "Klicken, um sie nach einer Warnung durch {version} zu ersetzen. Zum Entfernen die Mod abwählen und übernehmen.",
+    "Click to replace them with {version}. You are asked first.": "Klicken, um sie nach einer Warnung durch {version} zu ersetzen. Zum Entfernen die Mod abwählen und übernehmen.",
     "Could not check the latest release: {reason}.":
         "Die neueste Version konnte nicht geprüft werden: {reason}.",
     "EqUpdater cannot tell which version is installed now. If yours is newer, or a custom build, this replaces it with an older one.":
@@ -724,8 +691,149 @@ STRINGS = {
         "die Quelle hat keine veröffentlichte Version",
     "version unknown":
         "Version unbekannt",
-    "Default — {file}":
-        "Standard — {file}",
+    "Default – {file}":
+        "Standard – {file}",
     "No launch files found":
         "Keine Startdateien gefunden",
+    "Open repository in browser":
+        "Repository im Browser öffnen",
+    "API rate limit reached until {time}":
+        "API-Limit erreicht bis {time}",
+    "Could not check the addon's source: {reason}. Your installed files are not changed.":
+        "Die Quelle des Addons konnte nicht geprüft werden: {reason}. Deine installierten Dateien bleiben unverändert.",
+    "the source lists no commits":
+        "die Quelle enthält keine Commits",
+    "On: looting takes everything, and Shift opens the loot window. Off: looting opens the window, and Shift takes everything. This wins over addons with an auto-loot of their own.":
+        "An: Beim Plündern wird alles genommen, Umschalt öffnet das Beutefenster. Aus: Beim Plündern öffnet sich das Fenster, Umschalt nimmt alles. Das hat Vorrang vor Addons mit eigenem Auto-Loot.",
+    "Cancel":
+        "Abbrechen",
+    "Check for new evidence":
+        "Nach neuen Hinweisen suchen",
+    "Checking for new evidence…":
+        "Suche nach neuen Hinweisen…",
+    "Confirmed problems":
+        "Bestätigte Probleme",
+    "Coverage":
+        "Abdeckung",
+    "Crash report":
+        "Absturzbericht",
+    "Deep check":
+        "Tiefenprüfung",
+    "Duration":
+        "Dauer",
+    "Export support ZIP…":
+        "Support-ZIP exportieren…",
+    "Final outcome unavailable":
+        "Endergebnis nicht verfügbar",
+    "Folder scan":
+        "Ordnerprüfung",
+    "GAME DIAGNOSTICS":
+        "SPIELDIAGNOSE",
+    "Game Diagnostics…":
+        "Spieldiagnose…",
+    "Handed to another program; the result cannot be verified":
+        "An ein anderes Programm übergeben; das Ergebnis lässt sich nicht prüfen",
+    "Include MPQ archives":
+        "MPQ-Archive einbeziehen",
+    "Information":
+        "Information",
+    "Last launch":
+        "Letzter Start",
+    "Launch":
+        "Start",
+    "Launch blocked before anything started":
+        "Start blockiert, bevor etwas lief",
+    "Launch history":
+        "Startverlauf",
+    "Launch with diagnostics":
+        "Mit Diagnose starten",
+    "No game folder is set.":
+        "Es ist kein Spielordner festgelegt.",
+    "No launch has been recorded yet.":
+        "Es wurde noch kein Start aufgezeichnet.",
+    "Not included:":
+        "Nicht enthalten:",
+    "Observed loaded":
+        "Als geladen beobachtet",
+    "Possible conflicts":
+        "Mögliche Konflikte",
+    "Reading the client manifest…":
+        "Client-Manifest wird gelesen…",
+    "Recently changed launch files":
+        "Kürzlich geänderte Startdateien",
+    "Route":
+        "Weg",
+    "Saved to {path}":
+        "Gespeichert unter {path}",
+    "Scan OctoWoW folder":
+        "OctoWoW-Ordner prüfen",
+    "Scanning…":
+        "Prüfung läuft…",
+    "Show last scan":
+        "Letzte Prüfung zeigen",
+    "Still being observed":
+        "Wird noch beobachtet",
+    "Stopping…":
+        "Wird angehalten…",
+    "The launcher exited, and WoW.exe was never observed":
+        "Der Starter wurde beendet, WoW.exe wurde nie beobachtet",
+    "The launcher is running, and WoW.exe was not observed":
+        "Der Starter läuft, WoW.exe wurde nicht beobachtet",
+    "The launcher started and exited with an error":
+        "Der Starter lief an und wurde mit einem Fehler beendet",
+    "The launcher started and reported a problem":
+        "Der Starter lief an und meldete ein Problem",
+    "The report could not be written: {error}":
+        "Der Bericht konnte nicht geschrieben werden: {error}",
+    "The scan stopped early; the results cover what it reached.":
+        "Die Prüfung wurde vorzeitig beendet; die Ergebnisse decken nur das Erreichte ab.",
+    "This report will contain:":
+        "Dieser Bericht enthält:",
+    "This starts the game once with extra logging, for this launch only. Your settings are not changed.":
+        "Das Spiel wird einmal mit zusätzlicher Protokollierung gestartet, nur für diesen Start. Deine Einstellungen bleiben unverändert.",
+    "Timeline":
+        "Zeitverlauf",
+    "What happened after you pressed PLAY, a check of the game folder, and a report you can send for help.":
+        "Was nach dem Klick auf SPIELEN geschah, eine Prüfung des Spielordners und ein Bericht, den du für Hilfe senden kannst.",
+    "WoW.exe closed before its startup could be confirmed":
+        "WoW.exe wurde geschlossen, bevor der Start bestätigt werden konnte",
+    "WoW.exe closed normally":
+        "WoW.exe wurde normal beendet",
+    "WoW.exe closed with an error code":
+        "WoW.exe wurde mit einem Fehlercode beendet",
+    "WoW.exe closed; how it ended is not known":
+        "WoW.exe wurde geschlossen; wie es endete, ist unbekannt",
+    "WoW.exe crashed":
+        "WoW.exe ist abgestürzt",
+    "WoW.exe is running":
+        "WoW.exe läuft",
+    "Writing the report…":
+        "Bericht wird geschrieben…",
+    "Your user name, folder paths and passwords are removed. Nothing is sent anywhere: you choose who gets the file.":
+        "Dein Benutzername, Ordnerpfade und Passwörter werden entfernt. Nichts wird verschickt: Du entscheidest, wer die Datei bekommt.",
+    "Manage what is already installed?": "Bereits Installiertes verwalten?",
+    "Manage all ({count})": "Alle verwalten ({count})",
+    "{app} found {mods} mods and {addons} addons it did not install, from OctoLauncher or by hand.\n\nManaging them means {app} can update and remove them. Your current files are not changed now. Anything it cannot prove is safe to update stays as it is until you choose, and a build newer than the source's is never replaced automatically.\n\nManage them all?": "{app} hat {mods} Mods und {addons} Addons gefunden, die es nicht installiert hat – von OctoLauncher oder von Hand.\n\nWenn du sie verwalten lässt, kann {app} sie aktualisieren und entfernen. Deine Dateien werden jetzt nicht verändert. Was nicht nachweislich sicher aktualisiert werden kann, bleibt, wie es ist, bis du entscheidest, und eine neuere Version als die der Quelle wird nie automatisch ersetzt.\n\nAlle verwalten?",
+    "Discord": "Discord",
+    "Update all addons and mods (1 update available)": "Alle Addons und Mods aktualisieren (1 Update verfügbar)",
+    "Update all addons and mods ({count} updates available)": "Alle Addons und Mods aktualisieren ({count} Updates verfügbar)",
+    "Anything listed under “not being changed” stays exactly as it is. Each one can still be dealt with individually from its own tab.": "Alles unter „Wird nicht geändert“ bleibt genau so, wie es ist. Jeder Eintrag kann weiterhin einzeln auf seinem eigenen Tab bearbeitet werden.",
+    "Not being changed:": "Wird nicht geändert:",
+    "Nothing can be safely updated right now.": "Im Moment kann nichts gefahrlos aktualisiert werden.",
+    "Update all": "Alle aktualisieren",
+    "Updates to install: {count}": "Zu installierende Updates: {count}",
+    "Add the game folder to Defender exclusions?": "Spielordner zu den Defender-Ausnahmen hinzufügen?",
+    "Donate through Ko-Fi!": "Über Ko-Fi spenden!",
+    "Download from repository": "Aus dem Repository herunterladen",
+    "Show less": "Weniger anzeigen",
+    "Show more": "Mehr anzeigen",
+    "Stop managing. Your files are kept.": "Nicht mehr verwalten. Deine Dateien bleiben erhalten.",
+    "Uninstall": "Deinstallieren",
+    "Uninstall {name}?": "{name} deinstallieren?",
+    "{file} is deleted from the game's Data folder.": "{file} wird aus dem Data-Ordner des Spiels gelöscht.",
+    "{name}'s files are deleted from the game folder and it is taken out of dlls.txt.": "Die Dateien von {name} werden aus dem Spielordner gelöscht und der Eintrag aus dlls.txt entfernt.",
+    "Try again": "Erneut versuchen",
+    "EqUpdater will not replace it.": "EqUpdater ersetzt sie nicht.",
+    "EqUpdater did not install this pack and does not know where it came from, so it cannot check it for updates. Linking its source changes no files.": "EqUpdater hat dieses Paket nicht installiert und weiß nicht, woher es stammt, daher kann es nicht nach Updates suchen. Das Verknüpfen der Quelle ändert keine Dateien.",
+    "INSTALLED LOCALLY": "LOKAL INSTALLIERT",
 }

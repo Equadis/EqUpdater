@@ -159,24 +159,29 @@ class TestSplitButton(unittest.TestCase):
         self.btn._release(mock.Mock(x=up, y=10))
 
     def test_each_part_does_its_own_thing(self):
-        self.click(5)
+        self.click(125)
         self.assertEqual((self.arrow, self.play), ([1], []))
-        self.click(80)
+        self.click(5)
+        self.assertEqual((self.arrow, self.play), ([1], [1]))
+
+    def test_the_arrow_is_the_right_edge(self):
+        self.click(132 - 16)
+        self.click(132 - 17)
         self.assertEqual((self.arrow, self.play), ([1], [1]))
 
     def test_sliding_between_parts_does_nothing(self):
-        self.click(5, 80)
-        self.click(80, 5)
+        self.click(125, 80)
+        self.click(80, 125)
         self.assertEqual((self.arrow, self.play), ([], []))
 
     def test_without_a_split_all_of_it_is_the_button(self):
         self.btn.set_split()
-        self.click(5)
+        self.click(125)
         self.assertEqual((self.arrow, self.play), ([], [1]))
 
     def test_disabled_does_neither(self):
         self.btn.set_enabled(False)
-        self.click(5)
+        self.click(125)
         self.click(80)
         self.assertEqual((self.arrow, self.play), ([], []))
 

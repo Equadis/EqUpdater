@@ -93,6 +93,10 @@ def tearDownModule():
 
 
 @unittest.skipUnless(HAVE_TK, "no display")
+
+def app_tr(m, text, **kw):
+    return m.tr(text, **kw)
+
 class TestAppStarts(unittest.TestCase):
     """Build the real window against a throwaway data directory."""
 
@@ -124,6 +128,243 @@ class TestAppStarts(unittest.TestCase):
 
     def test_product_identity(self):
         self.assertEqual(self.app.title(), "EqUpdater")
+
+    def test_discord_and_coffee_sit_side_by_side_above_the_version(self):
+        c = self.app._bg_canvas
+        version = c.bbox(self.app._foot_items["version"])
+        d = c.bbox(self.app._foot_items["discord"])
+        k = c.bbox(self.app._foot_items["coffee"])
+        for box in (d, k):
+            self.assertLessEqual(box[3], version[1])     # above the version
+            self.assertLessEqual(version[1] - box[3], self.app._px(12))
+        self.assertEqual(d[3], k[3])                     # one baseline
+        self.assertLess(d[2], k[0])                      # Discord, then the cup
+        self.assertLessEqual(k[0] - d[2], self.app._px(14))
+        self.assertLessEqual(abs(k[2] - version[2]), self.app._px(2))
+        self.assertLess(k[2], self.app_mod.WIN_W)
+        # The same height, and each image's own proportions.
+        self.assertEqual(d[3] - d[1], k[3] - k[1])
+        from PIL import Image
+        for key, cands in (("discord", self.branding.discord_icon_candidates()),
+                           ("coffee", self.branding.coffee_icon_candidates())):
+            path = next(p for p in cands if os.path.exists(p))
+            with Image.open(path) as im:
+                x0, y0, x1, y1 = im.getbbox()
+            box = c.bbox(self.app._foot_items[key])
+            self.assertAlmostEqual((box[2] - box[0]) / (box[3] - box[1]),
+                                   (x1 - x0) / (y1 - y0), delta=0.12)
+
+    def test_footer_icons_hover_and_click(self):
+        from unittest import mock
+        c = self.app._bg_canvas
+        for key, tip, url in (
+                ("discord", "Discord", "https://discord.gg/QtdNpKnU72"),
+                ("coffee", "Donate through Ko-Fi!", "https://ko-fi.com/equadis")):
+            with self.subTest(icon=key):
+                item = self.app._foot_items[key]
+                rest = c.itemcget(item, "image")
+                self.fire(c, item, "<Enter>")
+                self.assertNotEqual(c.itemcget(item, "image"), rest)
+                self.assertEqual(str(c.cget("cursor")), "hand2")
+                win = self.app._foot_tips[key]
+                self.assertEqual(win.winfo_children()[0].cget("text"),
+                                 self.app_mod.tr(tip))
+                self.fire(c, item, "<Leave>")
+                self.assertEqual(c.itemcget(item, "image"), rest)
+                self.assertEqual(str(c.cget("cursor")), "")
+                self.assertNotIn(key, self.app._foot_tips)
+                with mock.patch.object(self.app_mod.platforms,
+                                       "open_url") as opened:
+                    self.fire(c, item, "<Button-1>")
+                opened.assert_called_once_with(url)
+
+    def test_footer_icons_follow_the_scale(self):
+        app, c = self.app, self.app._bg_canvas
+        before = c.bbox(app._foot_items["coffee"])
+        real = app._px
+        try:
+            app._px = lambda v: int(round(real(v) * 1.5))
+            app._layout_footer()
+            after = c.bbox(app._foot_items["coffee"])
+            self.assertGreater(after[3] - after[1], before[3] - before[1])
+        finally:
+            app._px = real
+            app._layout_footer()
+
+    def fire(self, canvas, item, seq):
+        """Run what a canvas item has bound to an event: the pointer cannot
+        be moved over it from a test."""
+        import re
+        canvas.tk.eval(re.sub(r"%[#a-zA-Z]", "0", canvas.tag_bind(item, seq)))
+
+    def mpq_folder(self, *names):
+        """A game folder holding these Data files, in use until the test ends."""
+        client = tempfile.mkdtemp(prefix="equ-mpq-", dir=self.tmp)
+        os.makedirs(os.path.join(client, "Data"))
+        for name in names:
+            with open(os.path.join(client, "Data", name), "wb") as f:
+                f.write(b"pack")
+        before = self.app._game_path.get()
+        self.app._game_path.set(client)
+        self.addCleanup(self.app._game_path.set, before)
+        self.addCleanup(self.app._render_mpq)
+        self.app._mpq_sections_open.update(INSTALLED=True, AVAILABLE=True)
+        self.app._mpq_check()
+        return client
+
+    def mpq_texts(self):
+        out = []
+
+        def walk(w):
+            for child in w.winfo_children():
+                if child.winfo_class() == "Label":
+                    out.append(child.cget("text"))
+                walk(child)
+        walk(self.app._mpq_inner)
+        return out
+
+    def test_octo_raid_visuals_absent_is_available_with_its_details(self):
+        self.mpq_folder()
+        self.assertEqual(self.app._mpq_installed_rows, [])
+        self.assertEqual([e["name"] for e in self.app._mpq_available_rows],
+                         ["Octo Raid Visuals"])
+        texts = self.mpq_texts()
+        tr = self.app_mod.tr
+        self.assertIn("Octo Raid Visuals", texts)
+        self.assertIn(tr("Install"), texts)
+        self.assertIn(tr("By {author}", author="Rook"), texts)
+        self.assertTrue(any(tr("Project page") in t for t in texts))
+
+    def test_octo_raid_visuals_installed_is_listed_once(self):
+        # Any case: the client does not care, so neither may this.
+        self.mpq_folder("Patch-O.MPQ")
+        self.assertEqual([r["file"] for r in self.app._mpq_installed_rows],
+                         ["Patch-O.MPQ"])
+        self.assertEqual(self.app._mpq_available_rows, [])
+        self.assertEqual(self.mpq_texts().count("Octo Raid Visuals"), 1)
+
+    def test_a_modified_pack_keeps_its_protection(self):
+        self.mpq_folder("patch-O.mpq")
+        row = self.app._mpq_installed_rows[0]
+        row.update(source={"kind": "catalogue"}, state="modified", update=False)
+        self.app._render_mpq()
+        texts = self.mpq_texts()
+        tr = self.app_mod.tr
+        self.assertIn(tr("Modified locally"), texts)
+        self.assertIn(tr("Replace…"), texts)
+        self.assertNotIn(tr("Update"), texts)
+        self.assertNotIn(tr("Install"), texts)
+
+    def test_every_mpq_row_has_a_divider_under_it(self):
+        self.mpq_folder("patch-L.mpq", "patch-S.mpq")
+        self.app.update()
+        kids = self.app._mpq_inner.winfo_children()
+        dividers = [w for w in kids if w.winfo_class() == "Frame"
+                    and w.cget("bg") == self.app_mod.C_DIVIDER]
+        # patch-L, patch-S (both unlinked) and the available Octo Raid Visuals.
+        self.assertEqual(len(dividers), 3)
+        for d in dividers:
+            self.assertEqual(int(d.cget("height")), self.app._px(1))
+
+    def play(self, client, spawn, diagnostic=False):
+        """Press PLAY with process creation replaced, and return the record."""
+        from unittest import mock
+        before = self.app._game_path.get()
+        self.app._game_path.set(client)
+        self.addCleanup(self.app._game_path.set, before)
+        with mock.patch.object(self.app_mod.platforms, "spawn_detached", spawn), \
+                mock.patch("tkinter.messagebox.showerror"), \
+                mock.patch.object(self.app_mod, "enforce_autoloot", lambda c: []):
+            self.app._launch_game(diagnostic=diagnostic)
+        return self.app._diag_store().recent(1)[0]
+
+    def game_folder(self, *names):
+        client = tempfile.mkdtemp(prefix="equ-play-", dir=self.tmp)
+        pe = (b"MZ" + b"\0" * 58 + (64).to_bytes(4, "little") + b"PE\0\0"
+              + (0x14c).to_bytes(2, "little") + b"\0" * 64)
+        for name in names:
+            with open(os.path.join(client, name), "wb") as f:
+                f.write(pe)
+        return client
+
+    def test_play_starts_a_detached_process_and_records_it(self):
+        from unittest import mock
+        client = self.game_folder("WoW.exe")
+        proc = mock.Mock(pid=4242)
+        proc.poll.return_value = None
+        spawn = mock.Mock(return_value=proc)
+        record = self.play(client, spawn)
+        self.assertEqual(spawn.call_count, 1)
+        self.assertEqual(os.path.basename(spawn.call_args[0][0][-1]), "WoW.exe")
+        self.assertEqual(record["processes"][0]["pid"], 4242)
+        self.assertEqual(record["route"]["target"], "WoW.exe")
+        for ob in self.app._diag_observers:
+            ob.stop()
+
+    def test_a_failed_diagnostic_record_does_not_stop_play(self):
+        from unittest import mock
+        client = self.game_folder("WoW.exe")
+        proc = mock.Mock(pid=4243)
+        proc.poll.return_value = None
+        spawn = mock.Mock(return_value=proc)
+        with mock.patch.object(self.app_mod.diagnostics, "Attempt",
+                               side_effect=OSError("disk full")), \
+                mock.patch.object(self.app_mod.platforms, "spawn_detached", spawn), \
+                mock.patch.object(self.app_mod, "enforce_autoloot", lambda c: []):
+            before = self.app._game_path.get()
+            self.app._game_path.set(client)
+            self.addCleanup(self.app._game_path.set, before)
+            self.app._launch_game()
+        self.assertEqual(spawn.call_count, 1)
+
+    def test_blocked_launches_say_where_they_stopped(self):
+        from unittest import mock
+        spawn = mock.Mock(side_effect=AssertionError("must not start"))
+        record = self.play(self.game_folder(), spawn)
+        self.assertEqual(record["outcome"], "blocked")
+        self.assertEqual(record["blocked"]["stage"], "executable")
+        error = OSError(13, "Access is denied")
+        record = self.play(self.game_folder("WoW.exe"), mock.Mock(side_effect=error))
+        self.assertEqual(record["outcome"], "blocked")
+        self.assertEqual(record["blocked"]["stage"], "process_creation")
+        self.assertIn("Access is denied", record["explanation"])
+
+    def test_diagnostics_view_opens_lists_and_starts_nothing(self):
+        from unittest import mock
+        self.play(self.game_folder(), mock.Mock())
+        spawn = mock.Mock()
+        if self.app._settings_overlay is None:
+            self.app._open_settings()
+        self.app.update()
+        with mock.patch.object(self.app_mod.platforms, "spawn_detached", spawn):
+            self.app._open_game_diagnostics()
+            self.app.update()
+            view = self.app._diag_view
+            self.assertGreaterEqual(view.listbox.size(), 1)
+            self.assertIn(self.app_mod.tr("Launch blocked before anything started"),
+                          view.text.get("1.0", "end"))
+            view.close()
+        self.assertEqual(spawn.call_count, 0)
+        self.assertIsNone(self.app._diag_view)
+        with mock.patch.object(self.app, "_prompt_av_exclusion", lambda: None):
+            self.app._close_settings()
+        self.app.update()
+
+    def test_mod_repository_links_explain_themselves(self):
+        self.app._render_mod_rows()
+        links = []
+
+        def walk(w):
+            for child in w.winfo_children():
+                if getattr(child, "_action_kind", None) == "link":
+                    links.append(child)
+                walk(child)
+        walk(self.app._mods_inner)
+        self.assertTrue(links)
+        for link in links:
+            self.assertEqual(link._tip_text,
+                             self.app_mod.tr("Open repository in browser"))
+            self.assertEqual(str(link.cget("cursor")), "hand2")
         self.assertEqual(self.app_mod.UA,
                          f"EqUpdater/{self.branding.APP_VERSION} "
                          f"Python-urllib/{sys.version_info[0]}."
@@ -319,11 +560,93 @@ class TestAppStarts(unittest.TestCase):
             app._wheel_canvases.remove(cv)
             cv.destroy()
 
-    def test_update_all_starts_faded(self):
-        """Nothing is installed in a throwaway folder, so there is nothing to
-        update and the button must not invite a click."""
-        self.app._refresh_update_all_btn()
-        self.assertFalse(self.app._all_ready)
+    def test_there_is_no_update_all_text_button(self):
+        self.assertNotIn("all", self.app._foot_items)
+        self.assertFalse(hasattr(self.app, "_all_btn"))
+
+    def updall(self, mods=0, addons=0, mode="play"):
+        app = self.app
+        app._mod_updates_count, app._addon_updates_count = mods, addons
+        app._btn_mode = mode
+        app._refresh_update_all_btn()
+        c = app._bg_canvas
+        return (c.itemcget(app._foot_items["updall"], "state"),
+                c.itemcget(app._foot_items["updall_spin"], "state"))
+
+    def test_the_update_arrow_shows_only_with_updates(self):
+        app = self.app
+        saved = (app._mod_updates_count, app._addon_updates_count, app._btn_mode)
+        try:
+            self.assertEqual(self.updall(0, 0), ("hidden", "hidden"))
+            self.assertEqual(self.updall(1, 2), ("normal", "hidden"))
+            # Right of PLAY, centred on it, PLAY where it was.
+            c = app._bg_canvas
+            arrow = c.bbox(app._foot_items["updall"])
+            play = c.bbox(app._foot_items["btn"])
+            self.assertGreater(arrow[0], play[2])
+            self.assertLess(arrow[0] - play[2], app._px(30))
+            self.assertLessEqual(abs((arrow[1] + arrow[3]) - (play[1] + play[3])),
+                                 app._px(3))
+            self.assertEqual(app._update_all_tip(), app_tr(
+                self.app_mod, "Update all addons and mods ({count} updates "
+                "available)", count=3))
+            self.updall(1, 0)
+            self.assertEqual(app._update_all_tip(), self.app_mod.tr(
+                "Update all addons and mods (1 update available)"))
+            # Something else running: not offered meanwhile.
+            self.assertEqual(self.updall(1, 0, mode="busy"), ("hidden", "hidden"))
+        finally:
+            app._mod_updates_count, app._addon_updates_count, app._btn_mode = saved
+            app._refresh_update_all_btn()
+
+    def test_the_update_arrow_spins_and_ignores_a_second_click(self):
+        from unittest import mock
+        app = self.app
+        saved = (app._mod_updates_count, app._addon_updates_count, app._btn_mode)
+        try:
+            self.updall(0, 2)
+            with mock.patch.object(app, "_update_all_preview", return_value=True), \
+                    mock.patch.object(app, "_addon_update_all", side_effect=lambda:
+                                      setattr(app, "_addons_busy", True)) as run, \
+                    mock.patch.object(app._game_path, "get", return_value="C:/game"):
+                # As _addon_apply does: busy at once, before its thread starts.
+                self.fire(app._bg_canvas, app._foot_items["updall"], "<Button-1>")
+                self.assertEqual(self.updall(0, 2, mode="busy"),
+                                 ("hidden", "normal"))
+                self.fire(app._bg_canvas, app._foot_items["updall"], "<Button-1>")
+            self.assertEqual(run.call_count, 1)
+            # Done, one failed: the arrow is back to try again.
+            app._addons_busy = False
+            self.assertEqual(self.updall(0, 1), ("normal", "hidden"))
+            self.assertFalse(app._update_all_running)
+            # Done, all installed: gone.
+            self.assertEqual(self.updall(0, 0), ("hidden", "hidden"))
+        finally:
+            app._addons_busy = False
+            app._update_all_running = False
+            app._mod_updates_count, app._addon_updates_count, app._btn_mode = saved
+            app._refresh_update_all_btn()
+
+    def test_mods_then_addons_keep_the_spinner_between_them(self):
+        from unittest import mock
+        app = self.app
+        saved = (app._mod_updates_count, app._addon_updates_count, app._btn_mode)
+        try:
+            self.updall(1, 1)
+            with mock.patch.object(app, "_update_all_preview", return_value=True), \
+                    mock.patch.object(self.app_mod.threading, "Thread"), \
+                    mock.patch.object(app._game_path, "get", return_value="C:/game"):
+                app._update_all()
+            self.assertTrue(app._update_all_chain)
+            # Between the halves nothing is busy, and the spinner stays.
+            self.assertEqual(self.updall(1, 1), ("hidden", "normal"))
+            with mock.patch.object(app, "_addon_update_all"):
+                app._chain_addon_update_all()
+            self.assertFalse(app._update_all_chain)
+        finally:
+            app._update_all_running = app._update_all_chain = False
+            app._mod_updates_count, app._addon_updates_count, app._btn_mode = saved
+            app._refresh_update_all_btn()
 
     def test_game_environment_variables_are_saved_and_checked(self):
         """Settings -> Game launcher -> Environment variables: saved as typed,
@@ -404,7 +727,8 @@ class TestAppStarts(unittest.TestCase):
                         app.update()
                         ov = app._settings_overlay
                         panel = ov.winfo_children()[0]
-                        last = find(ov, m.tr("Buy Me a Coffee"))
+                        self.assertIsNone(find(ov, m.tr("Donate through Ko-Fi!")))
+                        last = find(ov, m.tr("Game launcher…"))
                         self.assertIsNotNone(last)
                         self.assertLessEqual(bottom(last), bottom(panel))
                         self.assertIsNone(find(ov, m.tr("Environment variables")))
@@ -447,6 +771,13 @@ class TestAppStarts(unittest.TestCase):
         self.addCleanup(self.app_mod.update_config,
                         lambda c: c.pop("launch_default", None))
         app._game_path.set(folder)
+        # A ready client. An earlier PLAY test leaves a refresh due 5 s after
+        # its launch; on a slow run it lands mid-test and, with the client not
+        # ready, turns PLAY back into UPDATE, which closes the list.
+        ready = app._client_ready
+        app._client_ready = True
+        self.addCleanup(setattr, app, "_client_ready", ready)
+        app.update()
         return folder
 
     def launch_menu_reads(self):
@@ -469,7 +800,7 @@ class TestAppStarts(unittest.TestCase):
         app._toggle_launch_menu()
         app.update()
         heading, boxes = self.launch_menu_reads()
-        self.assertEqual(heading, "Default — VanillaFixes.exe")
+        self.assertEqual(heading, "Default – VanillaFixes.exe")
         self.assertEqual(boxes, {"VanillaFixes.exe": True, "WoW.exe": False,
                                  "Launch.bat": False})
 
@@ -477,7 +808,7 @@ class TestAppStarts(unittest.TestCase):
         app._choose_launch_default("Launch.bat")
         app.update()
         heading, boxes = self.launch_menu_reads()
-        self.assertEqual(heading, "Default — Launch.bat")
+        self.assertEqual(heading, "Default – Launch.bat")
         self.assertEqual(sorted(k for k, v in boxes.items() if v), ["Launch.bat"])
         self.assertEqual(self.app_mod.load_config()["launch_default"],
                          "Launch.bat")
@@ -500,12 +831,12 @@ class TestAppStarts(unittest.TestCase):
         app._refresh_launch_menu()
         app.update()
         heading, boxes = self.launch_menu_reads()
-        self.assertEqual(heading, "Default — VanillaFixes.exe")
+        self.assertEqual(heading, "Default – VanillaFixes.exe")
         self.assertNotIn("Launch.bat", boxes)
         with open(os.path.join(folder, "Launch.bat"), "wb") as f:
             f.write(b"WoW.exe")
         app._refresh_launch_menu()
-        self.assertEqual(self.launch_menu_reads()[0], "Default — Launch.bat")
+        self.assertEqual(self.launch_menu_reads()[0], "Default – Launch.bat")
 
     def test_the_play_list_follows_the_game_folder(self):
         app = self.app
@@ -541,6 +872,253 @@ class TestAppStarts(unittest.TestCase):
         app._set_btn_busy("x")
         self.assertEqual(app._upd_btn._split_w, 0)
         app._refresh_ready_state()
+
+
+
+    # ── row actions: one set of icons, each with its tooltip ─────────────────
+
+    def icons(self, root):
+        """{kind: [tooltip, ...]} of the action icons under ``root``."""
+        out = {}
+
+        def walk(w):
+            for child in w.winfo_children():
+                kind = getattr(child, "_action_kind", None)
+                if kind:
+                    out.setdefault(kind, []).append(child._tip_text)
+                walk(child)
+        walk(root)
+        return out
+
+    def mod_icons(self, mod_id):
+        refs = self.app._mod_row_vars[mod_id]
+        return self.icons(refs["name_label"].master.master)
+
+    def mods_folder(self, *files, records=None):
+        client = tempfile.mkdtemp(prefix="equ-mods-", dir=self.tmp)
+        for name in files:
+            with open(os.path.join(client, name), "wb") as f:
+                f.write(b"dll")
+        before = self.app._game_path.get()
+        m = self.app_mod
+        saved = m.load_config().get("mods")
+        self.app._game_path.set(client)
+        m.update_config(lambda c: c.__setitem__("mods", dict(records or {})))
+
+        def restore():
+            self.app._game_path.set(before)
+            m.update_config(lambda c: c.__setitem__("mods", saved)
+                            if saved is not None else c.pop("mods", None))
+            self.app._rebuild_mod_rows()
+        self.addCleanup(restore)
+        self.app._rebuild_mod_rows()
+        return client
+
+    def test_mod_rows_offer_what_applies_to_them(self):
+        m, tr = self.app_mod, self.app_mod.tr
+        self.mods_folder("nampower.dll", "VanillaFixes.exe", "VfPatcher.dll",
+                         records={"VanillaFixes": m.new_mod_record(
+                             managed=True, installed_version="v1.5.3",
+                             installed_files=["VfPatcher.dll",
+                                              "VanillaFixes.exe"])})
+        link = [tr("Open repository in browser")]
+        # Managed and here: uninstall, stop managing, the repository.
+        self.assertEqual(self.mod_icons("VanillaFixes"), {
+            "remove": [tr("Uninstall")],
+            "release": [tr("Stop managing. Your files are kept.")],
+            "link": link})
+        # Here, not managed: nothing to stop managing.
+        self.assertEqual(self.mod_icons("nampower"),
+                         {"remove": [tr("Uninstall")], "link": link})
+        # Not here: download it, or read about it.
+        self.assertEqual(self.mod_icons("ClassicAPI"), {
+            "download": [tr("Download from repository")], "link": link})
+
+    def test_uninstalling_a_mod_deletes_its_files_with_no_lookup(self):
+        from unittest import mock
+        m = self.app_mod
+        client = self.mods_folder("nampower.dll")
+        with open(os.path.join(client, "dlls.txt"), "w") as f:
+            f.write("nampower.dll\n")
+        with mock.patch("tkinter.messagebox.askyesno", return_value=True), \
+                mock.patch.object(m, "_fetch_release_cached") as lookup:
+            self.app._mod_uninstall("nampower")
+        lookup.assert_not_called()
+        self.assertFalse(os.path.exists(os.path.join(client, "nampower.dll")))
+        self.assertFalse(os.path.exists(os.path.join(client, "dlls.txt")))
+        rec = m.load_config()["mods"]["nampower"]
+        self.assertFalse(rec["managed"] or rec["enabled"])
+        self.assertEqual(self.mod_icons("nampower"),
+                         {"download": [m.tr("Download from repository")],
+                          "link": [m.tr("Open repository in browser")]})
+
+    def mod_sections(self):
+        """{section title: [mod ids]} as built, in order."""
+        out, current = {}, None
+        for w in self.app._mods_inner.winfo_children():
+            kids = w.winfo_children()
+            labels = [k for k in kids if isinstance(k, self.app_mod.tk.Label)]
+            title = next((k.cget("text") for k in labels
+                          if k.cget("text") in [self.app_mod.tr(t) for t in
+                                                self.app.MOD_SECTIONS]), None)
+            if title:
+                current = title
+                out[current] = []
+                continue
+            for mid, refs in self.app._mod_row_vars.items():
+                if refs["name_label"].winfo_toplevel() and \
+                        str(refs["name_label"]).startswith(str(w)):
+                    out[current].append(mid)
+        return out
+
+    def test_mods_are_in_three_sections_with_no_checkbox(self):
+        m, tr = self.app_mod, self.app_mod.tr
+        self.mods_folder("nampower.dll", "VanillaFixes.exe", "VfPatcher.dll",
+                         records={"VanillaFixes": m.new_mod_record(
+                             managed=True, installed_version="v1.5.3",
+                             installed_files=["VfPatcher.dll",
+                                              "VanillaFixes.exe"])})
+        sections = self.mod_sections()
+        self.assertEqual(list(sections), [tr("MANAGED"), tr("INSTALLED LOCALLY"),
+                                          tr("AVAILABLE")])
+        self.assertEqual(sections[tr("MANAGED")], ["VanillaFixes"])
+        self.assertEqual(sections[tr("INSTALLED LOCALLY")], ["nampower"])
+        self.assertIn("ClassicAPI", sections[tr("AVAILABLE")])
+        # The only checkbox left on a row is Ignore updates.
+        for refs in self.app._mod_row_vars.values():
+            row = refs["name_label"].master.master
+            boxes = [w for w in row.winfo_children()
+                     if isinstance(w, m.tk.Checkbutton)]
+            self.assertEqual(boxes, [])
+
+    def test_a_section_closes_and_a_mod_moves_when_it_is_installed(self):
+        m, tr = self.app_mod, self.app_mod.tr
+        client = self.mods_folder()
+        self.app._mod_sections_open = {"AVAILABLE": False}
+        self.addCleanup(setattr, self.app, "_mod_sections_open", {})
+        self.app._rebuild_mod_rows()
+        self.assertEqual(self.mod_sections()[tr("AVAILABLE")], [])
+        # Installed meanwhile: the row is rebuilt into MANAGED.
+        with open(os.path.join(client, "nampower.dll"), "wb") as f:
+            f.write(b"dll")
+        m.update_config(lambda c: c.setdefault("mods", {}).__setitem__(
+            "nampower", m.new_mod_record(managed=True, installed_version="v1",
+                                         installed_files=["nampower.dll"])))
+        self.app._render_mod_rows()
+        self.assertEqual(self.mod_sections()[tr("MANAGED")], ["nampower"])
+
+    def test_the_download_icon_installs_after_the_same_questions(self):
+        from unittest import mock
+        self.mods_folder()
+        # Not while something else runs; this test starts from an idle PLAY.
+        self.addCleanup(setattr, self.app, "_btn_mode", self.app._btn_mode)
+        self.app._btn_mode = "play"
+        with mock.patch.object(self.app, "_apply_mods") as apply:
+            self.app._mod_install("nampower")
+        apply.assert_called_once_with()
+        self.assertEqual(self.app._mod_pending_state["nampower"],
+                         {"enabled": True})
+        self.app._mod_pending_state.clear()
+        # Backing out of a question installs nothing.
+        with mock.patch.object(self.app, "_confirm_res_fix_toggle",
+                               return_value=False), \
+                mock.patch.object(self.app, "_apply_mods") as apply:
+            self.app._mod_install("no1600x1200")
+        apply.assert_not_called()
+        self.app._mod_pending_state.clear()
+
+    def test_ignore_updates_is_saved_at_once(self):
+        m = self.app_mod
+        self.mods_folder("nampower.dll", records={
+            "nampower": m.new_mod_record(managed=True, installed_version="v1",
+                                         installed_files=["nampower.dll"])})
+        var = m.tk.BooleanVar(master=self.app, value=True)
+        self.app._set_ignore("nampower", var)
+        self.assertTrue(m.load_config()["mods"]["nampower"]["ignore_updates"])
+        self.assertNotIn("nampower", self.app._mod_pending_state)
+        self.assertFalse(self.app._apply_btn.winfo_ismapped())
+
+    def test_declining_keeps_the_mod(self):
+        from unittest import mock
+        client = self.mods_folder("nampower.dll")
+        with mock.patch("tkinter.messagebox.askyesno", return_value=False):
+            self.app._mod_uninstall("nampower")
+        self.assertTrue(os.path.exists(os.path.join(client, "nampower.dll")))
+
+    def test_stop_managing_a_mod_keeps_its_files(self):
+        m = self.app_mod
+        client = self.mods_folder("nampower.dll", records={
+            "nampower": m.new_mod_record(managed=True, installed_version="v4.6.3",
+                                         installed_files=["nampower.dll"])})
+        self.app._mod_release("nampower")
+        rec = m.load_config()["mods"]["nampower"]
+        self.assertFalse(rec["managed"])
+        self.assertTrue(rec["released"])
+        self.assertEqual(rec["installed_files"], ["nampower.dll"])
+        self.assertTrue(os.path.exists(os.path.join(client, "nampower.dll")))
+        self.assertNotIn("release", self.mod_icons("nampower"))
+        # "Manage all" leaves it out; managing it again clears the mark.
+        self.assertNotIn("nampower", [x["id"] for x in self.app._found_mods()])
+        self.app._record_mod_adoption(next(x for x in m.MODS_REGISTRY
+                                           if x["id"] == "nampower"))
+        self.assertNotIn("released", m.load_config()["mods"]["nampower"])
+
+    def test_mpq_rows_offer_stop_managing_and_uninstall(self):
+        m, tr = self.app_mod, self.app_mod.tr
+        self.mpq_folder("patch-L.mpq")
+        icons = self.icons(self.app._mpq_inner)
+        self.assertEqual(icons, {"remove": [tr("Uninstall")]})   # not linked
+        self.assertNotIn(tr("Unlink"), " ".join(self.mpq_texts()))
+        # Linked: the grey x stops managing it.
+        self.app._mpq_installed_rows = [{
+            "file": "patch-O.mpq", "entry": m.mpq_patch_for("patch-O.mpq"),
+            "record": None, "source": m.mpq.catalogue_source("patch-O.mpq"),
+            "state": "upToDate", "update": False}]
+        self.app._render_mpq()
+        icons = self.icons(self.app._mpq_inner)
+        self.assertEqual(icons["release"],
+                         [tr("Stop managing. Your files are kept.")])
+        self.assertEqual(icons["remove"], [tr("Uninstall")])
+        self.assertNotIn(tr("Up to date"), self.mpq_texts())
+
+    def test_uninstalling_an_mpq_deletes_it(self):
+        from unittest import mock
+        client = self.mpq_folder("patch-L.mpq")
+        with mock.patch("tkinter.messagebox.askyesno", return_value=True):
+            self.app._mpq_uninstall("patch-L.mpq")
+        self.assertFalse(os.path.exists(os.path.join(client, "Data",
+                                                     "patch-L.mpq")))
+        self.assertEqual(self.app._mpq_installed_rows, [])
+
+    def test_quiet_states_draw_no_words(self):
+        """Up to date and Installed manually were noise in the right-hand
+        column; an action, a warning or a held-back state still shows."""
+        tk, tr = self.app_mod.tk, self.app_mod.tr
+        host = tk.Frame(self.app)
+        self.addCleanup(host.destroy)
+
+        def words(rec):
+            row = tk.Frame(host)
+            self.app._addon_row_status(row, rec, True, [])
+            return [w.cget("text") for w in row.winfo_children()]
+        self.assertEqual(words({"status": "upToDate"}), [])
+        self.assertEqual(words({"status": "unmanaged"}), [])
+        self.assertEqual(words({"status": "unmanaged",
+                                "suggested_git": "https://github.com/a/b"}),
+                         [tr("Manage")])
+        self.assertEqual(words({"status": "updateAvailable"}), [tr("Update")])
+
+    def test_a_tooltip_does_not_say_the_same_thing_twice(self):
+        tk, tr = self.app_mod.tk, self.app_mod.tr
+        row = tk.Frame(self.app)
+        self.addCleanup(row.destroy)
+        self.app._addon_row_status(row, {
+            "status": "unverifiable",
+            "reason": "cannot determine which is newer"}, True, [])
+        lbl = row.winfo_children()[-1]
+        self.assertEqual(lbl._tip_text, tr(
+            "Which side is newer could not be established, so nothing is "
+            "replaced."))
 
 
 @unittest.skipUnless(HAVE_TK, "no display")
@@ -612,9 +1190,11 @@ class TestPlannerReachesTheUI(unittest.TestCase):
     def test_every_addon_status_name_is_known_to_the_row(self):
         """A status the row cannot draw falls through to nothing on screen,
         which looks exactly like a working addon."""
+        # "upToDate" is drawn as nothing on purpose: an addon that is fine
+        # needs no word saying so.
         drawable = set(self.m.EqUpdaterApp._ADDON_STATES) | {
             "updateAvailable", "unmanaged", "invalid", "downloading",
-            "available"}
+            "available", "upToDate"}
         for status in self.m.ADDON_STATUS_NAMES.values():
             with self.subTest(status=status):
                 self.assertIn(status, drawable)
@@ -624,7 +1204,9 @@ class TestPlannerReachesTheUI(unittest.TestCase):
         for state in ("unmanaged", "modified", "unverifiable", "upToDate",
                       "updateAvailable", "sourceDiffers", "unconfirmed"):
             with self.subTest(state=state):
-                self.assertTrue(state == "updateAvailable"
+                # Up to date is deliberately quiet, as on an addon row.
+                self.assertTrue(state in ("updateAvailable", "upToDate",
+                                          "unmanaged")
                                 or state in self.m.EqUpdaterApp._MPQ_STATES)
 
     def test_listed_addons_are_offered_but_not_recommended(self):
@@ -969,10 +1551,10 @@ class TestAnimatedBackgroundSetting(unittest.TestCase):
         next status written over it is plain text again."""
         a, item = self.app, self.app._foot_items["status"]
         opened = []
-        a._status_error("Tweaks failed — check the log",
+        a._status_error("Tweaks failed – check the log",
                         lambda: opened.append(1))
         self.assertEqual(a._bg_canvas.itemcget(item, "text"),
-                         "Tweaks failed — check the log \u2192")
+                         "Tweaks failed – check the log \u2192")
         a._status_hover(True)
         self.assertEqual(a._bg_canvas.itemcget(item, "fill"), self.m.C_GOLD)
         a._status_click()

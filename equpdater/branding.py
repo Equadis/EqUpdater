@@ -25,7 +25,7 @@ APP_TITLE = "EqUpdater"
 #: release carries a fourth, raised for every such build (2.0.6.1, 2.0.6.2,
 #: ...), so a tester can tell builds apart: it shows in the window, the log
 #: and the file names, and still sorts after 2.0.6 and before 2.1.0.
-APP_VERSION = "2.1.3"
+APP_VERSION = "2.1.4"
 
 #: Upstream, for the About box and the attribution the licence requires.
 #: EqUpdater is a substantially reworked derivative of Octo Updater; see
@@ -118,6 +118,14 @@ def icon_candidates() -> list:
 BACKGROUND_STATIC = "pubbles.png"
 BACKGROUND_ANIMATED = "bubbles.gif"
 
+#: The community's Discord: the invite, and the logo on the button for it.
+DISCORD_URL = "https://discord.gg/QtdNpKnU72"
+DISCORD_ICON = "discord.png"
+#: Donations through Ko-fi, the cup in the footer beside Discord. The address is the one the
+#: Settings entry it replaces opened.
+KOFI_URL = "https://ko-fi.com/equadis"
+COFFEE_ICON = "coffee.png"
+
 
 def _asset_candidates(name: str) -> list:
     """Where a bundled (frozen) or source-tree asset may live."""
@@ -132,6 +140,16 @@ def _asset_candidates(name: str) -> list:
 def background_candidates() -> list:
     """Where the static bubble background may live."""
     return _asset_candidates(BACKGROUND_STATIC)
+
+
+def discord_icon_candidates() -> list:
+    """Where the Discord logo may live."""
+    return _asset_candidates(DISCORD_ICON)
+
+
+def coffee_icon_candidates() -> list:
+    """Where the Ko-fi cup may live."""
+    return _asset_candidates(COFFEE_ICON)
 
 
 def animated_background_candidates() -> list:

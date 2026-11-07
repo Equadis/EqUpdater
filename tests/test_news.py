@@ -897,13 +897,12 @@ class TestNewPosts(unittest.TestCase):
         self.assertFalse(new("", self.day(1), now))
         self.assertTrue(new("2026-10-28T08:00:00", None, now))   # no offset
 
-    def test_the_line_goes_under_the_oldest_of_several(self):
+    def test_marks_are_the_new_posts(self):
         items = [{"id": str(d), "date": self.iso(d)} for d in (29, 24, 23, 12)]
-        marks = self.app.news_marks(items, self.day(20), self.day(30))
-        self.assertEqual(marks, {"29": (True, False), "24": (True, False),
-                                 "23": (True, True)})
-        one = self.app.news_marks(items, self.day(25), self.day(30))
-        self.assertEqual(one, {"29": (True, False)})
+        self.assertEqual(self.app.news_marks(items, self.day(20), self.day(30)),
+                         {"29", "24", "23"})
+        self.assertEqual(self.app.news_marks(items, self.day(25), self.day(30)),
+                         {"29"})
 
 
 class TestAnnouncementsList(unittest.TestCase):
@@ -1159,10 +1158,10 @@ class TestAnnouncementsList(unittest.TestCase):
         self.assertEqual(st["rows"], {})
         self.assertIsNone(st["open"])
 
-    def test_new_posts_say_so_with_a_line_under_the_oldest(self):
-        """Posts since the Changelog was last read are NEW!; the oldest of
-        them has the red line under it; the launch's last-read time holds
-        all session (a read moves it on for the next launch only)."""
+    def test_new_posts_say_so_with_ordinary_dividers(self):
+        """Posts since the Changelog was last read are NEW!; no row's divider
+        marks where they end; the launch's last-read time holds all session
+        (a read moves it on for the next launch only)."""
         from datetime import datetime, timezone
         from unittest import mock
         ts = lambda d: datetime(2026, 10, d, tzinfo=timezone.utc).timestamp()
@@ -1180,11 +1179,12 @@ class TestAnnouncementsList(unittest.TestCase):
                 self.assertEqual([rows[i]["badge"].winfo_ismapped()
                                   for i in ("3100", "3087", "3074", "2902")],
                                  [1, 1, 1, 0])
-                self.assertEqual([rows[i]["divider"].cget("bg")
-                                  for i in ("3100", "3074", "2902")],
-                                 [self.m.C_DIVIDER, self.m.C_NEW,
-                                  self.m.C_DIVIDER])
-                # Read on the 25th: only the 28th is new -- alone, no line.
+                for i in ("3100", "3087", "3074", "2902"):
+                    self.assertEqual(rows[i]["divider"].cget("bg"),
+                                     self.m.C_DIVIDER)
+                    self.assertEqual(int(rows[i]["divider"].cget("height")),
+                                     self.app._px(1))
+                # Read on the 25th: only the 28th is new.
                 self.app._news_seen_before["patch"] = ts(25)
                 self.app._patch_toggle("3087")
                 self.app.update()
@@ -1215,3 +1215,92 @@ class TestAnnouncementsList(unittest.TestCase):
         self.app._render_patch_notes(items)            # a refresh keeps it
         self.assertEqual([r[1] for r in self.entries("patch")[0]],
                          [False, False, True])
+
+    # ── the Changelog's long entries, and headers that stay in view ──────────
+
+    def long_items(self, lines=120):
+        body = "\n".join(f"Line {n} of the patch notes." for n in range(lines))
+        return [{"id": str(t), "title": f"Patch {t}", "author": "Archer",
+                 "date": "2026-10-24T08:00:00+00:00", "body": body,
+                 "html": "", "url": news.topic_url(t)} for t in (3, 2, 1)]
+
+    def text_and_toggle(self, iid="3"):
+        self.app.update()
+        body = self.app._acc_lists["patch"]["rows"][iid]["body"]
+        txt = next(w for w in body.winfo_children()
+                   if isinstance(w, self.m.tk.Text))
+        toggle = [w for w in body.winfo_children()
+                  if isinstance(w, self.m.tk.Label) and w.winfo_manager()
+                  and w.cget("text") in (self.m.tr("Show more"),
+                                         self.m.tr("Show less"))]
+        return txt, toggle
+
+    def test_a_long_changelog_entry_shows_more_and_less(self):
+        self.app._patch_open = None
+        self.app._render_patch_notes(self.long_items())
+        txt, toggle = self.text_and_toggle()
+        limit = self.m.EqUpdaterApp.CHANGELOG_PREVIEW_LINES
+        self.assertEqual(int(txt.cget("height")), limit)
+        self.assertEqual([t.cget("text") for t in toggle], [self.m.tr("Show more")])
+        toggle[0].event_generate("<Button-1>")
+        txt, toggle = self.text_and_toggle()
+        self.assertGreaterEqual(int(txt.cget("height")), 120)
+        self.assertEqual([t.cget("text") for t in toggle], [self.m.tr("Show less")])
+        toggle[0].event_generate("<Button-1>")
+        txt, toggle = self.text_and_toggle()
+        self.assertEqual(int(txt.cget("height")), limit)
+
+    def test_a_short_changelog_entry_has_neither(self):
+        self.app._patch_open = None
+        self.app._render_patch_notes(self.long_items(lines=3))
+        txt, toggle = self.text_and_toggle()
+        self.assertEqual(toggle, [])
+        self.assertLess(int(txt.cget("height")),
+                        self.m.EqUpdaterApp.CHANGELOG_PREVIEW_LINES)
+
+    def test_an_open_entrys_header_stays_in_view_and_closes_it(self):
+        self.app._patch_open = None
+        self.app._render_patch_notes(self.long_items())
+        self.text_and_toggle()[1][0].event_generate("<Button-1>")   # all of it
+        lst = self.app._acc_lists["patch"]
+        canvas = self.app._acc_canvas["patch"]
+        self.app.update()
+        self.assertIsNone(lst.get("pinned"))              # header is in view
+        canvas.yview_moveto(0.3)                          # into its text
+        self.app.update()
+        pin = lst["pin"]
+        self.assertEqual(lst["pinned"], "3")
+        self.assertTrue(pin.winfo_ismapped())
+        self.assertEqual(pin._title.cget("text"), "Patch 3")
+        self.assertTrue(pin._byline.cget("text").endswith("▴"))
+        # Inside the list, at its top, not over the scrollbar.
+        self.assertEqual(pin.winfo_rooty(), canvas.winfo_rooty())
+        self.assertLessEqual(pin.winfo_rootx() + pin.winfo_width(),
+                             canvas.winfo_rootx() + canvas.winfo_width())
+        # A click closes it there and then, and the header is back in view.
+        pin._title.event_generate("<Button-1>")
+        self.app.update()
+        self.assertNotIn("3", self.app._patch_open)
+        self.assertFalse(pin.winfo_ismapped())
+        self.assertLessEqual(canvas.canvasy(0),
+                             lst["rows"]["3"]["entry"].winfo_y())
+
+    def test_no_header_is_pinned_past_its_own_entry(self):
+        """Two long entries open: scrolled into the second, the second's
+        header is the one in view, not the first's."""
+        self.app._patch_open = None
+        self.app._render_patch_notes(self.long_items())
+        self.app._patch_toggle("2")
+        for iid in ("3", "2"):
+            self.text_and_toggle(iid)[1][0].event_generate("<Button-1>")
+        lst = self.app._acc_lists["patch"]
+        canvas = self.app._acc_canvas["patch"]
+        self.app.update()
+        canvas.yview_moveto(0.25)
+        self.app.update()
+        self.assertEqual(lst["pinned"], "3")
+        canvas.yview_moveto(0.85)
+        self.app.update()
+        self.assertEqual(lst["pinned"], "2")
+        self.assertEqual(lst["pin"]._title.cget("text"), "Patch 2")
+

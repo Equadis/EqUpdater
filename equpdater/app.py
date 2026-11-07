@@ -42,7 +42,8 @@ from functools import cache
 import tkinter as tk
 from tkinter import filedialog
 
-from . import branding, gamepaths, i18n, logindoctor, mpq, octolauncher, platforms
+from . import (branding, diagnostics, gamepaths, gitlocal, i18n, logindoctor,
+               lootgate, mpq, octolauncher, platforms)
 from .i18n import N_, tr
 from .config import (APP_DATA_DIR, BACKUP_DIR, CONFIG_FILE, bootstrap_config,
                      ensure_dir, load_config, new_addon_record,
@@ -99,6 +100,24 @@ NEWS_CHANGELOG_COUNT = 8
 # unit instead of point-fonts overflowing fixed geometry on high-DPI displays.
 WIN_W, WIN_H = 1000, 700
 FOOT_H       = 130
+#: The footer's link icons (Discord, Ko-fi): height in design
+#: pixels, the gap between them, and how opaque they rest. Under the cursor
+#: they are fully white, which is the whole hover effect.
+FOOTER_ICON_H = 22
+FOOTER_ICON_GAP = 10
+FOOTER_ICON_REST = 0.86
+#: The update-all arrow beside PLAY, and its colour under the cursor.
+UPDALL_COLOR = "#cda348"
+UPDALL_HOVER = "#dfb95f"
+UPDALL_ICON_H = 24
+#: The arrow is coloured like the UPDATE ALL button it replaced: that
+#: button's gradient (top, bottom), resting and under the cursor, its 1 px
+#: border, and the 2 px glow around it.
+UPDALL_FILL = (("#cda348", "#ad7f2d"), ("#dfb95f", "#c29036"))
+UPDALL_BORDER = ("#d6b160", "#eed185")
+UPDALL_GLOW = "#6d5524"
+#: How opaque the arrow rests; under the cursor it is solid.
+UPDALL_REST = 0.80
 
 # Dark underwater palette tuned against the bubble artwork.  The artwork is the
 # visual identity; panels stay deliberately restrained so text remains legible.
@@ -117,13 +136,7 @@ C_LOG_BG     = "#041027"
 C_OK         = "#79bf73"
 C_ERR        = "#d17a7a"
 C_MOD_HL     = "#a8b83c"
-C_NEW        = "#ff3b3b"     # NEW! on a News post, and the line under the new ones
-
-# With nothing to update, UPDATE ALL is the same gold button faded 70%
-# towards the background -- still recognisably itself, not a grey slab.
-UPDALL_FADE     = 0.70
-UPDALL_GLOW_ON  = "#6d5524"
-UPDALL_GLOW_OFF = blend(UPDALL_GLOW_ON, C_BG, UPDALL_FADE)
+C_NEW        = "#ff3b3b"     # NEW! on a News post
 
 PLAY_GRADIENT = GradientPalette(
     top="#4d8049", bottom="#396637",
@@ -135,12 +148,6 @@ UPDATE_GRADIENT = GradientPalette(
     hover_top="#e0ba62", hover_bottom="#c7963b",
     disabled_top="#28354a", disabled_bottom="#1c293d",
     border="#e0bd6d", hover_border="#f0d18a")
-UPDATE_ALL_GRADIENT = GradientPalette(
-    top="#cda348", bottom="#ad7f2d",
-    hover_top="#dfb95f", hover_bottom="#c29036",
-    disabled_top="#26344a", disabled_bottom="#19273a",
-    border="#d6b160", hover_border="#eed185",
-    disabled_fade=UPDALL_FADE)
 BUSY_GRADIENT = GradientPalette(
     top="#293a53", bottom="#1b2a40",
     hover_top="#293a53", hover_bottom="#1b2a40",
@@ -245,8 +252,8 @@ def _check_url(url: str, allowed_hosts):
 class _HttpsOnlyRedirectHandler(urllib.request.HTTPRedirectHandler):
     """Require every redirect target to stay HTTPS (blocks an https→http
     downgrade). The host allowlist is deliberately *not* re-applied on
-    redirects: an allowlisted host controls its own redirects — legitimately
-    to its CDN (e.g. octowow.st→dl.octowow.st, github.com→codeload) — and TLS
+    redirects: an allowlisted host controls its own redirects – legitimately
+    to its CDN (e.g. octowow.st→dl.octowow.st, github.com→codeload) – and TLS
     protects wherever it lands. The allowlist's job is to vet the *initial*
     URL (against a tampered API response), which secure_urlopen still does."""
     def redirect_request(self, req, fp, code, msg, headers, newurl):
@@ -497,7 +504,7 @@ def fetch_torrent(url: str = CLIENT_TORRENT_URL) -> tuple:
 
 
 def torrent_version(raw: bytes) -> str:
-    """SHA-1 of the whole .torrent file — the client 'version'. Changes whenever
+    """SHA-1 of the whole .torrent file – the client 'version'. Changes whenever
     the torrent is re-rolled, so it's what we compare to detect a new build and
     decide whether aria2's resume state is stale. An occasional re-check when
     only the announce/date changed (content unchanged) is harmless."""
@@ -507,7 +514,7 @@ def torrent_version(raw: bytes) -> str:
 @cache
 def _torrent_excluded_files() -> frozenset:
     """Lower-cased basenames of every file the Mods tab installs, across all
-    mods — the client-root files the torrent sync leaves to the mod system.
+    mods – the client-root files the torrent sync leaves to the mod system.
 
     The torrent ships several of them (VfPatcher.dll, nampower.dll, d3d9.dll,
     …), but the Mods tab is the single source of truth for installing /
@@ -526,7 +533,7 @@ def _is_torrent_excluded(parts) -> bool:
 
 def _torrent_skip(parts, ignore_speech: bool, client_dir: str) -> bool:
     """Files the sync must leave alone: mod-owned client-root files, plus a
-    speech.MPQ the user opted to keep (Settings) — but only when it already
+    speech.MPQ the user opted to keep (Settings) – but only when it already
     exists on disk. A missing speech.MPQ is still downloaded so a clean client
     can launch; 'ignore' protects a custom copy, it doesn't skip a required file
     that isn't there."""
@@ -590,7 +597,7 @@ def unshield_protected_files(shielded) -> list:
 
 def recover_protected_files(client_dir: str, files):
     """Undo a shield interrupted by a crash: an orphaned '.octobak' beside a
-    torrent file is the real file — move it back into place."""
+    torrent file is the real file – move it back into place."""
     for parts, _length in files:
         p   = os.path.join(client_dir, *parts)
         bak = p + _SHIELD_SUFFIX
@@ -631,7 +638,7 @@ def torrent_selection(client_dir: str, files, drop_mismatched=False,
 def torrent_all_selection(client_dir: str, files, ignore_speech=False) -> list:
     """1-indexed list of every non-mod file in the torrent. Used for an
     integrity pass: aria2 --check-integrity verifies each selected file's piece
-    hashes and re-downloads only the bad/missing pieces — catching same-size but
+    hashes and re-downloads only the bad/missing pieces – catching same-size but
     corrupted files that the size-based torrent_selection can't."""
     return [i + 1 for i, (parts, _) in enumerate(files)
             if not _torrent_skip(parts, ignore_speech, client_dir)]
@@ -979,7 +986,7 @@ def run_aria2c(client_dir, select_files=None, check_integrity=False,
     on_progress(dict) per update and should_cancel()->bool to abort.
 
     aria2 is handed the .torrent URL (not a local copy), so it always fetches
-    the server's current torrent at download time — no chance of running a stale
+    the server's current torrent at download time – no chance of running a stale
     local .torrent if the user starts the update long after the verify."""
     global _active_aria2
     exe     = ensure_aria2c(log_fn)
@@ -1179,8 +1186,8 @@ class UpdateWorker:
             ("nameplateRange",        "float",  0x40c448,  nameplate),
             ("soundInBackground",     "int8",   0x3a4869,  snd_bg),
             ("alwaysAutoLoot", "bytes", None, [
-                (0x0c1ecf, bytes([0x75 if always_loot else 0x74])),
-                (0x0c2b25, bytes([0x75 if always_loot else 0x74])),
+                (off, bytes([lootgate.JNZ if always_loot else lootgate.JZ]))
+                for off in lootgate.AUTOLOOT_OFFSETS
             ]),
             # cameraSkipFix is baked into the torrent's WoW.exe, so we don't
             # apply it. skillUiGateHijack and octowowUrlAllowlist below are
@@ -1241,6 +1248,12 @@ class UpdateWorker:
         with open(exe, "wb") as f:
             f.write(buf)
         self.log("WoW.exe patched.", "ok")
+        # The other half of Auto Loot: without it an addon can undo the bytes
+        # just written. See equpdater/lootgate.py.
+        try:
+            lootgate.install(writable_addons_path(self.out_dir))
+        except Exception as e:
+            self.log(f"Could not install the Auto Loot gate addon: {e}", "err")
 
     def run(self):
         # The selection is recomputed here from the live torrent so an
@@ -1368,7 +1381,7 @@ class UpdateWorker:
             self.progress(1.0, N_("Verifying…"))
             if not torrent_tree_intact(self.out_dir, files,
                                        ignore_speech=ignore_speech):
-                self.log("\n✗  Download incomplete — click Update to finish.", "err")
+                self.log("\n✗  Download incomplete – click Update to finish.", "err")
                 self.log_q.put(("__ERROR__", ""))
                 return
 
@@ -1386,7 +1399,7 @@ class UpdateWorker:
                 self.progress(1.0, N_("Patching…"))
                 self.patch_exe()
             else:
-                self.log("\nWoW.exe unchanged — skipping patch.", "dim")
+                self.log("\nWoW.exe unchanged – skipping patch.", "dim")
 
             self.progress(1.0, "")
             self.log("\n✓  Everything is up to date!", "ok")
@@ -1406,7 +1419,7 @@ class UpdateWorker:
 
 def write_config_wtf(client_dir: str, tweaks: dict | None = None):
     """Write a fresh Config.wtf from scratch, overwriting any existing one.
-    Never raises — logs the error if the file can't be written (read-only,
+    Never raises – logs the error if the file can't be written (read-only,
     locked by a running game, or an unwritable folder)."""
     if tweaks is None:
         tweaks = load_tweaks_config()
@@ -1751,6 +1764,9 @@ MODS_REGISTRY = [
         "installed_files": ["VanillaMultiMonitorFix.dll",
                             "VMMFix_preferred_monitor.txt",
                             "ShowAllDisplayDevices.exe"],
+        # The DLL is the mod. OctoLauncher installs only that, and the text
+        # file is the player's to edit.
+        "core_files":      ["VanillaMultiMonitorFix.dll"],
     },
     {
         "id":          "no1600x1200",
@@ -1946,7 +1962,7 @@ def _release_latest(src: dict, raise_errors: bool = False) -> dict | None:
 
 
 def _release_version(mod: dict, rel: dict) -> str | None:
-    """Version string for a github/codeberg release. Normally the tag name —
+    """Version string for a github/codeberg release. Normally the tag name –
     but some mods (e.g. SuperWoW) keep a static tag and edit the release in
     place, so their tag never changes. For those, derive the version from the
     matched asset instead: its filename embeds the real version."""
@@ -2183,6 +2199,9 @@ def identify_installed_release(mod: dict, files: list, client_dir: str,
         written = install_mod(dict(mod), scratch, release=rel)
         theirs = {w.lower(): _sha256_file(os.path.join(scratch, w))
                   for w in written}
+        core = {f.lower() for f in mod.get("core_files") or []}
+        if core:
+            return all(k in local and theirs.get(k) == local[k] for k in core)
         return bool(theirs) and theirs == local
     except Exception as e:
         log(f"  Could not compare {mod['name']}: {describe_install_error(e)}")
@@ -3053,15 +3072,24 @@ def mod_supports_update_check(mod: dict) -> bool:
 
 
 def mod_files_on_disk(mod: dict, client_dir: str) -> bool:
-    """Whether this mod's *registry-declared* files are all present.
+    """Whether the files that identify this mod are all present.
 
     Distinct from `mod_installed_files_present`, which asks about the files a
     previous install recorded. This one answers "is something that looks like
     this mod already here" for a client EqUpdater has never touched -- the
-    first-run discovery question."""
-    files = mod.get("installed_files") or []
+    first-run discovery question. `core_files` is for a mod whose other files
+    are optional: without it, VanillaMultiMonitorFix as OctoLauncher installs
+    it read as not installed, and ticking it wrote over the DLL unasked."""
+    files = mod.get("core_files") or mod.get("installed_files") or []
     return bool(files) and all(
         os.path.exists(os.path.join(client_dir, f)) for f in files)
+
+
+def mod_found_files(mod: dict, client_dir: str) -> list:
+    """The files of this mod actually here: what a record of files found on
+    disk should name. A file it never had is not one it has lost."""
+    return [f for f in mod.get("installed_files") or []
+            if os.path.exists(os.path.join(client_dir, f))]
 
 
 def mod_component(mod: dict, state: dict, live: dict | None,
@@ -3109,7 +3137,11 @@ def mod_component(mod: dict, state: dict, live: dict | None,
     return Component(
         id=mod["id"], kind="mod", name=mod.get("name") or mod["id"],
         installed=installed, managed=managed,
-        enabled=bool(state.get("enabled", False)),
+        # Unticked means "EqUpdater, leave this out". It cannot describe files
+        # EqUpdater never owned: those read "disabled" with nothing to click,
+        # when first-run discovery had not recorded them. Not managed is the
+        # truth, and it comes with the way in.
+        enabled=bool(state.get("enabled", False)) or (installed and not managed),
         ignore_updates=bool(state.get("ignore_updates", False)),
         files_present=present,
         installed_version=installed_ver,
@@ -3692,8 +3724,18 @@ def _describe_net_error(e: Exception) -> str:
     """Human-readable cause for a failed API request."""
     import urllib.error
     if isinstance(e, urllib.error.HTTPError):
-        if e.code == 403:
-            return N_("API rate limit exceeded — try again in 1 hour")
+        headers = e.headers or {}
+        limited = (headers.get("X-RateLimit-Remaining") == "0"
+                   or bool(headers.get("Retry-After")))
+        if e.code == 429 or (e.code == 403 and limited):
+            reset = headers.get("X-RateLimit-Reset")
+            if str(reset or "").isdigit():
+                return tr("API rate limit reached until {time}",
+                          time=time.strftime("%H:%M", time.localtime(int(reset))))
+            return N_("API rate limit exceeded – try again in 1 hour")
+        if e.code == 403 and "X-RateLimit-Remaining" not in headers \
+                and "api.github.com" in (e.url or ""):
+            return N_("API rate limit exceeded – try again in 1 hour")
         if e.code == 404:
             return N_("repository or branch not found")
         host = (e.url or "").split("/")[2] if (e.url or "").count("/") >= 2 \
@@ -3714,11 +3756,11 @@ def describe_install_error(e: Exception) -> str:
             and getattr(e, "errno", None) in (2, 13, 22)):
         # The archive/file vanished or got locked mid-operation — on Windows
         # that's almost always the antivirus quarantining the download.
-        return N_("Blocked by antivirus — open Settings (⚙) → "
+        return N_("Blocked by antivirus – open Settings (⚙) → "
                   "'Add game folder to Defender exclusions', then retry")
     if isinstance(e, zipfile.BadZipFile):
         return N_("Downloaded archive is corrupted (possibly blocked by "
-                  "antivirus) — retry, or use Settings (⚙) → "
+                  "antivirus) – retry, or use Settings (⚙) → "
                   "'Add game folder to Defender exclusions'")
     return str(e)
 
@@ -3759,7 +3801,7 @@ ADDON_FAILURES = {
     "source": N_("The addon's address is not on an allowed git host."),
     "no_space": N_("Not enough disk space to write the addon files."),
     "permission": N_("No permission to write to the AddOns folder."),
-    "antivirus": N_("The files were blocked or removed while being written — "
+    "antivirus": N_("The files were blocked or removed while being written – "
                     "usually antivirus. Open Settings (⚙) → 'Add game "
                     "folder to Defender exclusions', then retry."),
     "write": N_("Could not write the addon files ({error})."),
@@ -3859,16 +3901,76 @@ def addon_failure(e: BaseException, url: str | None = None) -> tuple:
     return out("unknown", error=text or type(first).__name__)
 
 
+#: Why the last look at an addon's source failed: {cache key: reason}.
+#: Cleared by the next look that succeeds. A failure is never cached, so the
+#: next look -- any verify, or the row's "can't check" -- asks again.
+ADDON_LOOKUP_FAILURES: dict = {}
+
+#: Most of a ref advertisement read while looking for a pinned branch or tag.
+_GIT_REFS_MAX = 4 * 1024 * 1024
+
+
+def _git_refs_sha(repo_url: str, pin=None) -> str | None:
+    """The latest commit of the default branch (or ``pin``), from git's own
+    ref advertisement: what ``git ls-remote`` reads.
+
+    GitHub's REST API allows an address 60 requests an hour, shared by every
+    addon, every mod release check and anyone else behind that address.
+    Twenty addons and a few refreshes use it up, and then every addon fails
+    at once, whatever its repository. This endpoint does not count against
+    that allowance, and the default branch's commit is its first line. Returns
+    None when the source does not list the commit; raises when it cannot be
+    asked."""
+    req = urllib.request.Request(
+        f"{repo_url}.git/info/refs?service=git-upload-pack",
+        headers={"User-Agent": UA})
+    wanted = {f"refs/heads/{pin}", f"refs/tags/{pin}", f"refs/tags/{pin}^{{}}",
+              str(pin)} if pin else {"HEAD"}
+    found = {}
+    with secure_urlopen(req, timeout=15) as r:
+        if not (r.headers.get("Content-Type") or "").startswith(
+                "application/x-git-upload-pack"):
+            raise ValueError("the source did not answer as a git repository")
+        seen = 0
+        while seen < _GIT_REFS_MAX:
+            size = r.read(4)
+            if len(size) < 4:
+                break
+            n = int(size, 16)
+            if n < 4:           # a flush between the service line and the refs
+                seen += 4
+                continue
+            line = r.read(n - 4)
+            seen += n
+            head = line.split(b"\0", 1)[0].rstrip(b"\n").decode("utf-8", "replace")
+            sha, _, name = head.partition(" ")
+            if name in wanted and _SHA.fullmatch(sha):
+                found[name] = sha
+                if not pin:
+                    return sha
+                if not name.startswith("refs/tags/") or name.endswith("^{}"):
+                    return sha
+    # A pinned annotated tag: the commit it peels to, if it was listed.
+    return (found.get(f"refs/tags/{pin}^{{}}") or found.get(f"refs/tags/{pin}")
+            if pin else None)
+
+
+def addon_lookup_reason(git_url: str, branch=None, ref=None) -> str | None:
+    return ADDON_LOOKUP_FAILURES.get(f"{git_url}#{ref or branch or ''}")
+
+
 def addon_remote_sha(git_url: str, branch=None, ref=None,
                      force=False, raise_errors=False) -> str | None:
     """Latest commit sha of a repo's branch (or pinned ref), cached in the
     config file so repeated verifies don't burn API quota. Returns None on
-    failure — or raises with a readable cause when raise_errors is set."""
+    failure, with the cause in ADDON_LOOKUP_FAILURES -- or raises with that
+    cause when raise_errors is set."""
     key = f"{git_url}#{ref or branch or ''}"
     now = time.time()
     if not force:
         entry = load_config().get("addon_sha_cache", {}).get(key)
         if entry and (now - entry.get("timestamp", 0)) < ADDON_SHA_CACHE_TTL:
+            ADDON_LOOKUP_FAILURES.pop(key, None)
             return entry.get("sha")
 
     pin = ref or branch          # explicit branch/ref when the caller has one
@@ -3876,7 +3978,16 @@ def addon_remote_sha(git_url: str, branch=None, ref=None,
     try:
         kind, _repo_url, owner, repo, api = _git_parts(git_url)
         if kind == "github":
-            if pin:
+            # A full commit id is not a ref the advertisement lists.
+            if not (pin and _SHA.fullmatch(pin)):
+                try:
+                    sha = _git_refs_sha(_repo_url, pin)
+                except Exception as e:
+                    log(f"{owner}/{repo}: git refs not available "
+                        f"({_describe_net_error(e)}), asking the API")
+            if sha:
+                pass
+            elif pin:
                 sha = _api_json(
                     f"{api}/repos/{owner}/{repo}/commits/{pin}").get("sha")
             else:
@@ -3904,17 +4015,22 @@ def addon_remote_sha(git_url: str, branch=None, ref=None,
                 # not, and say which commit they are. See _commit_from_archive.
                 sha = _commit_from_archive(git_url, pin)
     except Exception as e:
+        reason = _describe_net_error(e)
+        ADDON_LOOKUP_FAILURES[key] = reason
         if raise_errors:
-            raise RuntimeError(_describe_net_error(e)) from e
+            raise RuntimeError(reason) from e
         return None
     if sha:
+        ADDON_LOOKUP_FAILURES.pop(key, None)
         update_config(lambda c: c.setdefault("addon_sha_cache", {}).__setitem__(
             key, {"timestamp": now, "sha": sha}))
+    else:
+        ADDON_LOOKUP_FAILURES[key] = N_("the source lists no commits")
     return sha
 
 
 def addon_cached_sha(git_url: str, branch=None, ref=None):
-    """Cached remote sha regardless of age — never touches the network."""
+    """Cached remote sha regardless of age – never touches the network."""
     key = f"{git_url}#{ref or branch or ''}"
     entry = load_config().get("addon_sha_cache", {}).get(key)
     return entry.get("sha") if entry else None
@@ -4194,11 +4310,13 @@ TWEAKS_ITEMS = [
      None, None, None),
 
     ("alwaysAutoLoot",    N_("Auto Loot"),        "checkbox", True,  None,
-     N_("Reverses the auto-loot behavior to always auto-loot."),
+     N_("On: looting takes everything, and Shift opens the loot window. Off: "
+        "looting opens the window, and Shift takes everything. This wins over "
+        "addons with an auto-loot of their own."),
      None, None, None),
 
     ("nameplateRange",    N_("Nameplate Range"),          "number",   False, None,
-     N_("Distance at which nameplates are visible. [0 - 41]"),
+     N_("Distance at which nameplates are visible. [0–41]"),
      0, 41, 1),
 
     (None, N_("CAMERA"), "section", False, None, None, None, None, None),
@@ -4208,17 +4326,17 @@ TWEAKS_ITEMS = [
      90, 180, 5),
 
     ("cameraDistance",    N_("Camera Distance"),          "number",   False, None,
-         N_("Maximum camera zoom-out distance. [50 - 100]"),
+         N_("Maximum camera zoom-out distance. [50–100]"),
          50, 100, 1),
 
     (None, N_("GRAPHICS"), "section", False, None, None, None, None, None),
 
     ("farClip",           N_("World Distance"),          "number",   False, None,
-     N_("Terrain and world objects rendering distance. [100 - 10,000]"),
+     N_("How far terrain and world objects are drawn. [100–10,000]"),
      100, 10000, 1),
 
     ("frillDistance",     N_("Ground Clutter Distance"),  "number",   False, None,
-     N_("Grass and small rocks rendering distance. [0 - 300]"),
+     N_("How far grass and small rocks are drawn. [0–300]"),
      0, 300, 1),
 
     (None, N_("SOUND"), "section", False, None, None, None, None, None),
@@ -4228,7 +4346,7 @@ TWEAKS_ITEMS = [
      None, None, None),
 
     ("soundChannels",     N_("Sound Channels"),           "number",   False, None,
-     N_("How many sounds can play at once. More keeps sounds from cutting out in busy fights. [12 - 64]"),
+     N_("How many sounds can play at once. More keeps sounds from cutting out in busy fights. [12–64]"),
      12, 64, 1),
 ]
 
@@ -4335,7 +4453,38 @@ def load_tweaks_config() -> dict:
     # shown beside the Field of View box - it is never applied on its own.
     # Seeding the default from it rewrote WoW.exe's field of view behind the
     # player's back: a 3440x1440 display silently became 150 degrees.
-    return {k: stored.get(k, v) for k, v in TWEAKS_DEFAULTS.items()}
+    values = {k: stored.get(k, v) for k, v in TWEAKS_DEFAULTS.items()}
+    # Never set here: an existing client (OctoLauncher's, say) already does
+    # one or the other, and the checkbox says which rather than a default
+    # that a later Apply would then write over the player's choice.
+    if "alwaysAutoLoot" not in stored and cfg.get("out_dir"):
+        state = lootgate.exe_state(os.path.join(cfg["out_dir"], "WoW.exe"))
+        if state is not None:
+            values["alwaysAutoLoot"] = state
+    return values
+
+
+def enforce_autoloot(client_dir: str) -> list:
+    """Make WoW.exe and the gate addon say what the Auto Loot checkbox says,
+    just before the game starts. OctoLauncher patches WoW.exe to its own
+    setting whenever it plays, so the bytes can change behind the checkbox.
+    Returns what it did, for the log. Never prevents a launch."""
+    notes = []
+    wanted = load_tweaks_config().get("alwaysAutoLoot")
+    exe = os.path.join(client_dir, "WoW.exe")
+    state = lootgate.exe_state(exe)
+    if state is not None and wanted is not None and state != bool(wanted):
+        if client_exe_locked(client_dir):
+            notes.append("Auto Loot: WoW.exe does not match the setting, and "
+                         "it is in use so it was left as it is.")
+        else:
+            lootgate.set_exe_state(exe, bool(wanted))
+            notes.append(f"Auto Loot: WoW.exe did not match the setting "
+                         f"(another launcher may have patched it); set to "
+                         f"{'on' if wanted else 'off'}.")
+    if lootgate.install(writable_addons_path(client_dir)):
+        notes.append("Auto Loot: installed the gate addon.")
+    return notes
 
 
 def save_tweaks_config(values: dict):
@@ -4404,16 +4553,10 @@ def news_is_new(iso: str, last_seen: float | None, now: float) -> bool:
             or ts >= now - NEWS_NEW_DAYS * 86400)
 
 
-def news_marks(items: list, last_seen: float | None, now: float) -> dict:
-    """{id: (new, last)} for a list shown newest first: which posts are
-    NEW!, and the oldest of them (``last``), which has the red line under
-    it dividing the new ones from the rest. The line is drawn only when
-    more than one post is new: under a single one it divides nothing a
-    NEW! does not already say."""
-    new = [str(i.get("id", "")) for i in items
-           if news_is_new(i.get("date", ""), last_seen, now)]
-    last = new[-1] if len(new) > 1 else None
-    return {iid: (True, iid == last) for iid in new}
+def news_marks(items: list, last_seen: float | None, now: float) -> set:
+    """The ids of the posts in a list that are NEW!."""
+    return {str(i.get("id", "")) for i in items
+            if news_is_new(i.get("date", ""), last_seen, now)}
 
 
 def _news_open(req, timeout):
@@ -4831,6 +4974,8 @@ class EqUpdaterApp(tk.Tk):
         # been used (mod_release_cache exists). On a first run or right after a
         # game-folder change nothing is installed yet, so there's nothing to
         # check; the MODS tab will do it when opened.
+        # Attempts the last EqUpdater left open: no Tk in there, so a thread.
+        threading.Thread(target=self._diag_recover, daemon=True).start()
         if self._cfg.get("mod_release_cache"):
             self.after(900, lambda: threading.Thread(
                 target=self._load_mods_state,
@@ -4851,6 +4996,10 @@ class EqUpdaterApp(tk.Tk):
         # First launch: open Settings so the user sets the game folder etc.
         if self._first_run:
             self.after(500, self._open_settings)
+        else:
+            # Installed or updated with a game folder already chosen: offer
+            # the Defender exclusion once for it.
+            self.after(1200, self._offer_av_exclusion)
 
         # Dark title bar on Windows 10; the app's own navy on Windows 11.
         # Set before the window is first shown: Windows 10 only paints the
@@ -4861,7 +5010,7 @@ class EqUpdaterApp(tk.Tk):
 
     def _px(self, *vals):
         """Scale design pixels (authored at 96 DPI) to the current DPI. Returns
-        an int for one arg, a tuple for several — handy for canvas coordinate
+        an int for one arg, a tuple for several – handy for canvas coordinate
         lists. Exact identity when the scale factor is 1.0 (100% scaling)."""
         if len(vals) == 1:
             return round(vals[0] * self._sc)
@@ -4963,6 +5112,70 @@ class EqUpdaterApp(tk.Tk):
 
         widget.bind("<Enter>", show, add="+")
         widget.bind("<Leave>", hide, add="+")
+
+    #: The row action icons, drawn in a 20 x 18 box at 2 px strokes so they
+    #: line up and weigh the same wherever they appear: (resting colour,
+    #: colour under the cursor).
+    ACTION_ICONS = {
+        "link":     ("#8a96ad", "#c99a3d"),
+        "release":  ("#8a96ad", "#eee9dc"),
+        "remove":   ("#8a4a4a", "#ff5555"),
+        "download": ("#58b85a", "#8fdf8e"),
+    }
+
+    def _action_icon(self, parent, kind: str, tip: str, command,
+                     padx=None):
+        """One row action, the same everywhere: ↗ opens a page, a grey ×
+        stops managing (the files stay), the red bin uninstalls, the arrow
+        into a tray downloads. Packed on the right of ``parent``."""
+        rest, lit = self.ACTION_ICONS[kind]
+        if kind == "remove":
+            rest, lit = "#8a4a4a", C_ERR
+        if kind == "download":
+            rest = C_OK
+        w = self._px(2)
+        c = tk.Canvas(parent, width=self._px(20), height=self._px(18),
+                      bg=parent.cget("bg"), highlightthickness=0,
+                      cursor="hand2")
+        c.pack(side="right", padx=padx if padx is not None
+               else (self._px(4), self._px(2)))
+        if kind == "link":
+            c.create_line(*self._px(5, 14, 14, 5), fill=rest, width=w,
+                          capstyle="round", tags="ink")
+            c.create_line(*self._px(8, 5, 14, 5, 14, 11), fill=rest, width=w,
+                          capstyle="round", joinstyle="round", tags="ink")
+        elif kind == "release":
+            c.create_line(*self._px(6, 5, 14, 13), fill=rest, width=w,
+                          capstyle="round", tags="ink")
+            c.create_line(*self._px(14, 5, 6, 13), fill=rest, width=w,
+                          capstyle="round", tags="ink")
+        elif kind == "remove":
+            # The bin as it always was: handle, lid, tapered body, slats.
+            c.create_rectangle(*self._px(8, 2, 12, 4), fill=rest, outline="",
+                               tags="fill")
+            c.create_rectangle(*self._px(4, 4, 16, 6), fill=rest, outline="",
+                               tags="fill")
+            c.create_polygon(*self._px(5, 8, 15, 8, 14, 16, 6, 16), fill=rest,
+                             outline="", tags="fill")
+            for x in (8, 10, 12):
+                c.create_line(*self._px(x, 10, x, 14), fill=parent.cget("bg"))
+        elif kind == "download":
+            c.create_polygon(*self._px(8, 1, 12, 1, 12, 6, 15, 6, 10, 11,
+                                       5, 6, 8, 6), fill=rest, outline="",
+                             tags="fill")
+            c.create_line(*self._px(3, 11, 3, 15, 17, 15, 17, 11), fill=rest,
+                          width=w, capstyle="round", joinstyle="round",
+                          tags="ink")
+
+        def paint(colour):
+            c.itemconfigure("ink", fill=colour)
+            c.itemconfigure("fill", fill=colour)
+        c.bind("<Button-1>", lambda _e: command(), add="+")
+        c.bind("<Enter>", lambda _e: paint(lit), add="+")
+        c.bind("<Leave>", lambda _e: paint(rest), add="+")
+        c._action_kind = kind
+        self._set_tooltip(c, tip)
+        return c
 
     def _set_tooltip(self, widget, text: str):
         """A tooltip whose text can change without stacking another handler.
@@ -5904,7 +6117,11 @@ class EqUpdaterApp(tk.Tk):
         canvas = tk.Canvas(list_frame, bg=C_PANEL, highlightthickness=0)
         sb = SlimScrollbar(list_frame, command=canvas.yview, bg=C_PANEL,
                            width=self._px(10), thumb="#31547e")
-        canvas.configure(yscrollcommand=sb.set)
+
+        def scrolled(first, last):
+            sb.set(first, last)
+            self._acc_pin(key)
+        canvas.configure(yscrollcommand=scrolled)
         sb.pack(side="right", fill="y")
         canvas.pack(side="left", fill="both", expand=True)
         self._wheel_canvases.append(canvas)
@@ -5932,7 +6149,7 @@ class EqUpdaterApp(tk.Tk):
             canvas.yview_moveto(y_px / total)
 
     @staticmethod
-    def _acc_signature(item, is_open, mark=(False, False)):
+    def _acc_signature(item, is_open, mark=False):
         """What an entry shows: when this changes, the entry is redone."""
         body = item.get("body")
         return (is_open, item.get("title"), body is None, body or "",
@@ -5967,8 +6184,8 @@ class EqUpdaterApp(tk.Tk):
         body.pack(fill="x")
         divider = tk.Frame(lst["inner"], bg=C_DIVIDER, height=self._px(1))
         divider.pack(fill="x", padx=(0, self._px(8)), pady=(self._px(10), 0))
-        row = {"entry": entry, "title": title, "byline": byline, "body": body,
-               "divider": divider, "badge": badge, "sig": None}
+        row = {"entry": entry, "head": head, "title": title, "byline": byline,
+               "body": body, "divider": divider, "badge": badge, "sig": None}
         for w in (head, title_row, title, badge, byline):
             w.bind("<Button-1>", lambda e, i=iid: lst["toggle"](i))
             w.bind("<Enter>", lambda e, l=title: l.configure(fg=C_GOLD))
@@ -5983,13 +6200,12 @@ class EqUpdaterApp(tk.Tk):
         what it shows changed, its text -- nothing else in the list."""
         lst = self._acc_lists[key]
         row = lst["rows"][iid]
-        is_new, is_last_new = lst.get("marks", {}).get(iid, (False, False))
-        sig = self._acc_signature(item, is_open, (is_new, is_last_new))
+        is_new = iid in lst.get("marks", ())
+        sig = self._acc_signature(item, is_open, is_new)
         if sig == row["sig"]:
             return
         row["sig"] = sig
-        # NEW! after the title, the title wrapping short of it; the oldest
-        # of several new posts has the red line under it, not the divider.
+        # NEW! after the title, the title wrapping short of it.
         badge, title = row["badge"], row["title"]
         if is_new:
             title._wrap_cut = badge.winfo_reqwidth() + self._px(8)
@@ -5999,8 +6215,6 @@ class EqUpdaterApp(tk.Tk):
             badge.pack_forget()
         title.configure(wraplength=max(self._px(80), self._news_wrap(key)
                                        - title._wrap_cut))
-        row["divider"].configure(bg=C_NEW if is_last_new else C_DIVIDER,
-                                 height=self._px(2 if is_last_new else 1))
         meta = []
         if item.get("author"):
             meta.append(tr("by {author}", author=item["author"]))
@@ -6016,6 +6230,8 @@ class EqUpdaterApp(tk.Tk):
             w.destroy()
         if not is_open:
             body.configure(height=1)
+            if lst.get("pinned") == iid:
+                self.after_idle(lambda: self._acc_pin(key))
             return
         text = item.get("body")
         if text is None:
@@ -6030,7 +6246,9 @@ class EqUpdaterApp(tk.Tk):
             err.pack(fill="x", pady=(self._px(6), 0))
             self._acc_wraps.setdefault(key, []).append(err)
         elif text.strip():
-            self._news_text(body, text, item.get("links") or [])
+            txt = self._news_text(body, text, item.get("links") or [])
+            if key == "patch":
+                self._acc_clamp(key, iid, item, txt)
         if item.get("url"):
             lnk = tk.Label(body, text=tr("Open in Browser") + "  ↗",
                            font=self._font(9, bold=True), fg=C_GOLD,
@@ -6039,6 +6257,145 @@ class EqUpdaterApp(tk.Tk):
             lnk.bind("<Button-1>", lambda e, u=item["url"]: self._open_url(u))
             lnk.bind("<Enter>", lambda e, w=lnk: w.configure(fg=C_GOLD_LT))
             lnk.bind("<Leave>", lambda e, w=lnk: w.configure(fg=C_GOLD))
+
+    #: How many lines of a changelog entry show before "Show more".
+    CHANGELOG_PREVIEW_LINES = 14
+
+    def _acc_clamp(self, key, iid, item, txt):
+        """A long changelog entry opens to its first lines and a "Show more"
+        under them; "Show less" puts it back. A short one shows whole, with
+        neither. Follows the text's own height as the column is resized."""
+        lst = self._acc_lists[key]
+        full = lst.setdefault("full", set())
+        limit = self.CHANGELOG_PREVIEW_LINES
+        toggle = tk.Label(txt.master, text="", font=self._font(9, bold=True),
+                          fg=C_GOLD, bg=C_PANEL, cursor="hand2", anchor="w")
+
+        def lines():
+            try:
+                n = txt.count("1.0", "end-1c", "displaylines")
+                return (n[0] if isinstance(n, tuple) else n) or 0
+            except (tk.TclError, TypeError):
+                return 0
+
+        def fit(_event=None):
+            n = lines() + 1
+            long = n > limit
+            want = n if (iid in full or not long) else limit
+            try:
+                if int(txt.cget("height")) != want:
+                    txt.configure(height=want)
+                if long:
+                    toggle.configure(text=tr("Show less") if iid in full
+                                     else tr("Show more"))
+                    if not toggle.winfo_manager():
+                        toggle.pack(fill="x", after=txt,
+                                    pady=(self._px(4), 0))
+                elif toggle.winfo_manager():
+                    toggle.pack_forget()
+            except tk.TclError:
+                pass
+
+        def flip(_e=None):
+            full.symmetric_difference_update({iid})
+            fit()
+            if iid not in full:
+                # Back at the top of the entry, not lost below it.
+                self._acc_scroll_to(key, iid)
+        toggle.bind("<Button-1>", flip)
+        toggle.bind("<Enter>", lambda e: toggle.configure(fg=C_GOLD_LT))
+        toggle.bind("<Leave>", lambda e: toggle.configure(fg=C_GOLD))
+        txt.bind("<Configure>", fit, add="+")
+        fit()
+
+    def _acc_scroll_to(self, key, iid):
+        """Scroll a list so an entry's header is at the top, if it is above."""
+        lst = self._acc_lists.get(key)
+        canvas = getattr(self, "_acc_canvas", {}).get(key)
+        if not lst or canvas is None or iid not in lst["rows"]:
+            return
+        try:
+            lst["inner"].update_idletasks()
+            y = lst["rows"][iid]["entry"].winfo_y()
+            if y < canvas.canvasy(0):
+                total = max(1, lst["inner"].winfo_reqheight())
+                canvas.configure(scrollregion=(0, 0, lst["inner"].winfo_reqwidth(),
+                                               total))
+                canvas.yview_moveto(y / total)
+            self._acc_pin(key)
+        except tk.TclError:
+            pass
+
+    def _acc_pin(self, key):
+        """Keep an open entry's header in view while its text scrolls under
+        it: when the header has scrolled off the top of the list, a copy of it
+        sits there, with the divider and gap under it, until the entry's text
+        has gone too. Clicking it closes the entry, wherever the list is."""
+        lst = getattr(self, "_acc_lists", {}).get(key)
+        canvas = getattr(self, "_acc_canvas", {}).get(key)
+        if not lst or canvas is None:
+            return
+        try:
+            if not canvas.winfo_exists():
+                return
+            top = canvas.canvasy(0)
+        except tk.TclError:
+            return
+        pin = lst.get("pin")
+        found = None
+        for iid in lst["order"]:
+            row = lst["rows"][iid]
+            if not (row["sig"] and row["sig"][0]):
+                continue
+            try:
+                y = row["entry"].winfo_y()
+                h = row["entry"].winfo_height()
+                head = row["head"].winfo_height()
+            except tk.TclError:
+                continue
+            pin_h = pin.winfo_reqheight() if pin is not None else head
+            if y + self._px(10) < top and y + h > top + pin_h:
+                found = iid
+                break
+        if found is None:
+            if pin is not None:
+                pin.place_forget()
+            lst["pinned"] = None
+            return
+        if pin is None:
+            pin = tk.Frame(canvas.master, bg=C_PANEL, cursor="hand2")
+            title = tk.Label(pin, font=self._font(lst["title_size"], bold=True),
+                             fg=C_GOLD_LT, bg=C_PANEL, justify="left",
+                             anchor="w", cursor="hand2")
+            title.pack(fill="x", pady=(self._px(10), 0))
+            byline = tk.Label(pin, font=self._font(8), fg=C_TEXT_DIM,
+                              bg=C_PANEL, anchor="w", cursor="hand2")
+            byline.pack(fill="x", pady=(self._px(2), 0))
+            tk.Frame(pin, bg=C_DIVIDER, height=self._px(1)).pack(
+                fill="x", pady=(self._px(8), 0))
+            tk.Frame(pin, bg=C_PANEL, height=self._px(6)).pack(fill="x")
+            pin._title, pin._byline = title, byline
+
+            def close(_e=None):
+                iid = lst.get("pinned")
+                if iid is None:
+                    return
+                lst["toggle"](iid)
+                self._acc_scroll_to(key, iid)
+            for w in (pin, title, byline):
+                w.bind("<Button-1>", close)
+                w.bind("<Enter>", lambda e: pin._title.configure(fg=C_GOLD))
+                w.bind("<Leave>", lambda e: pin._title.configure(fg=C_GOLD_LT))
+            lst["pin"] = pin
+        row = lst["rows"][found]
+        lst["pinned"] = found
+        pin._title.configure(text=row["title"].cget("text"),
+                             wraplength=row["title"].cget("wraplength"))
+        pin._byline.configure(text=row["byline"].cget("text"))
+        # Over the list, not past it: the scrollbar stays uncovered.
+        pin.place(in_=canvas, x=0, y=0,
+                  width=max(1, canvas.winfo_width() - self._px(8)))
+        pin.lift()
 
     def _acc_footer(self, key):
         """What goes under a list's entries, made again."""
@@ -6505,7 +6862,7 @@ class EqUpdaterApp(tk.Tk):
             name_lbl.pack(side="left")
             if tid == "locale":
                 self._add_tooltip(name_lbl, tr(
-                    "Language selection for both in-game and EqUpdater Client."))
+                    "The language of the game and of EqUpdater."))
 
             if kind == "checkbox":
                 var = tk.BooleanVar(value=values.get(tid, False))
@@ -6647,7 +7004,7 @@ class EqUpdaterApp(tk.Tk):
                 var.set(str(int(v)) if v is not None else "")
 
     def _get_tweaks_from_ui(self) -> dict:
-        """Read tweak values from the UI, always clamped to their limits —
+        """Read tweak values from the UI, always clamped to their limits –
         an out-of-range entry can never reach the config or the exe patch."""
         result = {}
         for tid, var in self._tweak_vars.items():
@@ -6712,7 +7069,7 @@ class EqUpdaterApp(tk.Tk):
 
         exe = os.path.join(out, "WoW.exe")
         if not os.path.exists(exe):
-            self._log_line("WoW.exe not found — run Update first.\n", "err")
+            self._log_line("WoW.exe not found – run Update first.\n", "err")
             self._offer_language_restart()
             return
 
@@ -6749,7 +7106,7 @@ class EqUpdaterApp(tk.Tk):
             self._log_line(f"\n✗ Tweak patch failed: {e}\n", "err")
 
             def _fail_state():
-                self._status_error(tr("Tweaks failed — check the log"),
+                self._status_error(tr("Tweaks failed – check the log"),
                                    self._show_logs)
                 self._set_btn_update()
             self.after(0, _fail_state)
@@ -6799,7 +7156,7 @@ class EqUpdaterApp(tk.Tk):
         Otherwise replay every migration step newer than the stored version,
         then stamp the current one so each runs exactly once. Runs
         synchronously (before the normal startup verify is scheduled), so any
-        WoW.exe re-patch is settled before verify reads the exe — no read/write
+        WoW.exe re-patch is settled before verify reads the exe – no read/write
         race, and the standard verify still runs and can surface a pending
         client update. Future versions add their own ``if from_ver < (x, y): …``
         block below."""
@@ -6968,6 +7325,9 @@ class EqUpdaterApp(tk.Tk):
         self._apply_btn.bind("<Enter>",    lambda e: self._apply_btn.configure(bg=C_GOLD, fg="#000"))
         self._apply_btn.bind("<Leave>",    lambda e: self._apply_btn.configure(bg=C_PANEL_BDR, fg=C_TEXT))
 
+        # "Manage all" is on the INSTALLED LOCALLY header, as on Addons.
+        self._mods_manage_all = None
+
         add = tk.Label(foot, text="+  " + tr("Add custom git mod"),
                        font=self._font(10, bold=True), fg="#d76f9e",
                        bg=C_PANEL, cursor="hand2")
@@ -6991,6 +7351,9 @@ class EqUpdaterApp(tk.Tk):
             MODS_REGISTRY,
             key=lambda m: (not m.get("essential", False), m["name"].lower()))
 
+        if self._mod_row_vars and self._mod_icons_stale(mods_cfg):
+            self._rebuild_mod_rows()
+            return
         if self._mod_row_vars:
             for mod in mods_sorted:
                 mid   = mod["id"]
@@ -7040,8 +7403,12 @@ class EqUpdaterApp(tk.Tk):
         name_w = max(self._px(210),
                      max(name_font.measure(m["name"]) for m in MODS_REGISTRY)
                      + small.measure("★ " + "  " + tr("unknown")) + self._px(10))
+        self._mod_built_sections = {}
 
-        for mod in mods_sorted:
+        for mod in self._mod_build_list(mods_sorted, mods_cfg):
+            if isinstance(mod, tuple):
+                self._mod_section_header(*mod)
+                continue
             mid   = mod["id"]
             state = mods_cfg.get(mid, {})
             live  = next((m for m in self._mods_state if m["id"] == mid), {})
@@ -7060,6 +7427,7 @@ class EqUpdaterApp(tk.Tk):
 
             container = tk.Frame(self._mods_inner, bg=C_PANEL)
             container.pack(fill="x")
+            self._mod_built_sections[mid] = self._mod_section(mod, state)
 
             row = tk.Frame(container, bg=C_PANEL)
             row.pack(fill="x", pady=self._px(5))
@@ -7083,14 +7451,10 @@ class EqUpdaterApp(tk.Tk):
                                  font=self._font(9), fg=C_TEXT_DIM, bg=C_PANEL)
             ver_label.pack(side="left")
 
+            # No on/off box: the section says what a mod is, and its icons do
+            # the rest -- download to install, the bin to uninstall. The
+            # variable stays for the code that still reads a row's state.
             enabled_var = tk.BooleanVar(value=enabled)
-            tk.Checkbutton(row, variable=enabled_var,
-                           bg=C_PANEL, activebackground=C_PANEL,
-                           fg=C_TEXT, selectcolor=C_PANEL,
-                           highlightthickness=0, bd=0,
-                           relief="flat", cursor="hand2",
-                           command=lambda m=mid, v=enabled_var: self._toggle_mod(m, v)
-                           ).pack(side="left", padx=(self._px(4), self._px(8)))
 
             # Right-side widgets are packed first so they stay pinned to the
             # panel's right edge; the description then fills the middle.
@@ -7107,22 +7471,25 @@ class EqUpdaterApp(tk.Tk):
             tk.Label(ig_f, text=tr("Ignore updates"),
                      font=self._font(9), fg=C_TEXT_DIM, bg=C_PANEL).pack(side="left")
 
-            link = tk.Label(row, text="⧉",
-                            font=self._font(12), fg=C_TEXT_DIM,
-                            bg=C_PANEL, cursor="hand2")
-            link.pack(side="right", padx=self._px(4))
-            link.bind("<Button-1>", lambda e, u=mod["repo_url"]: self._open_url(u))
-            link.bind("<Enter>",    lambda e, l=link: l.configure(fg=C_GOLD))
-            link.bind("<Leave>",    lambda e, l=link: l.configure(fg=C_TEXT_DIM))
-
+            # Uninstall, stop managing, then the repository: in that order
+            # from the right edge, as on an addon row.
+            client = self._game_path.get().strip()
+            here = bool(client) and bool(mod_found_files(mod, client))
             if mod.get("custom"):
-                rm = tk.Label(row, text="✕", font=self._font(11),
-                              fg=C_TEXT_DIM, bg=C_PANEL, cursor="hand2")
-                rm.pack(side="right", padx=self._px(4))
-                rm.bind("<Button-1>", lambda e, m=mid: self._remove_custom_mod(m))
-                rm.bind("<Enter>", lambda e, l=rm: l.configure(fg=C_ERR))
-                rm.bind("<Leave>", lambda e, l=rm: l.configure(fg=C_TEXT_DIM))
-                self._add_tooltip(rm, tr("Remove this custom mod"))
+                self._action_icon(row, "remove", tr("Uninstall"),
+                                  lambda m=mid: self._remove_custom_mod(m))
+            elif here:
+                self._action_icon(row, "remove", tr("Uninstall"),
+                                  lambda m=mid: self._mod_uninstall(m))
+            if here and state.get("managed") and not mod.get("custom"):
+                self._action_icon(row, "release", tr("Stop managing. Your "
+                                                     "files are kept."),
+                                  lambda m=mid: self._mod_release(m))
+            if not here:
+                self._action_icon(row, "download", tr("Download from repository"),
+                                  lambda m=mid: self._mod_install(m))
+            self._action_icon(row, "link", tr("Open repository in browser"),
+                              lambda u=mod["repo_url"]: self._open_url(u))
 
             update_label = tk.Label(row, text=tr("update"),
                                     font=self._font(10, bold=True),
@@ -7147,6 +7514,22 @@ class EqUpdaterApp(tk.Tk):
                                   bg=C_PANEL, wraplength=self._px(400),
                                   justify="left", anchor="w")
             desc_label.pack(side="left", fill="x", expand=True)
+            # Wrapped to the room the row leaves it, not a fixed width: a
+            # status word on the right ("update to v1.20.4") would otherwise
+            # sit on top of the text's last words. Measured from the row and
+            # the widgets beside the text -- never from the text itself, whose
+            # size follows its wrap, which would feed back into itself.
+            def fit_desc(_e=None, w=desc_label, r=row):
+                try:
+                    others = sum(c.winfo_reqwidth() for c in r.pack_slaves()
+                                 if c is not w)
+                    want = max(self._px(120), min(
+                        self._px(400), r.winfo_width() - others - self._px(30)))
+                    if abs(int(w.cget("wraplength")) - want) > self._px(2):
+                        w.configure(wraplength=want)
+                except tk.TclError:
+                    pass
+            row.bind("<Configure>", fit_desc, add="+")
 
             error_label = tk.Label(container, text="",
                                    font=self._font(9), fg=C_ERR,
@@ -7166,6 +7549,7 @@ class EqUpdaterApp(tk.Tk):
                 "desc_label":   desc_label,
                 "error_label":  error_label,
                 "update_label": update_label,
+                "icons":        self._mod_icon_state(mod, state),
             }
 
     def _load_mods_state(self, max_age: float = _MOD_VERSION_CACHE_TTL):
@@ -7429,7 +7813,7 @@ class EqUpdaterApp(tk.Tk):
         """Confirm enabling no1600x1200 / VanillaMultiMonitorFix. They conflict,
         so first offer to replace the other one, then show that mod's own notice
         (_RES_FIX_NOTICE). Returns True to proceed, or False if the user backed
-        out — in which case the checkbox and pending state are reset to 'off'."""
+        out – in which case the checkbox and pending state are reset to 'off'."""
         from tkinter import messagebox
         other = self._RES_FIX_CONFLICTS[mod_id]
         name  = next(m["name"] for m in MODS_REGISTRY if m["id"] == mod_id)
@@ -7445,7 +7829,7 @@ class EqUpdaterApp(tk.Tk):
         if replace_other and not messagebox.askyesno(
                 tr("Conflicting mods"),
                 tr("{name} and {other} both affect the game's resolution "
-                   "detection and can't be used together — only one can be "
+                   "detection and can't be used together – only one can be "
                    "active at a time.\n\n"
                    "VanillaMultiMonitorFix is recommended if you experience "
                    "resolution issues in the game.\n\n"
@@ -7474,12 +7858,22 @@ class EqUpdaterApp(tk.Tk):
         return True
 
     def _set_ignore(self, mod_id: str, var: tk.BooleanVar):
-        self._mod_pending_state.setdefault(mod_id, {})["ignore_updates"] = var.get()
+        """Saved at once: with no on/off boxes left, there is no Apply to
+        wait for."""
+        value = bool(var.get())
+        self._cfg = update_config(lambda c: c.setdefault("mods", {}).setdefault(
+            mod_id, {}).__setitem__("ignore_updates", value))
+        self._mod_pending_state.get(mod_id, {}).pop("ignore_updates", None)
+        if not self._mod_pending_state.get(mod_id, True):
+            self._mod_pending_state.pop(mod_id, None)
+        self._render_mod_rows()
+        self._refresh_mods_badge()
         self._refresh_apply_btn_visibility()
 
     def _refresh_apply_btn_visibility(self):
         """Apply is offered only when there is something to apply: pending
         checkbox changes, or a failed mod the user may want to retry."""
+        self._refresh_manage_all()
         has_error = any(bool(s.get("error"))
                         for s in load_config().get("mods", {}).values())
         if self._mod_pending_state or has_error:
@@ -7542,7 +7936,8 @@ class EqUpdaterApp(tk.Tk):
             lbl._base, lbl._hover = C_GOLD, C_GOLD_LT
             lbl._mode = "act"
             lbl.configure(text=tr("retry"), fg=C_GOLD)
-            self._set_tooltip(lbl, tr(str(state.get("error"))))
+            # The error itself is on the line under the row.
+            self._set_tooltip(lbl, tr("Try again"))
             lbl.pack(side="right", padx=(self._px(2), self._px(8)))
             return
 
@@ -7559,9 +7954,10 @@ class EqUpdaterApp(tk.Tk):
             text = tr("update to {version}", version=p.remote)
             tip = f"{p.local} \u2192 {p.remote}"
         elif p.status is Status.LOCAL_NEWER:
+            # Not the generic tooltip as well: it says the same thing.
             tip = (tr("Installed {local}; the configured source offers "
                       "{remote}.", local=p.local, remote=p.remote)
-                   + " " + tip + "\n\n"
+                   + " " + tr("EqUpdater will not replace it.") + "\n\n"
                    + tr("Right-click to install {version} anyway.",
                         version=p.remote))
         elif p.status is Status.MODIFIED:
@@ -7585,8 +7981,7 @@ class EqUpdaterApp(tk.Tk):
                         version=p.remote))
         elif p.status is Status.VERSION_UNKNOWN:
             tip = (tip + "\n\n"
-                   + tr("Click to replace them with {version}, after a "
-                        "warning. Untick the mod and Apply to remove it.",
+                   + tr("Click to replace them with {version}. You are asked first.",
                         version=p.remote))
         elif p.status is Status.MISSING_FILES and not p.local:
             # Some files are gone and nothing says which build the rest are:
@@ -7668,8 +8063,6 @@ class EqUpdaterApp(tk.Tk):
         mod = next((m for m in MODS_REGISTRY if m["id"] == mod_id), None)
         if not mod:
             return
-        client = self._game_path.get().strip()
-        files = mod.get("installed_files") or []
         if not messagebox.askyesno(
                 tr("Manage {name} with {app}?", name=mod["name"],
                    app=branding.APP_NAME),
@@ -7681,6 +8074,21 @@ class EqUpdaterApp(tk.Tk):
                    "replaced automatically.\n\n"
                    "Manage it?", name=mod["name"], app=branding.APP_NAME)):
             return
+        self._record_mod_adoption(mod)
+        self._log_line(f"\n{mod['name']} is now managed by "
+                       f"{branding.APP_NAME}.\n", "acct")
+        self._render_mod_rows()
+        self._refresh_mods_badge()
+        # Which release is it? Only an exact match with a published release
+        # can say; until one does, the row reads "version unknown".
+        self._mod_recheck(mod_id, force=False)
+
+    def _record_mod_adoption(self, mod: dict):
+        """Write down that EqUpdater looks after this mod's files as they are
+        now. Installs nothing; the caller has the player's consent."""
+        mod_id = mod["id"]
+        client = self._game_path.get().strip()
+        files = mod_found_files(mod, client)
 
         def _merge(c):
             mods = c.setdefault("mods", {})
@@ -7693,15 +8101,189 @@ class EqUpdaterApp(tk.Tk):
                 enabled=True))
             rec["ignore_updates"] = bool(
                 (mods.get(mod_id) or {}).get("ignore_updates", False))
+            rec.pop("released", None)
             mods[mod_id] = rec
         self._cfg = update_config(_merge)
-        self._log_line(f"\n{mod['name']} is now managed by "
-                       f"{branding.APP_NAME}.\n", "acct")
+
+    # ── bringing in what another tool installed ──────────────────────────────
+
+    def _found_mods(self) -> list:
+        """Mods here that EqUpdater does not manage."""
+        client = self._game_path.get().strip()
+        if not client:
+            return []
+        mods_cfg = load_config().get("mods", {})
+        return [m for m in MODS_REGISTRY
+                if not (mods_cfg.get(m["id"]) or {}).get("released")
+                and mod_plan(m, mods_cfg.get(m["id"], {}), None,
+                             client).status is Status.UNMANAGED]
+
+    def _found_addons(self) -> list:
+        """Addons here that EqUpdater does not manage, that have a source to
+        track, and that nobody released from management on purpose."""
+        saved = load_config().get("addons", {}) or {}
+        return [r for r in self._addons_status["addons"].values()
+                if r.get("status") == "unmanaged"
+                and (r.get("suggested_git") or r.get("git"))
+                and not (saved.get(r["folder"]) or {}).get("released")]
+
+    def _manage_all_found(self):
+        """One question for everything OctoLauncher (or anything else) left
+        here, instead of one click per row. Consent, not assumption: it says
+        what will be managed, and no file changes."""
+        from tkinter import messagebox
+        mods, addons = self._found_mods(), self._found_addons()
+        if not mods and not addons:
+            return
+        if not messagebox.askyesno(
+                tr("Manage what is already installed?"),
+                tr("{app} found {mods} mods and {addons} addons it did not "
+                   "install, from OctoLauncher or by hand.\n\n"
+                   "Managing them means {app} can update and remove them. "
+                   "Your current files are not changed now. Anything it "
+                   "cannot prove is safe to update stays as it is until you "
+                   "choose, and a build newer than the source's is never "
+                   "replaced automatically.\n\n"
+                   "Manage them all?", app=branding.APP_NAME,
+                   mods=len(mods), addons=len(addons)),
+                parent=self):
+            return
+        for mod in mods:
+            self._record_mod_adoption(mod)
+        for rec in addons:
+            self._record_addon_adoption(rec)
+        self._log_line(f"\n{branding.APP_NAME} now manages {len(mods)} mods and "
+                       f"{len(addons)} addons it found here. "
+                       f"No files were changed.\n", "acct")
         self._render_mod_rows()
         self._refresh_mods_badge()
-        # Which release is it? Only an exact match with a published release
-        # can say; until one does, the row reads "version unknown".
-        self._mod_recheck(mod_id, force=False)
+        self._refresh_manage_all()
+        client = self._game_path.get().strip()
+
+        def work():
+            try:
+                self._identify_unversioned_mods(client)
+                self._identify_adopted_addons(client)
+            except Exception as e:
+                log(f"Could not identify everything found here: {e}")
+            self.after(0, self._after_identify)
+        threading.Thread(target=work, daemon=True).start()
+
+    def _after_identify(self):
+        self._render_mod_rows()
+        self._refresh_mods_badge()
+        self._addons_verified_ts = 0.0
+        self._addons_verify(force=False)
+
+    def _offer_manage_found(self):
+        """Ask once per game folder, when the addons have been looked at and
+        there is something to ask about. The rows and the "Manage all" links
+        stay for anybody who says no."""
+        if os.environ.get("EQUPDATER_NO_MIGRATION_PROMPT"):
+            return
+        client = self._game_path.get().strip()
+        if not client or load_config().get("found_offered_for") == client:
+            return
+        if (getattr(self, "_settings_overlay", None) is not None or self._running
+                or getattr(self, "_asking", False)):
+            self.after(3000, self._offer_manage_found)
+            return
+        if not self._found_mods() and not self._found_addons():
+            return
+        update_config(lambda c: c.__setitem__("found_offered_for", client))
+        self._asking = True
+        try:
+            self._manage_all_found()
+        finally:
+            self._asking = False
+
+    def _refresh_manage_all(self):
+        """The MODS tab's "Manage all" link: there while there is something
+        to manage."""
+        lbl = getattr(self, "_mods_manage_all", None)
+        if lbl is None:
+            return
+        count = len(self._found_mods())
+        if count:
+            lbl.configure(text=tr("Manage all ({count})", count=count))
+            lbl.pack(side="left", padx=(self._px(10), 0))
+        else:
+            lbl.pack_forget()
+
+    def _identify_adopted_addons(self, client_dir: str):
+        """Find the commit of managed addons that have none: from their own
+        clone when its files still match it, otherwise by comparing them
+        with the source's latest commit. Only an exact match records a sha.
+        An answer is kept per commit and fingerprint, so an addon is
+        downloaded to compare once, not on every check."""
+        if not client_dir:
+            return
+        cfg = load_config()
+        cache = cfg.get("addon_identify_cache", {})
+        found, seen = {}, {}
+        root = addons_path(client_dir)
+        for folder, saved in list((cfg.get("addons") or {}).items()):
+            dirp = os.path.join(root, folder)
+            git = saved.get("git")
+            if (not addon_is_managed(saved) or saved.get("sha") or not git
+                    or not os.path.isdir(dirp)):
+                continue
+            fp = folder_hash(dirp)
+            clone = gitlocal.read_clone(dirp)
+            if (clone and clone.sha and same_repo(clone.remote, git)
+                    and gitlocal.clone_is_clean(dirp)):
+                found[folder] = (clone.sha, clone.branch, fp)
+                continue
+            remote = addon_remote_sha(git, saved.get("branch"), saved.get("ref"))
+            if not remote:
+                continue
+            key = f"{remote}|{fp}"
+            if (cache.get(folder) or {}).get(key) is False:
+                continue
+            match = self._addon_is_commit(client_dir, folder, git, remote, fp)
+            if match is None:
+                continue                    # no answer; ask again later
+            seen.setdefault(folder, {})[key] = match
+            if match:
+                found[folder] = (remote, saved.get("branch"), fp)
+
+        def _merge(c):
+            addons = c.setdefault("addons", {})
+            for folder, (sha, branch, fp) in found.items():
+                rec = addons.get(folder)
+                if not rec or rec.get("sha"):
+                    continue
+                rec["sha"] = sha
+                rec["branch"] = rec.get("branch") or branch
+                rec["content_hash"] = fp
+                rec["hash_baseline"] = "commit"
+            ident = c.setdefault("addon_identify_cache", {})
+            for folder, answers in seen.items():
+                kept = dict(ident.get(folder) or {})
+                kept.update(answers)
+                ident[folder] = dict(list(kept.items())[-4:])
+        if found or seen:
+            update_config(_merge)
+        for folder, (sha, _b, _f) in found.items():
+            log(f"{folder}: the installed files are commit {sha[:10]} - recorded.")
+
+    def _addon_is_commit(self, client_dir: str, folder: str, git: str,
+                         sha: str, fp: str) -> bool | None:
+        """Whether an addon's files are exactly what commit ``sha`` unpacks
+        to. Unpacked into a scratch folder; the game folder is not touched.
+        None when it could not be downloaded."""
+        import tempfile
+        staging = os.path.join(APP_DATA_DIR, "staging")
+        ensure_dir(staging)
+        scratch = tempfile.mkdtemp(prefix="identify-addon-", dir=staging)
+        try:
+            install_addon_files(scratch, folder, git, sha)
+            return folder_hash(os.path.join(addons_path(scratch), folder)) == fp
+        except Exception as e:
+            log(f"  Could not compare {folder}: {describe_install_error(e)}")
+            return None
+        finally:
+            shutil.rmtree(scratch, ignore_errors=True)
 
     def _update_mod(self, mod_id: str):
         """Download and install the newest release of a single mod (the
@@ -7729,7 +8311,7 @@ class EqUpdaterApp(tk.Tk):
 
     def _maybe_install_default_addons(self):
         """Auto-install the recommended addons the first time this game
-        folder is ready — the same one-shot mechanism as the default mods:
+        folder is ready – the same one-shot mechanism as the default mods:
         the absence of the "addons" key in config means "never initialized
         for this folder", and a game-folder change wipes it to re-arm.
         Runs after the default mods finished (chained from the mods apply
@@ -7773,10 +8355,10 @@ class EqUpdaterApp(tk.Tk):
 
     def _maybe_install_essential_mods(self):
         """Auto-install every mod flagged essential the first time this game
-        folder is ready to use — i.e. on a brand-new install, or right after
+        folder is ready to use – i.e. on a brand-new install, or right after
         the game folder was changed to a new location. Both cases wipe the
         "mods" key from config, which is what this checks for, so once this
-        has run (successfully or not — failures are recorded per-mod) it
+        has run (successfully or not – failures are recorded per-mod) it
         won't fire again until the folder changes.
 
         Reuses the normal apply worker so failures land in config exactly
@@ -7830,7 +8412,7 @@ class EqUpdaterApp(tk.Tk):
         if discovered:
             self._log_line(
                 "\nFound %d mod(s) already installed here: %s.\n"
-                "Left untouched — open the MODS tab to have %s manage "
+                "Left untouched – open the MODS tab to have %s manage "
                 "them.\n" % (len(discovered), ", ".join(sorted(discovered)),
                              branding.APP_NAME), "acct")
 
@@ -7880,9 +8462,9 @@ class EqUpdaterApp(tk.Tk):
         is what a comparison would then act on."""
         found = {}
         for mod in MODS_REGISTRY:
-            files = mod.get("installed_files") or []
-            if not files or not mod_files_on_disk(mod, client_dir):
+            if not mod_files_on_disk(mod, client_dir):
                 continue
+            files = mod_found_files(mod, client_dir)
             rec = new_mod_record(
                 managed=False, enabled=True,
                 installed_files=files,
@@ -7974,6 +8556,11 @@ class EqUpdaterApp(tk.Tk):
                     and not state.get("error")
                     and mod_files_on_disk(mod, client_dir)):
                 needs_install = False
+                if mid in pending:
+                    log("")
+                    log(f"{mod['name']}: already here and not managed by "
+                        f"{branding.APP_NAME}, so it was left alone. Click "
+                        f"\"not managed\" on its row to manage it.")
 
             needs_version_lookup = needs_install or (enabled and is_installed and not ignore_upd)
             latest_ver  = None
@@ -8185,6 +8772,8 @@ class EqUpdaterApp(tk.Tk):
             log(f"{name} was enabled but missing from dlls.txt - re-registered.")
 
         def _do_inplace_update():
+            if self._mod_icons_stale(fresh_mods):
+                self._rebuild_mod_rows()
             for mod in MODS_REGISTRY:
                 mid         = mod["id"]
                 state       = fresh_mods.get(mid, {})
@@ -8224,10 +8813,9 @@ class EqUpdaterApp(tk.Tk):
             # Fresh setup chain: once the default mods finished installing,
             # the recommended addons follow (no-op if already initialized).
             self._maybe_install_default_addons()
-            # UPDATE ALL: the mods half is done; the addons half follows.
+            # Update all: the mods half is done; the addons half follows.
             if self._update_all_chain:
-                self._update_all_chain = False
-                self.after(0, self._addon_update_all)
+                self.after(0, self._chain_addon_update_all)
 
             # Any mod in an error state (download blocked, API limit, AV
             # deleted the archive, …) — bring the MODS tab up so the error
@@ -8350,8 +8938,7 @@ class EqUpdaterApp(tk.Tk):
         cb_ignore_speech.pack(anchor="w")
         self._add_tooltip(
             cb_ignore_speech,
-            tr("Ignores verification and updates for speech.mpq, allowing "
-               "custom speech sounds"))
+            tr("Ignores verification and updates for speech.mpq, allowing custom speech sounds."))
 
         list_frame = tk.Frame(outer, bg=C_PANEL)
         list_frame.pack(fill="both", expand=True,
@@ -8516,7 +9103,7 @@ class EqUpdaterApp(tk.Tk):
                 if src:
                     source_line = (tr("Source: {source}",
                                       source=mpq.describe_source(src)),
-                                   tr("Unlink"), lambda f=fname: self._mpq_unlink(f))
+                                   None, None)
                 else:
                     source_line = (tr("Source: not linked"), tr("Link source…"),
                                    lambda f=fname: self._open_mpq_link_dialog(f))
@@ -8529,7 +9116,10 @@ class EqUpdaterApp(tk.Tk):
                               replace=(lambda r=row: self._mpq_replace(r))
                               if src and state in mpq.REPLACEABLE else None,
                               source_line=source_line,
-                              credit=entry if listed else None)
+                              credit=entry if listed else None,
+                              uninstall=lambda f=fname: self._mpq_uninstall(f),
+                              release=(lambda f=fname: self._mpq_unlink(f))
+                              if src else None)
 
         self._mpq_section_header(N_("AVAILABLE"), available)
         if self._mpq_sections_open.get("AVAILABLE", True):
@@ -8574,13 +9164,6 @@ class EqUpdaterApp(tk.Tk):
     #: one somebody made themselves. These say which is which instead of
     #: calling all three out of date and offering to replace them.
     _MPQ_STATES = {
-        "upToDate":      (N_("Up to date"), None,
-                          N_("Matches the pack its source publishes.")),
-        "unmanaged":     (N_("Not linked"), None,
-                          N_("EqUpdater did not install this pack and does not "
-                          "know where it came from, so it cannot check it "
-                          "for updates. Link its source below; linking "
-                          "changes no files.")),
         "modified":      (N_("Modified locally"), "#d4b43c",
                           N_("This file has changed since EqUpdater installed "
                           "or linked it. Automatic updates are held back.")),
@@ -8588,11 +9171,7 @@ class EqUpdaterApp(tk.Tk):
                           N_("The source could not be checked, so nothing is "
                           "replaced.")),
         "sourceDiffers": (N_("Differs from source"), "#d4b43c",
-                          N_("This is not the file its source publishes now. An "
-                          "MPQ carries no version, so it could be older, "
-                          "newer or edited - it is left alone. Replace "
-                          "installs the source's copy and keeps yours as a "
-                          ".bak file.")),
+                          N_("This is not the file its source publishes now. An MPQ carries no version, so it could be older, newer or edited – it is left alone. Replace installs the source's copy and keeps yours as a .bak file.")),
         "unconfirmed":   (N_("Source not confirmed"), None,
                           N_("The source publishes no checksum, so EqUpdater "
                           "cannot prove this file is its copy. Replace "
@@ -8601,7 +9180,8 @@ class EqUpdaterApp(tk.Tk):
     }
 
     def _mpq_row(self, name, filename, description, busy=None, button=None,
-                 state=None, replace=None, source_line=None, credit=None):
+                 state=None, replace=None, source_line=None, credit=None,
+                 uninstall=None, release=None):
         """One patch row: name (and filename), then on the right either a
         busy label, a button, or the state with its explanation; the
         description underneath; and for installed packs, where the pack
@@ -8609,10 +9189,14 @@ class EqUpdaterApp(tk.Tk):
 
         `button` is (label, callback). `replace` is a callback offered as a
         quiet "Replace…" beside a held-back state. `source_line` is (text,
-        link label, callback)."""
+        link label, callback); the link may be None. `uninstall` and
+        `release` add the bin and the grey × at the right edge."""
         f = self._mpq_inner
         box = tk.Frame(f, bg=C_PANEL)
-        box.pack(fill="x", pady=self._px(4))
+        box.pack(fill="x", pady=(self._px(4), 0))
+        # The same divider as an Addons row, under everything this pack says.
+        tk.Frame(f, bg=C_DIVIDER, height=self._px(1)).pack(
+            fill="x", pady=(self._px(3), 0))
         top = tk.Frame(box, bg=C_PANEL)
         top.pack(fill="x")
         tk.Label(top, text=name, font=self._font(11, bold=True),
@@ -8621,6 +9205,14 @@ class EqUpdaterApp(tk.Tk):
         if filename and filename.lower() != name.lower():
             tk.Label(top, text=f"  {filename}", font=self._font(9),
                      fg=C_TEXT_DIM, bg=C_PANEL).pack(side="left")
+        if not busy:
+            if uninstall:
+                self._action_icon(top, "remove", tr("Uninstall"), uninstall,
+                                  padx=(self._px(8), self._px(8)))
+            if release:
+                self._action_icon(top, "release", tr("Stop managing. Your "
+                                                     "files are kept."),
+                                  release, padx=(self._px(2), 0))
         if busy:
             tk.Label(top, text=busy, font=self._font(10),
                      fg=C_TEXT_DIM, bg=C_PANEL).pack(side="right",
@@ -8681,7 +9273,7 @@ class EqUpdaterApp(tk.Tk):
             line.pack(fill="x", padx=self._px(8), pady=(self._px(2), 0))
             tk.Label(line, text=text, font=self._font(9), fg=C_TEXT_DIM,
                      bg=C_PANEL, anchor="w").pack(side="left")
-            if not busy:
+            if not busy and link_text:
                 link = tk.Label(line, text="  ·  " + link_text,
                                 font=self._font(9, bold=True), fg=C_MOD_HL,
                                 bg=C_PANEL, cursor="hand2")
@@ -8689,6 +9281,12 @@ class EqUpdaterApp(tk.Tk):
                 link.bind("<Button-1>", lambda e, cb=callback: cb())
                 link.bind("<Enter>", lambda e, w=link: w.configure(fg=C_GOLD_LT))
                 link.bind("<Leave>", lambda e, w=link: w.configure(fg=C_MOD_HL))
+                if state == "unmanaged":
+                    # "Source: not linked" says it; this says why it matters.
+                    self._set_tooltip(link, tr(
+                        "EqUpdater did not install this pack and does not "
+                        "know where it came from, so it cannot check it for "
+                        "updates. Linking its source changes no files."))
 
     def _mpq_start(self, filename: str, text: str) -> str | None:
         """Mark one pack busy and return the Data folder, or None if another
@@ -8769,6 +9367,28 @@ class EqUpdaterApp(tk.Tk):
         entry = row.get("entry")
         self._mpq_fetch(fname, row["source"],
                         entry["name"] if entry else fname, replace=True)
+
+    def _mpq_uninstall(self, filename: str):
+        """Delete a pack from Data, after asking, and forget its record."""
+        from tkinter import messagebox
+        out = self._game_path.get().strip()
+        if not out or getattr(self, "_mpq_busy", None):
+            return
+        if not messagebox.askyesno(
+                tr("Uninstall {name}?", name=filename),
+                tr("{file} is deleted from the game's Data folder.",
+                   file=filename), parent=self):
+            return
+        try:
+            os.remove(os.path.join(gamepaths.game_path(out, "Data"), filename))
+        except FileNotFoundError:
+            pass
+        except OSError as e:
+            self._log_line(f"Could not uninstall {filename}: {e}\n", "err")
+            return
+        self._mpq_save_record(filename, None)
+        self._log_line(f"\n{filename} uninstalled.\n", "acct")
+        self._mpq_check()
 
     def _mpq_unlink(self, filename: str):
         """Forget where a pack came from. The file stays exactly where it is;
@@ -9025,6 +9645,8 @@ class EqUpdaterApp(tk.Tk):
             ap = addons_path(client) if client else ""
             if ap and os.path.isdir(ap):
                 for name in sorted(os.listdir(ap)):
+                    if name == lootgate.FOLDER:
+                        continue        # part of the Auto Loot setting
                     if name.startswith(("Blizzard_", "Turtle_")):
                         continue
                     dirp = os.path.join(ap, name)
@@ -9055,6 +9677,19 @@ class EqUpdaterApp(tk.Tk):
                     suggested = override or (avail or {}).get("git")
                     rec["suggested_git"] = suggested
                     rec["managed"] = addon_is_managed(saved)
+                    if not rec["managed"]:
+                        # A clone knows where it came from, which outranks
+                        # what the catalogue would recommend for the name --
+                        # and works for an addon the catalogue has never heard
+                        # of. OctoLauncher's addons are all clones.
+                        clone = gitlocal.read_clone(dirp)
+                        if clone and is_allowed_git_url(
+                                canonical_repo_url(clone.remote).removesuffix(".git")):
+                            rec["suggested_git"] = canonical_repo_url(
+                                clone.remote).removesuffix(".git")
+                        rec["catalog_git"] = suggested
+                        rec["catalog_ref"] = (avail or {}).get("ref")
+                        rec["catalog_branch"] = (avail or {}).get("branch")
 
                     if not rec["managed"]:
                         # **Found, not owned.** The inherited updater matched
@@ -9122,7 +9757,15 @@ class EqUpdaterApp(tk.Tk):
                     rec["remote_sha"] = remote
                     rec["installed_sha"] = saved.get("sha")
                     if decision.status is Status.UNVERIFIABLE and lookup_failed:
-                        rec["error"] = N_("Could not reach the addon's source")
+                        # Not an addon error: nothing is wrong with the files,
+                        # which stay as they are, nor with the record. The
+                        # next look asks again.
+                        rec["check_failed"] = (
+                            addon_lookup_reason(rec["git"], rec["branch"],
+                                                rec["ref"])
+                            or N_("the source did not answer"))
+                        log(f"Addon source check failed: {name} from "
+                            f"{rec['git']}: {rec['check_failed']}")
                     addons[name] = rec
 
             # Overlay install failures from this session: the rescan drops
@@ -9155,6 +9798,9 @@ class EqUpdaterApp(tk.Tk):
                     self._render_addons(keep_scroll=True)
                 else:
                     self._refresh_addons_footer()
+                self._refresh_manage_all()
+                self.after(500, self._offer_manage_found)
+                self._identify_addons_once()
             self.after(0, done)
         threading.Thread(target=worker, daemon=True).start()
 
@@ -9286,7 +9932,7 @@ class EqUpdaterApp(tk.Tk):
                         self._addons_status["addons"].pop(folder, None)
                 if failures:
                     self._status_error(
-                        tr("Some addons failed — see the message for details"),
+                        tr("Some addons failed – see the message for details"),
                         lambda f=list(failures), n=len(recs):
                             self._report_addon_failures(f, n))
                 # Cache-only refresh: the install itself already resolved and
@@ -9679,6 +10325,167 @@ class EqUpdaterApp(tk.Tk):
                where=shown, loads=loads, app=branding.APP_NAME),
             icon="warning", parent=self)
 
+    #: The Mods tab's sections, in order.
+    MOD_SECTIONS = (N_("MANAGED"), N_("INSTALLED LOCALLY"), N_("AVAILABLE"))
+
+    def _mod_section(self, mod: dict, state: dict) -> str:
+        """MANAGED: files here that EqUpdater looks after. INSTALLED
+        LOCALLY: files here that it does not. AVAILABLE: not here."""
+        here, managed = self._mod_icon_state(mod, state)
+        if not here:
+            return "AVAILABLE"
+        return "MANAGED" if managed else "INSTALLED LOCALLY"
+
+    def _mod_build_list(self, mods_sorted, mods_cfg) -> list:
+        """The rows to build, each section's header first: (title, count)
+        for a header, the mod for a row. A closed section has no rows."""
+        groups = {t: [] for t in self.MOD_SECTIONS}
+        for mod in mods_sorted:
+            groups[self._mod_section(mod, mods_cfg.get(mod["id"], {}))].append(mod)
+        out = []
+        opened = getattr(self, "_mod_sections_open", {})
+        for title in self.MOD_SECTIONS:
+            out.append((title, len(groups[title])))
+            if opened.get(title, True):
+                out.extend(groups[title])
+        return out
+
+    def _mod_section_header(self, title: str, count: int):
+        """A section's title and count, opening and closing it -- drawn as
+        the Addons tab draws its own."""
+        f = self._mods_inner
+        self._mod_sections_open = getattr(self, "_mod_sections_open", {})
+        is_open = self._mod_sections_open.get(title, True)
+        hdr = tk.Frame(f, bg=C_PANEL)
+        hdr.pack(fill="x", pady=(self._px(10), self._px(2)))
+        arrow = tk.Label(hdr, text="▾" if is_open else "▸",
+                         font=self._font(14, bold=True),
+                         fg=C_GOLD, bg=C_PANEL, cursor="hand2", width=2)
+        arrow.pack(side="left")
+        lbl = tk.Label(hdr, text=tr(title), font=self._font(12, bold=True),
+                       fg=C_GOLD, bg=C_PANEL, cursor="hand2")
+        lbl.pack(side="left")
+        tk.Label(hdr, text=f"  {count}", font=self._font(10),
+                 fg=C_TEXT_DIM, bg=C_PANEL).pack(side="left")
+        if title == "INSTALLED LOCALLY" and count and self._found_mods():
+            every = tk.Label(hdr, text=tr("Manage all ({count})",
+                                          count=len(self._found_mods())),
+                             font=self._font(10, bold=True), fg=C_MOD_HL,
+                             bg=C_PANEL, cursor="hand2")
+            every.pack(side="right", padx=self._px(4))
+            every.bind("<Button-1>", lambda _e: self._manage_all_found())
+            every.bind("<Enter>", lambda _e, w=every: w.configure(fg=C_GOLD_LT))
+            every.bind("<Leave>", lambda _e, w=every: w.configure(fg=C_MOD_HL))
+
+        def toggle(_e=None, t=title):
+            self._mod_sections_open[t] = not self._mod_sections_open.get(t, True)
+            self._rebuild_mod_rows()
+        arrow.bind("<Button-1>", toggle)
+        lbl.bind("<Button-1>", toggle)
+        if is_open and not count:
+            tk.Label(f, text=tr("Nothing here."), font=self._font(10),
+                     fg=C_TEXT_DIM, bg=C_PANEL).pack(anchor="w",
+                                                     padx=self._px(8))
+
+    def _mod_install(self, mod_id: str):
+        """Install a mod from its row's download icon: the same questions
+        the old checkbox asked (a resolution fix that conflicts, two builds of
+        one mod), then an Apply for just what they agreed to."""
+        if self._btn_mode == "busy":
+            return
+        var = tk.BooleanVar(master=self, value=True)
+        self._toggle_mod(mod_id, var)
+        if not var.get() or not self._mod_pending_state.get(
+                mod_id, {}).get("enabled"):
+            return                              # backed out of a question
+        self._apply_mods()
+
+    def _mod_icon_state(self, mod: dict, state: dict) -> tuple:
+        """What decides a mod row's icons: whether its files are here, and
+        whether EqUpdater manages them."""
+        client = self._game_path.get().strip()
+        return (bool(client) and bool(mod_found_files(mod, client)),
+                bool(state.get("managed")))
+
+    def _mod_icons_stale(self, mods_cfg: dict) -> bool:
+        """Whether any built row shows icons for a state it is no longer in
+        (installed, uninstalled, adopted or released since it was drawn)."""
+        built = getattr(self, "_mod_built_sections", {})
+        for mod in MODS_REGISTRY:
+            state = mods_cfg.get(mod["id"], {})
+            refs = self._mod_row_vars.get(mod["id"])
+            if refs is not None and refs.get("icons") != self._mod_icon_state(
+                    mod, state):
+                return True
+            # Moved section -- into one that is closed, or out of one.
+            if built and built.get(mod["id"]) != self._mod_section(mod, state):
+                return True
+        return False
+
+    def _mod_release(self, mod_id: str):
+        """Stop managing a mod. Its files stay exactly where they are and it
+        still loads; EqUpdater just stops updating it, and "Manage all"
+        leaves it out. The row's "not managed" takes it back."""
+        mod = next((m for m in MODS_REGISTRY if m["id"] == mod_id), None)
+        if mod is None:
+            return
+
+        def _merge(c):
+            rec = c.setdefault("mods", {}).setdefault(mod_id, {})
+            rec.update(managed=False, adopted=False, installed_by=None,
+                       released=True, error=None)
+        self._cfg = update_config(_merge)
+        self._mod_pending_state.pop(mod_id, None)
+        self._log_line("\n%s is no longer managed by %s; its files are "
+                       "untouched.\n" % (mod["name"], branding.APP_NAME), "acct")
+        self._rebuild_mod_rows()
+        self._refresh_mods_badge()
+        self._refresh_apply_btn_visibility()
+
+    def _mod_uninstall(self, mod_id: str):
+        """Uninstall a mod now: its files are deleted and its dlls.txt line
+        removed, managed or not, without a release lookup -- the same as
+        unticking it and pressing Apply, for this one mod."""
+        from tkinter import messagebox
+        mod = next((m for m in MODS_REGISTRY if m["id"] == mod_id), None)
+        client = self._game_path.get().strip()
+        if mod is None or not client or self._btn_mode == "busy":
+            return
+        if not messagebox.askyesno(
+                tr("Uninstall {name}?", name=mod["name"]),
+                tr("{name}'s files are deleted from the game folder and it is "
+                   "taken out of dlls.txt.", name=mod["name"]),
+                parent=self):
+            return
+        state = load_config().get("mods", {}).get(mod_id, {})
+        try:
+            if not state.get("installed_files"):
+                # Never recorded: the files found here, and only those.
+                mod = dict(mod, installed_files=mod_found_files(mod, client))
+                update_config(lambda c: c.setdefault("mods", {}).setdefault(
+                    mod_id, {}).__setitem__("installed_files",
+                                            mod["installed_files"]))
+            uninstall_mod(mod, client)
+            if mod.get("register_dll"):
+                remove_dll(client, mod["register_dll"])
+        except OSError as e:
+            self._log_line(f"Could not uninstall {mod['name']}: {e}\n", "err")
+            return
+
+        def _merge(c):
+            mods = c.setdefault("mods", {})
+            rec = new_mod_record(managed=False, enabled=False)
+            rec["ignore_updates"] = bool((mods.get(mod_id) or {}).get(
+                "ignore_updates", False))
+            mods[mod_id] = rec
+        self._cfg = update_config(_merge)
+        self._mod_pending_state.pop(mod_id, None)
+        self._log_line(f"\n{mod['name']} uninstalled.\n", "acct")
+        self._rebuild_mod_rows()
+        self._refresh_mods_badge()
+        self._refresh_apply_btn_visibility()
+        self._refresh_ready_state()
+
     def _remove_custom_mod(self, mod_id: str):
         """Take a custom mod out of the list: its file is deleted, its
         dlls.txt line removed, and its record forgotten."""
@@ -9847,7 +10654,7 @@ class EqUpdaterApp(tk.Tk):
             old.destroy()
 
     def _on_addon_filter_changed(self, *_args):
-        """Debounce search input — re-render once typing pauses, not on
+        """Debounce search input – re-render once typing pauses, not on
         every keystroke."""
         if self._addon_filter_job is not None:
             self.after_cancel(self._addon_filter_job)
@@ -9906,7 +10713,7 @@ class EqUpdaterApp(tk.Tk):
 
         work = []
         for title, rows in ((N_("MANAGED"), managed),
-                            (N_("INSTALLED MANUALLY"), unmanaged),
+                            (N_("INSTALLED LOCALLY"), unmanaged),
                             (N_("AVAILABLE"), available)):
             work.append(("header", title, rows))
             if self._addon_sections_open.get(title, True):
@@ -9951,6 +10758,15 @@ class EqUpdaterApp(tk.Tk):
         lbl.pack(side="left")
         tk.Label(hdr, text=f"  {len(rows)}", font=self._font(10),
                  fg=C_TEXT_DIM, bg=C_PANEL).pack(side="left")
+        if title == "INSTALLED LOCALLY" and self._found_addons():
+            every = tk.Label(hdr, text=tr("Manage all ({count})",
+                                          count=len(self._found_addons())),
+                             font=self._font(10, bold=True), fg=C_MOD_HL,
+                             bg=C_PANEL, cursor="hand2")
+            every.pack(side="right", padx=self._px(4))
+            every.bind("<Button-1>", lambda _e: self._manage_all_found())
+            every.bind("<Enter>", lambda _e, w=every: w.configure(fg=C_GOLD_LT))
+            every.bind("<Leave>", lambda _e, w=every: w.configure(fg=C_MOD_HL))
 
         def toggle(_e=None, t=title):
             self._addon_sections_open[t] = \
@@ -9992,42 +10808,19 @@ class EqUpdaterApp(tk.Tk):
 
         # right side first so it stays pinned to the edge
         if installed:
-            # Trash can drawn as canvas shapes (handle, lid, tapered body
-            # with slats) — same fixed-size approach as the download arrow.
-            rm = tk.Canvas(row, width=self._px(20), height=self._px(18),
-                           bg=C_PANEL, highlightthickness=0, cursor="hand2")
-            rm.pack(side="right", padx=(self._px(8), self._px(2)))
-            rm.create_rectangle(*self._px(8, 2, 12, 4), fill="#8a4a4a",
-                                outline="", tags="trash")
-            rm.create_rectangle(*self._px(4, 4, 16, 6), fill="#8a4a4a",
-                                outline="", tags="trash")
-            rm.create_polygon(*self._px(5, 8, 15, 8, 14, 16, 6, 16),
-                              fill="#8a4a4a", outline="", tags="trash")
-            for x in (8, 10, 12):
-                rm.create_line(*self._px(x, 10, x, 14), fill=C_PANEL)
-            rm.bind("<Button-1>",
-                    lambda e, n=rec["folder"]: self._addon_remove(n))
-            rm.bind("<Enter>", lambda e, c=rm:
-                    c.itemconfigure("trash", fill=C_ERR))
-            rm.bind("<Leave>", lambda e, c=rm:
-                    c.itemconfigure("trash", fill="#8a4a4a"))
+            self._action_icon(row, "remove", tr("Uninstall"),
+                              lambda n=rec["folder"]: self._addon_remove(n),
+                              padx=(self._px(8), self._px(2)))
 
-            # **Stop managing**, next to Remove and deliberately unlike it:
-            # one gives up ownership, the other deletes files. Offered only
-            # on addons EqUpdater actually owns - there is nothing to release
-            # on one it never claimed.
+            # **Stop managing**, next to Uninstall and deliberately unlike
+            # it: one gives up ownership, the other deletes files. Offered
+            # only on addons EqUpdater actually owns - there is nothing to
+            # release on one it never claimed.
             if rec.get("status") not in ("unmanaged", "available", None):
-                rel = tk.Label(row, text="↩", font=self._font(11),
-                               fg=C_TEXT_DIM, bg=C_PANEL, cursor="hand2")
-                rel.pack(side="right", padx=(self._px(2), 0))
-                rel.bind("<Button-1>",
-                         lambda e, n=rec["folder"]: self._addon_release(n))
-                rel.bind("<Enter>", lambda e, w=rel: w.configure(fg=C_GOLD))
-                rel.bind("<Leave>", lambda e, w=rel: w.configure(fg=C_TEXT_DIM))
-                self._set_tooltip(
-                    rel, tr("Stop managing this addon. The files stay exactly "
-                            "where they are; {app} simply stops offering "
-                            "updates for it.", app=branding.APP_NAME))
+                self._action_icon(row, "release", tr("Stop managing. Your "
+                                                     "files are kept."),
+                                  lambda n=rec["folder"]: self._addon_release(n),
+                                  padx=(self._px(2), 0))
 
             # A recommended source that is not the one this was installed
             # from. Offered as a switch, never taken as an update - see
@@ -10050,32 +10843,17 @@ class EqUpdaterApp(tk.Tk):
                            "not an update, so nothing happens until you ask.",
                            source=suggested))
         else:
-            # Download arrow drawn as a polygon — exact size and centering,
-            # independent of any font, without inflating the row height.
-            dl = tk.Canvas(row, width=self._px(20), height=self._px(18),
-                           bg=C_PANEL, highlightthickness=0, cursor="hand2")
-            dl.pack(side="right", padx=(self._px(8), self._px(2)))
-            dl_item = dl.create_polygon(
-                *self._px(8, 3, 12, 3, 12, 9, 16, 9, 10, 15, 4, 9, 8, 9),
-                fill=C_OK, outline="")
-            dl.bind("<Button-1>",
-                    lambda e, r=rec: self._addon_apply([dict(r)]))
-            dl.bind("<Enter>", lambda e, c=dl, i=dl_item:
-                    c.itemconfigure(i, fill="#8fdf8e"))
-            dl.bind("<Leave>", lambda e, c=dl, i=dl_item:
-                    c.itemconfigure(i, fill=C_OK))
+            self._action_icon(row, "download", tr("Download from repository"),
+                              lambda r=rec: self._addon_apply([dict(r)]),
+                              padx=(self._px(8), self._px(2)))
 
         # Repo link on the right (like the Mods tab), between the status text
         # and the install/remove icon.
         if rec.get("git"):
             repo_url = rec["git"][:-4] if rec["git"].endswith(".git") \
                 else rec["git"]
-            lnk = tk.Label(row, text="⧉", font=self._font(10),
-                           fg=C_TEXT_DIM, bg=C_PANEL, cursor="hand2")
-            lnk.pack(side="right", padx=(self._px(4), self._px(2)))
-            lnk.bind("<Button-1>", lambda e, u=repo_url: self._open_url(u))
-            lnk.bind("<Enter>", lambda e, w=lnk: w.configure(fg=C_GOLD))
-            lnk.bind("<Leave>", lambda e, w=lnk: w.configure(fg=C_TEXT_DIM))
+            self._action_icon(row, "link", tr("Open repository in browser"),
+                              lambda u=repo_url: self._open_url(u))
 
         self._addon_row_status(row, rec, installed, warnings)
 
@@ -10108,6 +10886,14 @@ class EqUpdaterApp(tk.Tk):
                      font=self._font(9), fg=C_ERR, bg=C_PANEL,
                      wraplength=self._px(840), justify="left",
                      anchor="w").pack(fill="x", pady=(0, self._px(3)))
+        elif rec.get("check_failed"):
+            tk.Label(f, text="  ⚠  " + tr(
+                         "Could not check the addon's source: {reason}. "
+                         "Your installed files are not changed.",
+                         reason=tr(rec["check_failed"])),
+                     font=self._font(9), fg=C_GOLD, bg=C_PANEL,
+                     wraplength=self._px(840), justify="left",
+                     anchor="w").pack(fill="x", pady=(0, self._px(3)))
 
         tk.Frame(f, bg=C_DIVIDER, height=self._px(1)).pack(
             fill="x", pady=(self._px(3), 0))
@@ -10116,7 +10902,6 @@ class EqUpdaterApp(tk.Tk):
     #: offer to act reads as plain text in a muted colour: a state the user
     #: cannot act on is not drawn to look like a button.
     _ADDON_STATES = {
-        "upToDate":        (N_("Up to date"), C_TEXT_DIM, ""),
         "localNewer":      (N_("Local version newer"), "#d4b43c",
                             N_("The installed commit is ahead of the source's. "
                             "EqUpdater will not roll it back.")),
@@ -10129,9 +10914,7 @@ class EqUpdaterApp(tk.Tk):
                             "one now recommended. Switching forks is a "
                             "choice, not an update.")),
         "diverged":        (N_("Different revision"), "#d4b43c",
-                            N_("The installed commit and the remote one do not "
-                            "contain each other - another branch, a fork, or "
-                            "rebased history.")),
+                            N_("The installed commit and the remote one do not contain each other – another branch, a fork, or rebased history.")),
         "unverifiable":    (N_("Unable to verify"), C_TEXT_DIM,
                             N_("Which side is newer could not be established, "
                             "so nothing is replaced.")),
@@ -10156,6 +10939,17 @@ class EqUpdaterApp(tk.Tk):
                                                      padx=self._px(4))
             return
 
+        if rec.get("check_failed") and not rec.get("error"):
+            btn = tk.Label(row, text=tr("can't check"),
+                           font=self._font(10, bold=True), fg=C_GOLD,
+                           bg=C_PANEL, cursor="hand2")
+            btn.pack(side="right", padx=self._px(4))
+            btn.bind("<Button-1>", lambda _e: self._addons_verify(force=True))
+            btn.bind("<Enter>", lambda _e, w=btn: w.configure(fg=C_GOLD_LT))
+            btn.bind("<Leave>", lambda _e, w=btn: w.configure(fg=C_GOLD))
+            self._set_tooltip(btn, tr("Nothing is changed. Click to check again."))
+            return
+
         if status == "invalid" or rec.get("error"):
             # Short marker on the right; the full reason gets its own line
             # under the row (long messages would squeeze the description).
@@ -10168,7 +10962,7 @@ class EqUpdaterApp(tk.Tk):
             # nothing now - and never to "update" it, because nothing here
             # establishes that the catalogue copy and this copy are even the
             # same addon.
-            if rec.get("suggested_git"):
+            if rec.get("suggested_git") or rec.get("git"):
                 btn = tk.Label(row, text=tr("Manage"),
                                font=self._font(10, bold=True),
                                fg=C_MOD_HL, bg=C_PANEL, cursor="hand2")
@@ -10179,13 +10973,8 @@ class EqUpdaterApp(tk.Tk):
                 self._set_tooltip(
                     btn, tr("Let {app} update this addon from {source}. Your "
                             "current files are not changed now.",
-                            app=branding.APP_NAME, source=rec["suggested_git"]))
-            lbl = tk.Label(row, text=tr("Installed manually"),
-                           font=self._font(10), fg=C_TEXT_DIM, bg=C_PANEL)
-            lbl.pack(side="right", padx=self._px(4))
-            self._set_tooltip(
-                lbl, tr("{app} did not install this and will not change it.",
-                        app=branding.APP_NAME))
+                            app=branding.APP_NAME,
+                            source=rec.get("suggested_git") or rec.get("git")))
             return
 
         if status == "updateAvailable" and installed:
@@ -10231,7 +11020,9 @@ class EqUpdaterApp(tk.Tk):
             lbl = tk.Label(row, text=text, font=self._font(10),
                            fg=colour, bg=C_PANEL)
             lbl.pack(side="right", padx=self._px(4))
-            if rec.get("reason") and status not in ("upToDate", "unknown"):
+            # The planner's reason, only where it adds something: the
+            # sources' addresses. Elsewhere it restates the tooltip.
+            if rec.get("reason") and status == "differentSource":
                 tip = (tip + "\n\n" + tr(str(rec["reason"]))).strip()
             if tip:
                 self._set_tooltip(lbl, tip)
@@ -10245,12 +11036,12 @@ class EqUpdaterApp(tk.Tk):
         untouched; what changes is that EqUpdater may now offer updates for
         it, and can tell afterwards whether those files changed.
 
-        No commit sha is claimed, because none is known -- whatever is in
-        that folder did not necessarily come from the repository the
-        catalogue suggests, and inventing a sha would let the next run
-        "update" a fork into a different fork. With no sha the planner
-        answers "unable to verify" until the user explicitly installs from
-        the source once, which is the honest sequence."""
+        No commit sha is claimed unless the files prove one: a clean clone
+        of that source, or an exact match with its latest commit. Whatever
+        else is in the folder did not necessarily come from the repository
+        the catalogue suggests, and inventing a sha would let the next run
+        "update" a fork into a different fork. With no sha the planner answers
+        "unable to verify", and Replace is the way out."""
         from tkinter import messagebox
         folder = rec["folder"]
         git = rec.get("suggested_git") or rec.get("git")
@@ -10267,19 +11058,66 @@ class EqUpdaterApp(tk.Tk):
                    "Manage it?", name=folder, app=branding.APP_NAME,
                    source=git)):
             return
-
+        self._record_addon_adoption(rec)
+        self._log_line("\n%s is now managed by %s, tracking %s.\n"
+                       "Its files were not changed.\n"
+                       % (folder, branding.APP_NAME, git), "acct")
         client = self._game_path.get().strip()
+
+        def work():
+            try:
+                self._identify_adopted_addons(client)
+            except Exception as e:
+                log(f"Could not identify {folder}: {e}")
+            self.after(0, self._after_identify)
+        threading.Thread(target=work, daemon=True).start()
+
+    def _record_addon_adoption(self, rec: dict):
+        """Write down that EqUpdater looks after this folder, tracking the
+        source it came from. Installs nothing; the caller has the player's
+        consent. A source other than the catalogue's stays the player's: the
+        addon keeps updating from where it came from, and is not offered as
+        "installed from a different source" for the next fork along."""
+        folder = rec["folder"]
+        git = rec.get("suggested_git") or rec.get("git")
+        client = self._game_path.get().strip()
+        catalog = rec.get("catalog_git")
+        same = bool(catalog) and same_repo(catalog, git)
         record = new_addon_record(
             managed=True, adopted=True, git=git,
+            branch=rec.get("catalog_branch") if same else None,
+            ref=rec.get("catalog_ref") if same else None,
+            custom_source=bool(catalog) and not same,
             content_hash=folder_hash(
                 os.path.join(addons_path(client), folder)) if client else None)
         update_config(lambda c, f=folder, r=record:
                       c.setdefault("addons", {}).__setitem__(f, r))
-        self._log_line("\n%s is now managed by %s, tracking %s.\n"
-                       "Its files were not changed.\n"
-                       % (folder, branding.APP_NAME, git), "acct")
-        self._addons_verified_ts = 0.0
-        self._addons_verify(force=False)
+
+    def _identify_addons_once(self):
+        """Once a session: find the commit of addons adopted before this
+        could, and of any since. Records written by an older version get
+        theirs here, with no click needed."""
+        if getattr(self, "_addons_identify_started", False):
+            return
+        client = self._game_path.get().strip()
+        pending = [f for f, r in (load_config().get("addons") or {}).items()
+                   if addon_is_managed(r) and not r.get("sha") and r.get("git")]
+        if not client or not pending:
+            return
+        self._addons_identify_started = True
+
+        def work():
+            before = {f: r.get("sha") for f, r in
+                      (load_config().get("addons") or {}).items()}
+            try:
+                self._identify_adopted_addons(client)
+            except Exception as e:
+                log(f"Could not identify adopted addons: {e}")
+            after = {f: r.get("sha") for f, r in
+                     (load_config().get("addons") or {}).items()}
+            if before != after:
+                self.after(0, self._after_identify)
+        threading.Thread(target=work, daemon=True).start()
 
     def _addon_release(self, folder: str):
         """Stop managing an addon. The files stay exactly where they are.
@@ -10296,6 +11134,7 @@ class EqUpdaterApp(tk.Tk):
             r = c.setdefault("addons", {}).setdefault(folder, {})
             r["managed"] = False
             r["installed_by"] = None
+            r["released"] = True        # "Manage all" leaves this one out
         update_config(_merge)
         self._log_line("\n%s is no longer managed by %s; its files are "
                        "untouched.\n" % (folder, branding.APP_NAME), "acct")
@@ -10375,7 +11214,7 @@ class EqUpdaterApp(tk.Tk):
     # ── footer ────────────────────────────────────────────────────────────────
 
     def _build_footer(self):
-        """PLAY/UPDATE, UPDATE ALL, the status line, the progress bar and the
+        """PLAY/UPDATE, the status line, the progress bar and the
         version -- drawn over the bottom of the background, which fades to
         dark there (see _draw_bg), instead of on a solid block. Text is
         canvas text so the gradient shows through around it."""
@@ -10415,21 +11254,6 @@ class EqUpdaterApp(tk.Tk):
         self._foot_items["btn"] = c.create_window(
             0, 0, window=self._btn_glow, anchor="nw")
 
-        # UPDATE ALL: only safe, managed, provably newer components.
-        self._all_glow = tk.Frame(c, bg=UPDALL_GLOW_OFF)
-        self._all_btn = GradientButton(
-            self._all_glow, width=self._px(132), height=self._px(38),
-            text=tr("UPDATE ALL"), palette=UPDATE_ALL_GRADIENT,
-            command=self._update_all, bg=C_BG,
-            font_factory=lambda: self._font(11, bold=True))
-        self._all_btn.pack(padx=self._px(2), pady=self._px(2))
-        self._all_btn.set_enabled(False)
-        self._gradient_buttons.append(self._all_btn)
-        self._all_ready = False
-        self._update_all_chain = False
-        self._foot_items["all"] = c.create_window(
-            0, 0, window=self._all_glow, anchor="nw")
-
         self._client_ver_var = tk.StringVar(value="")
         text("client", self._client_ver_var, text="", anchor="nw",
              fill=C_TEXT_DIM)
@@ -10444,6 +11268,8 @@ class EqUpdaterApp(tk.Tk):
 
         text("version", text=f"v{UPDATER_VERSION}", anchor="se",
              fill="#6a7690", font=("Courier New", 8))
+        self._build_footer_links()
+        self._build_update_all_button()
         self._layout_footer()
 
     def _status_error(self, text: str, action):
@@ -10474,6 +11300,318 @@ class EqUpdaterApp(tk.Tk):
         if self._status_action is not None:
             self._status_action()
 
+    def _footer_icon_photos(self):
+        """The footer's link icons at this scale, {key: (resting, under the
+        cursor)}. Each supplied image is trimmed to what it draws, so the two
+        logos are the same height whatever transparent margin they came with,
+        and keeps its proportions. Rebuilt only when the scale changes."""
+        height = self._px(FOOTER_ICON_H)
+        if getattr(self, "_footer_icon_height", None) == height:
+            return
+        from PIL import Image, ImageTk
+        photos = {}
+        for key, candidates in (("discord", branding.discord_icon_candidates()),
+                                ("coffee", branding.coffee_icon_candidates())):
+            path = next(p for p in candidates if os.path.exists(p))
+            with Image.open(path) as im:
+                im = im.convert("RGBA")
+                im = im.crop(im.getbbox() or (0, 0, im.width, im.height))
+                width = max(1, round(im.width * height / im.height))
+                full = im.resize((width, height), Image.Resampling.LANCZOS)
+            resting = full.copy()
+            resting.putalpha(full.getchannel("A").point(
+                lambda a: round(a * FOOTER_ICON_REST)))
+            photos[key] = (ImageTk.PhotoImage(resting, master=self),
+                           ImageTk.PhotoImage(full, master=self))
+        self._footer_icons = photos
+        self._footer_icon_height = height
+
+    def _canvas_link(self, key: str, images, tip, on_click):
+        """An image on the footer canvas that behaves as a link: the hover
+        image and a hand under the cursor, a tooltip above it, ``on_click``
+        on a click. ``images`` and ``tip`` are callables, read each time, so a
+        rescale or a new count shows at once."""
+        c = self._bg_canvas
+        item = c.create_image(0, 0, anchor="se", image=images()[0])
+        self._foot_items[key] = item
+        self._foot_tips = getattr(self, "_foot_tips", {})
+
+        def hide_tip():
+            win = self._foot_tips.pop(key, None)
+            if win is not None:
+                win.destroy()
+
+        def enter(_e=None):
+            c.itemconfigure(item, image=images()[1])
+            c.configure(cursor="hand2")
+            hide_tip()
+            win = tk.Toplevel(self)
+            win.wm_overrideredirect(True)
+            tk.Label(win, text=tip(), font=self._font(9),
+                     fg=C_TEXT, bg="#0f0b16", highlightthickness=1,
+                     highlightbackground=C_PANEL_BDR, padx=self._px(6),
+                     pady=self._px(2)).pack()
+            # Above the icon, kept inside the window: the right edge is near.
+            win.update_idletasks()
+            x0, y0, x1, _y1 = c.bbox(item)
+            x = min(x0, c.winfo_width() - win.winfo_reqwidth() - self._px(4))
+            win.wm_geometry("+%d+%d" % (
+                c.winfo_rootx() + max(0, x),
+                c.winfo_rooty() + y0 - win.winfo_reqheight() - self._px(4)))
+            self._foot_tips[key] = win
+
+        def leave(_e=None):
+            c.itemconfigure(item, image=images()[0])
+            c.configure(cursor="")
+            hide_tip()
+
+        c.tag_bind(item, "<Enter>", enter)
+        c.tag_bind(item, "<Leave>", leave)
+        c.tag_bind(item, "<Button-1>", lambda _e: on_click())
+        return item, leave
+
+    def _build_footer_links(self):
+        """Discord and the Ko-fi cup, side by side in the bottom-right
+        corner, above the version. A missing image or Pillow leaves the footer
+        as it was."""
+        try:
+            self._footer_icon_photos()
+        except Exception as e:
+            log(f"Footer icons not shown: {e}")
+            return
+        self._canvas_link("discord", lambda: self._footer_icons["discord"],
+                          lambda: tr("Discord"),
+                          lambda: self._open_url(branding.DISCORD_URL))
+        self._canvas_link("coffee", lambda: self._footer_icons["coffee"],
+                          lambda: tr("Donate through Ko-Fi!"),
+                          lambda: self._open_url(branding.KOFI_URL))
+
+    # ── update everything ────────────────────────────────────────────────────
+
+    def _update_all_photos(self):
+        """The up arrow in the old UPDATE ALL button's colours: its gold
+        gradient filling the arrow, and its 1 px border and 2 px glow
+        following the arrow's outline -- the button's frame, wrapped around
+        the arrow instead of a box. Drawn at four times the size and scaled
+        down so the edges are smooth: (resting, under the cursor)."""
+        h = self._px(UPDALL_ICON_H)
+        if getattr(self, "_updall_height", None) == h:
+            return
+        from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageTk
+        k = 4
+        line, glow = max(1, self._px(1)) * k, self._px(2) * k
+        pad = line + glow
+        ah = h * k
+        aw = round(ah * 0.9)
+        shaft, head = round(aw * 0.46), round(ah * 0.5)
+        W, H = aw + 2 * pad, ah + 2 * pad
+        arrow = Image.new("L", (W, H), 0)
+        d = ImageDraw.Draw(arrow)
+        d.polygon([(pad + aw / 2, pad), (pad + aw, pad + head), (pad, pad + head)],
+                  fill=255)
+        d.rectangle([pad + (aw - shaft) / 2, pad + head - 1,
+                     pad + (aw + shaft) / 2, pad + ah], fill=255)
+        # Rounded, not cut: the arrow's corners softened, and each layer
+        # around it grown with round corners. Blurring a mask and cutting it
+        # at the middle rounds its corners in place; cutting it low grows it
+        # by a set distance (1.5 blur radii at 17/255) with rounded corners.
+        def soften(mask, r):
+            return mask.filter(ImageFilter.GaussianBlur(r)).point(
+                lambda v: 255 if v >= 128 else 0)
+
+        def grow(mask, by):
+            return mask.filter(ImageFilter.GaussianBlur(by / 1.5)).point(
+                lambda v: 255 if v > 17 else 0)
+        arrow = soften(arrow, 1.0 * k)
+        bordered = grow(arrow, line)
+        glowed = grow(bordered, glow)
+        ring = ImageChops.subtract(bordered, arrow)
+        halo = ImageChops.subtract(glowed, bordered)
+
+        def gradient(top, bottom):
+            a = [int(top[i:i + 2], 16) for i in (1, 3, 5)]
+            b = [int(bottom[i:i + 2], 16) for i in (1, 3, 5)]
+            col = Image.new("RGB", (1, H))
+            for y in range(H):
+                t = max(0.0, min(1.0, (y - pad) / max(1, ah)))
+                col.putpixel((0, y), tuple(round(a[i] + (b[i] - a[i]) * t)
+                                           for i in range(3)))
+            return col.resize((W, H))
+
+        out = []
+        for (top, bottom), border, opacity in (
+                (UPDALL_FILL[0], UPDALL_BORDER[0], UPDALL_REST),
+                (UPDALL_FILL[1], UPDALL_BORDER[1], 1.0)):
+            im = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+            im.paste(Image.new("RGB", (W, H), UPDALL_GLOW), (0, 0), halo)
+            im.paste(Image.new("RGB", (W, H), border), (0, 0), ring)
+            im.paste(gradient(top, bottom), (0, 0),
+                     arrow.point(lambda v, o=opacity: round(v * o)))
+            small = im.resize((W // k, H // k), Image.Resampling.LANCZOS)
+            out.append(ImageTk.PhotoImage(small, master=self))
+        self._updall_images = tuple(out)
+        self._updall_height = h
+
+    def _build_update_all_button(self):
+        """The arrow right of PLAY: there only while something can be
+        updated, a spinner while it is updating."""
+        self._update_all_chain = False
+        self._update_all_running = False
+        self._updall_spin = 0
+        try:
+            self._update_all_photos()
+        except Exception as e:
+            log(f"Update-all arrow not shown: {e}")
+            return
+        _item, self._updall_leave = self._canvas_link(
+            "updall", lambda: self._updall_images, self._update_all_tip,
+            self._update_all)
+        c = self._bg_canvas
+        self._foot_items["updall_spin"] = c.create_arc(
+            0, 0, 1, 1, start=90, extent=270, style="arc",
+            outline=UPDALL_COLOR, width=max(2, self._px(3)), state="hidden")
+        c.itemconfigure(self._foot_items["updall"], state="hidden")
+
+    def _update_all_tip(self) -> str:
+        count = self._update_all_count()
+        if count == 1:
+            return tr("Update all addons and mods (1 update available)")
+        return tr("Update all addons and mods ({count} updates available)",
+                  count=count)
+
+    def _update_all_count(self) -> int:
+        return int(self._mod_updates_count) + int(self._addon_updates_count)
+
+    def _refresh_update_all_btn(self):
+        """Show the arrow while there is something EqUpdater can prove is
+        safe to update, and nothing else is running; a spinner in its place
+        while an update-all runs. Called whenever a count or the busy state
+        changes, so it follows them without a restart. A failed update leaves
+        its count where it was, and with it the arrow, to try again."""
+        items = getattr(self, "_foot_items", {})
+        if "updall" not in items:
+            return
+        c = self._bg_canvas
+        busy = (self._btn_mode == "busy" or self._addons_busy
+                or getattr(self, "_running", False))
+        if self._update_all_running and not busy and not self._update_all_chain:
+            self._update_all_running = False
+        spinning = self._update_all_running
+        show = not spinning and not busy and self._update_all_count() > 0
+        if not show and c.itemcget(items["updall"], "state") != "hidden":
+            self._updall_leave()            # no tooltip left over a hidden icon
+        c.itemconfigure(items["updall"], state="normal" if show else "hidden")
+        c.itemconfigure(items["updall_spin"],
+                        state="normal" if spinning else "hidden")
+        if spinning and not self._updall_spin:
+            self._spin_update_all()
+
+    def _spin_update_all(self):
+        if not self._update_all_running or getattr(self, "_destroying", False):
+            self._updall_spin = 0
+            return
+        self._updall_spin = (self._updall_spin + 30) % 360 or 360
+        try:
+            self._bg_canvas.itemconfigure(self._foot_items["updall_spin"],
+                                          start=90 - self._updall_spin)
+            self.after(60, self._spin_update_all)
+        except (tk.TclError, RuntimeError):
+            self._updall_spin = 0
+
+    def _all_plans(self) -> list:
+        """Everything EqUpdater has an opinion about, mods and addons."""
+        return list(self._mod_plans().values()) + self._addon_plans()
+
+    def _update_all_preview(self, plans) -> bool:
+        """Show what the update will and will not do; True to go ahead.
+
+        Shown only when something is being held back. A run where everything
+        is ordinary is one click, which is the point of the button -- and a
+        confirmation nobody ever needs is a confirmation everybody learns to
+        dismiss, which is how the one that mattered gets dismissed too."""
+        from tkinter import messagebox
+        doing = updatable(plans)
+        held = skipped_notably(plans)
+        if not held:
+            return True
+
+        lines = []
+        if doing:
+            lines.append(tr("Updates to install: {count}", count=len(doing)))
+            for p in doing:
+                if p.local and p.remote:
+                    lines.append("    %s   %s \u2192 %s"
+                                 % (p.component_id, p.local, p.remote))
+                else:
+                    lines.append("    %s" % p.component_id)
+            lines.append("")
+        else:
+            lines.append(tr("Nothing can be safely updated right now."))
+            lines.append("")
+
+        lines.append(tr("Not being changed:"))
+        for p in held:
+            lines.append("    %s" % p.component_id)
+            lines.append("        %s" % tr(str(p.reason)))
+        lines.append("")
+        lines.append(tr("Anything listed under \u201cnot being changed\u201d "
+                        "stays exactly as it is. Each one can still be dealt "
+                        "with individually from its own tab."))
+
+        if not doing:
+            messagebox.showinfo(tr("Update all"), "\n".join(lines))
+            return False
+        return messagebox.askokcancel(tr("Update all"), "\n".join(lines))
+
+    def _update_all(self):
+        """Update everything EqUpdater manages and can prove is behind.
+
+        It does **not** mean "make this installation match the catalogue".
+        Mods run through the normal Apply worker, which asks the planner per
+        mod; when it finishes, `_update_all_chain` hands over to the addons.
+        Both halves consult the same decisions the preview just showed, so
+        what runs is what was agreed to."""
+        if self._update_all_running or self._btn_mode == "busy" \
+                or self._addons_busy or getattr(self, "_running", False):
+            return                          # a second click while it runs
+        out = self._game_path.get().strip()
+        if not out or self._update_all_count() <= 0:
+            return
+
+        plans = self._all_plans()
+        if not self._update_all_preview(plans):
+            self._refresh_update_all_btn()
+            return
+
+        mods = self._mod_updates_count
+        addons = self._addon_updates_count
+        self._log_line("\nUpdating everything: %d mod(s), %d addon(s)...\n"
+                       % (mods, addons), "acct")
+        # Every hold-back, in the log, with its reason. A skip nobody is told
+        # about is indistinguishable from the updater not working.
+        for p in skipped_notably(plans):
+            self._log_line("  \u2022 %s \u2014 %s\n"
+                           % (p.component_id, p.reason), "")
+
+        self._update_all_running = True
+        if mods > 0:
+            self._update_all_chain = addons > 0
+            self._set_btn_busy(tr("Installing\u2026"))
+            self._status_var.set(tr("Downloading mods\u2026"))
+            threading.Thread(target=self._apply_mods_worker,
+                             args=(out,), daemon=True).start()
+        else:
+            self._addon_update_all()
+        self._refresh_update_all_btn()
+
+    def _chain_addon_update_all(self):
+        """The addons half of an update-all, once the mods are done. The
+        chain flag stays up until the addons are busy, so the spinner does not
+        blink out in between."""
+        self._addon_update_all()
+        self._update_all_chain = False
+        self._refresh_update_all_btn()
+
     def _layout_footer(self):
         """Place the footer from the current font's line height, so a larger
         face (OpenDyslexic) pushes the buttons down instead of under the
@@ -10489,17 +11627,15 @@ class EqUpdaterApp(tk.Tk):
         x = self._px(40)
         status_y = y0 + self._px(6)
         btn_y = status_y + line + self._px(6)
-        # Both buttons as wide as the longest word either can show, in this
-        # language and face ("ACTUALIZAR TODO" outgrew 132 px), and never so
-        # wide that they reach the progress bar.
+        # As wide as the longest word it can show, in this language and face,
+        # and never so wide that it reaches the progress bar.
         btn_font = tkfont.Font(font=self._font(11, bold=True))
         widest = max(btn_font.measure(tr(t)) for t in (
-            "UPDATE", "UPDATE ALL", "PLAY", "Installing…", "Patching…",
+            "UPDATE", "PLAY", "Installing…", "Patching…",
             "Checking…", "Verifying…", "Updating…"))
         btn_w = min(self._px(170), max(self._px(132), widest + self._px(20)))
-        for b in (getattr(self, "_upd_btn", None), getattr(self, "_all_btn", None)):
-            if b is not None:
-                b.set_width(btn_w)
+        if getattr(self, "_upd_btn", None) is not None:
+            self._upd_btn.set_width(btn_w)
         glow_w = btn_w + 2 * self._px(2)
         glow_h = self._px(38) + 2 * self._px(2)
         btn_bottom = btn_y + glow_h
@@ -10507,7 +11643,19 @@ class EqUpdaterApp(tk.Tk):
         c.coords(items["status"], x, status_y)
         c.itemconfigure(items["status"], font=status_font)
         c.coords(items["btn"], x, btn_y)
-        c.coords(items["all"], x + glow_w + self._px(10), btn_y)
+        if "updall" in items:
+            # Right of PLAY, centred on it. PLAY itself does not move.
+            self._update_all_photos()
+            c.itemconfigure(items["updall"], image=self._updall_images[0])
+            aw = self._updall_images[0].width()
+            ah = self._updall_images[0].height()
+            ax = x + glow_w + self._px(10)     # where UPDATE ALL sat
+            ay = btn_y + (glow_h - ah) // 2
+            c.coords(items["updall"], ax + aw, ay + ah)
+            r = self._px(11)                    # inside the box
+            cx, cy = ax + aw // 2, btn_y + glow_h // 2
+            c.coords(items["updall_spin"], cx - r, cy - r, cx + r, cy + r)
+            c.itemconfigure(items["updall_spin"], width=max(2, self._px(3)))
         c.coords(items["client"], x, btn_bottom + self._px(6))
         c.itemconfigure(items["client"], font=self._font(8))
 
@@ -10517,6 +11665,17 @@ class EqUpdaterApp(tk.Tk):
                  self._pb_y - self._px(6))
         c.itemconfigure(items["progress"], font=self._font(10))
         c.coords(items["version"], WIN_W - self._px(10), WIN_H - self._px(6))
+        if "coffee" in items:
+            # Above the version, side by side, the right one's edge on the
+            # version's: Discord, then the Ko-fi cup.
+            self._footer_icon_photos()
+            bottom = c.bbox(items["version"])[1] - self._px(6)
+            right = WIN_W - self._px(10)
+            for key in ("coffee", "discord"):
+                photo = self._footer_icons[key][0]
+                c.itemconfigure(items[key], image=photo)
+                c.coords(items[key], right, bottom)
+                right -= photo.width() + self._px(FOOTER_ICON_GAP)
         self._draw_progress(self._pb_val)
 
     def _draw_progress(self, value: float):
@@ -10543,8 +11702,8 @@ class EqUpdaterApp(tk.Tk):
     # ── helpers ───────────────────────────────────────────────────────────────
 
     def _game_folder_changed(self, new_val: str):
-        """Wipe all state tied to the previous game folder — the folder-scoped
-        config (mods/addons install records) and session TTLs/badges — and
+        """Wipe all state tied to the previous game folder – the folder-scoped
+        config (mods/addons install records) and session TTLs/badges – and
         point everything at new_val. Called from _close_settings when the user
         has switched to a different folder."""
         if os.path.exists(os.path.join(new_val, "WoW.exe")):
@@ -10591,11 +11750,12 @@ class EqUpdaterApp(tk.Tk):
         self._draw_nav_tab("ADDONS")
         self._draw_nav_tab("MPQ")
         self._update_all_chain = False
+        self._update_all_running = False
         self._refresh_update_all_btn()
         self._render_addons()
         self._render_mpq()
 
-        self._log_line("\nGame folder changed — state reset.\n", "acct")
+        self._log_line("\nGame folder changed – state reset.\n", "acct")
 
     def _set_pending_reconcile(self, mode):
         """Set the pending-reconcile mode (None / 'full' / 'keep-config') and
@@ -10609,26 +11769,54 @@ class EqUpdaterApp(tk.Tk):
         """Surface the Update button for the pending reconcile (mode already
         set) WITHOUT running a verify first. Clicking Update then reconciles:
         an integrity check + WoW.exe re-patch (+ a fresh Config.wtf when the
-        mode is 'full') — meaningful even when the game files are already
+        mode is 'full') – meaningful even when the game files are already
         intact."""
         self._running = False
         self._client_ready = False
         self._status_var.set(tr("Update available!"))
         self._set_btn_update()
 
-    def _prompt_av_exclusion(self):
+    def _prompt_av_exclusion(self, title: str | None = None):
         """Ask whether to add the current game folder to Windows Defender
-        exclusions (some mods can be mistakenly flagged by antivirus)."""
+        exclusions (some mods can be mistakenly flagged by antivirus). The
+        answer, yes or no, is recorded for this folder: it is asked once."""
         from tkinter import messagebox
-        if messagebox.askyesno(
-                tr("Game folder changed"),
+        client = os.path.normpath(self._game_path.get().strip())
+        update_config(lambda c: c.__setitem__("defender_offered_for", client))
+        self._asking = True
+        try:
+            yes = messagebox.askyesno(
+                title or tr("Game folder changed"),
                 tr("It is highly recommended to add the game folder to your "
                    "antivirus exclusions. Antivirus software may incorrectly "
                    "detect some mods as threats and prevent them from being "
                    "downloaded or installed properly.\n\n"
                    "Do you want to add the game folder to Defender exclusions?"),
-                parent=self):
+                parent=self)
+        finally:
+            self._asking = False
+        if yes:
             self._allow_through_antivirus()
+
+    def _offer_av_exclusion(self):
+        """After installing or updating EqUpdater: offer the Defender
+        exclusion once for this game folder, the way the "manage what is
+        already installed" question is offered. A first run asks when
+        Settings closes instead (see _close_settings), and a folder already
+        asked about -- or excluded from Settings -- is not asked again."""
+        if not platforms.WINDOWS or os.environ.get("EQUPDATER_NO_DEFENDER_PROMPT"):
+            return
+        client = self._game_path.get().strip()
+        if (not client or self._first_run or self._av_excluded
+                or not os.path.isdir(client)):
+            return
+        if load_config().get("defender_offered_for") == os.path.normpath(client):
+            return
+        if (getattr(self, "_settings_overlay", None) is not None
+                or getattr(self, "_asking", False)):
+            self.after(3000, self._offer_av_exclusion)    # one question at a time
+            return
+        self._prompt_av_exclusion(tr("Add the game folder to Defender exclusions?"))
 
     def _render_log(self, msg: str, tag: str = ""):
         """Normalize a raw log message (ensure a trailing newline, auto-tag
@@ -10787,19 +11975,15 @@ class EqUpdaterApp(tk.Tk):
         _titem("✓", tr("Verify game files"), self._settings_verify)
         _titem("✚", tr("Login Doctor"), self._open_login_doctor,
                tip=tr("Checks this computer for common login problems: the game client, its login settings, OctoLogin and the connection to OctoWoW. It can repair the login settings."))
+        _titem("⚑", tr("Game Diagnostics…"), self._open_game_diagnostics,
+               tip=tr("What happened after you pressed PLAY, a check of the "
+                      "game folder, and a report you can send for help."))
         _titem("☰", tr("Show logs"), self._show_logs)
         if platforms.WINDOWS:
             _titem("⛊", tr("Add game folder to Defender exclusions"),
                    self._allow_through_antivirus)
         else:
             _titem("⚙", tr("Game launcher…"), self._open_game_launcher)
-
-        tk.Label(lcol, text=tr("SUPPORT ME"),
-                 font=self._font(10, bold=True),
-                 fg=C_GOLD, bg=P_BG).pack(anchor="w", pady=(self._px(22), 0))
-        _titem("☕", tr("Buy Me a Coffee"),
-               lambda: self._open_url("https://ko-fi.com/equadis"),
-               icon_color="#e8615f")
 
         tk.Label(rcol, text=tr("GENERAL"),
                  font=self._font(10, bold=True),
@@ -11251,8 +12435,7 @@ class EqUpdaterApp(tk.Tk):
         env_box.edit_modified(False)
         env_box.pack(anchor="w", fill="x")
         self._add_tooltip(env_box, tr(
-            "Optional. One NAME=value per line, given only to the game when "
-            "PLAY starts it - for example DXVK_HUD=fps."))
+            "Optional. One NAME=value per line, given only to the game when PLAY starts it – for example DXVK_HUD=fps."))
         env_error = tk.Label(parent, text="", font=self._font(9), fg=C_ERR,
                              bg=bg, justify="left", wraplength=self._px(500))
         self._env_vars_box, self._env_vars_error = env_box, env_error
@@ -11396,6 +12579,8 @@ class EqUpdaterApp(tk.Tk):
             f'-NoProfile -WindowStyle Hidden -Command "{cmd}"', None, 0)
         if r > 32:
             self._av_excluded = True
+            update_config(lambda c: c.__setitem__("defender_offered_for",
+                                                  client_dir))
             self._log_line(
                 f"Requested Defender exclusion for: {client_dir}\n", "ok")
         else:
@@ -11403,7 +12588,7 @@ class EqUpdaterApp(tk.Tk):
 
     def _maybe_show_aria2_firewall_notice(self):
         """One-time heads-up, shown before the first download, that the bundled
-        aria2c downloader may trigger a Windows Firewall prompt — so it doesn't
+        aria2c downloader may trigger a Windows Firewall prompt – so it doesn't
         look sketchy to a non-technical user. Purely informational; tracked in
         the config so it appears only once."""
         if self._cfg.get("aria2_firewall_notice_shown") or not platforms.WINDOWS:
@@ -11558,7 +12743,7 @@ class EqUpdaterApp(tk.Tk):
             return
         self._client_ready = False
         self._log_line(
-            "\nVerify game files — hash-checking every file against the torrent.\n",
+            "\nVerify game files – hash-checking every file against the torrent.\n",
             "acct")
         self._start_update(check_integrity=True)
 
@@ -11574,7 +12759,7 @@ class EqUpdaterApp(tk.Tk):
                 self._logwin_text = None
 
         win = tk.Toplevel(self)
-        win.title(tr("{app} — Logs", app=branding.APP_TITLE))
+        win.title(tr("{app} – Logs", app=branding.APP_TITLE))
         LW, LH = self._px(760), self._px(420)
         sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
         win.geometry(f"{LW}x{LH}+{(sw - LW) // 2}+{(sh - LH) // 2}")
@@ -11621,21 +12806,6 @@ class EqUpdaterApp(tk.Tk):
 
     # ── button helpers ───────────────────────────────────────────────────────────
 
-    def _update_all_count(self) -> int:
-        return int(self._mod_updates_count) + int(self._addon_updates_count)
-
-    def _refresh_update_all_btn(self):
-        """Enable the subtle gold gradient only when safe updates exist."""
-        if not hasattr(self, "_all_btn"):
-            return
-        busy = (self._btn_mode == "busy" or self._addons_busy
-                or getattr(self, "_running", False))
-        ready = self._update_all_count() > 0 and not busy
-        self._all_ready = ready
-        self._all_btn.set_enabled(ready)
-        self._all_glow.configure(
-            bg=UPDALL_GLOW_ON if ready else UPDALL_GLOW_OFF)
-
     def _addon_plans(self) -> list:
         """The addons' decisions, taken from the last verify.
 
@@ -11649,94 +12819,6 @@ class EqUpdaterApp(tk.Tk):
                 out.append(p)
         return out
 
-    def _all_plans(self) -> list:
-        """Everything EqUpdater has an opinion about, mods and addons."""
-        return list(self._mod_plans().values()) + self._addon_plans()
-
-    def _update_all_preview(self, plans) -> bool:
-        """Show what Update All will and will not do; True to go ahead.
-
-        Shown only when something is being held back. A run where everything
-        is ordinary is one click, which is the point of the button -- and a
-        confirmation nobody ever needs is a confirmation everybody learns to
-        dismiss, which is how the one that mattered gets dismissed too."""
-        from tkinter import messagebox
-        doing = updatable(plans)
-        held = skipped_notably(plans)
-        if not held:
-            return True
-
-        lines = []
-        if doing:
-            lines.append(tr("Updates to install: {count}", count=len(doing)))
-            for p in doing:
-                if p.local and p.remote:
-                    lines.append("    %s   %s \u2192 %s"
-                                 % (p.component_id, p.local, p.remote))
-                else:
-                    lines.append("    %s" % p.component_id)
-            lines.append("")
-        else:
-            lines.append(tr("Nothing can be safely updated right now."))
-            lines.append("")
-
-        lines.append(tr("Not being changed:"))
-        for p in held:
-            lines.append("    %s" % p.component_id)
-            lines.append("        %s" % tr(str(p.reason)))
-        lines.append("")
-        lines.append(tr("Anything listed under \u201cnot being changed\u201d "
-                        "stays exactly as it is. Each one can still be dealt "
-                        "with individually from its own tab."))
-
-        if not doing:
-            messagebox.showinfo(tr("Update All"), "\n".join(lines))
-            return False
-        return messagebox.askokcancel(tr("Update All"), "\n".join(lines))
-
-    def _update_all(self):
-        """Update everything EqUpdater manages and can prove is behind.
-
-        It does **not** mean "make this installation match the catalogue".
-        Mods run through the normal Apply worker, which asks the planner per
-        mod; when it finishes, `_update_all_chain` hands over to the addons.
-        Both halves consult the same decisions the preview just showed, so
-        what runs is what was agreed to."""
-        if not self._all_ready:
-            return
-        out = self._game_path.get().strip()
-        if not out:
-            return
-
-        plans = self._all_plans()
-        if not self._update_all_preview(plans):
-            self._refresh_update_all_btn()
-            return
-
-        mods = self._mod_updates_count
-        addons = self._addon_updates_count
-        self._log_line("\nUpdating everything: %d mod(s), %d addon(s)...\n"
-                       % (mods, addons), "acct")
-
-        # Every hold-back, in the log, with its reason. A skip nobody is told
-        # about is indistinguishable from the updater not working -- and the
-        # silence is what let the old behaviour hide a downgrade.
-        for p in skipped_notably(plans):
-            self._log_line("  \u2022 %s \u2014 %s\n"
-                           % (p.component_id, p.reason), "")
-
-        self._all_ready = False
-        self._refresh_update_all_btn()
-        if mods > 0:
-            self._update_all_chain = addons > 0
-            self._set_btn_busy(tr("Installing\u2026"))
-            self._status_var.set(tr("Downloading mods\u2026"))
-            threading.Thread(target=self._apply_mods_worker,
-                             args=(out,), daemon=True).start()
-        elif addons > 0:
-            self._addon_update_all()
-        else:
-            self._refresh_ready_state()
 
     def _addon_force_replace(self, rec):
         """Overwrite a managed addon with the latest from its source, after
@@ -11761,9 +12843,7 @@ class EqUpdaterApp(tk.Tk):
             "modified": tr("Your local changes to this addon will be lost."),
             "localNewer": tr("The installed copy is NEWER than the source's. "
                              "Replacing it is a downgrade."),
-            "diverged": tr("The installed copy came from different history - "
-                           "another branch or fork. Its contents may differ "
-                           "substantially."),
+            "diverged": tr("The installed copy came from different history – another branch or fork. Its contents may differ substantially."),
             "unverifiable": tr("The source has a different version, but "
                                "whether it is newer or older than yours "
                                "could not be checked."),
@@ -11856,6 +12936,7 @@ class EqUpdaterApp(tk.Tk):
         self._upd_btn.set_palette(PLAY_GRADIENT)
         self._upd_btn.set_enabled(True)
         self._upd_btn.set_split(self._px(16), self._toggle_launch_menu)
+        self._refresh_update_all_btn()
         self._btn_glow.configure(bg="#29472c")
 
     def _set_btn_update(self):
@@ -11866,6 +12947,7 @@ class EqUpdaterApp(tk.Tk):
         self._upd_btn.set_palette(UPDATE_GRADIENT)
         self._upd_btn.set_enabled(True)
         self._btn_glow.configure(bg="#5a4828")
+        self._refresh_update_all_btn()
 
     def _set_btn_busy(self, label="…"):
         self._btn_mode = "busy"
@@ -11884,7 +12966,7 @@ class EqUpdaterApp(tk.Tk):
     def _refresh_ready_state(self):
         """Recompute the footer status/button after an operation finishes.
         PLAY is only offered when the client files are up to date AND no mod
-        is in an error state — otherwise the button stays grey and inactive."""
+        is in an error state – otherwise the button stays grey and inactive."""
         self._refresh_launch_menu()
         # Never re-enable PLAY while addons are actively installing — this
         # guards against a stray call during the mods→addons setup chain or a
@@ -11899,12 +12981,11 @@ class EqUpdaterApp(tk.Tk):
             return
         if self._mods_have_errors():
             self._set_btn_busy(tr("PLAY"))
-            self._status_error(tr("Mod errors — check MODS tab"),
+            self._status_error(tr("Mod errors – check the MODS tab"),
                                lambda: self._switch_tab("MODS"))
         else:
             self._set_btn_play()
             self._status_var.set(tr("Everything up to date!"))
-        self._refresh_update_all_btn()
 
     # ── what PLAY starts ─────────────────────────────────────────────────────
 
@@ -11948,7 +13029,7 @@ class EqUpdaterApp(tk.Tk):
         inner.pack(padx=self._px(1), pady=self._px(1))
         tk.Label(inner, font=self._font(10, bold=True), fg=C_GOLD, bg=C_PANEL,
                  anchor="w",
-                 text=(tr("Default — {file}", file=target) if target
+                 text=(tr("Default – {file}", file=target) if target
                        else tr("No launch files found"))
                  ).pack(fill="x", padx=self._px(10),
                         pady=(self._px(7), self._px(5)))
@@ -12019,7 +13100,83 @@ class EqUpdaterApp(tk.Tk):
         elif self._btn_mode == "update":
             self._start_update()
 
-    def _launch_game(self):
+    def _diag_store(self):
+        store = getattr(self, "_diag_store_obj", None)
+        if store is None:
+            store = self._diag_store_obj = diagnostics.Store(
+                os.path.join(APP_DATA_DIR, "diagnostics"))
+        return store
+
+    def _diag_probe(self):
+        if not hasattr(self, "_diag_probe_obj"):
+            self._diag_probe_obj = diagnostics.default_probe()
+        return self._diag_probe_obj
+
+    def _diag_begin(self, client_dir: str, diagnostic: bool):
+        """The record of one PLAY, on disk before anything else happens. If
+        it cannot be made the game still starts: the view reports the error."""
+        try:
+            attempt = diagnostics.Attempt(
+                self._diag_store(), client_dir, UPDATER_VERSION,
+                sys.platform, diagnostic)
+            if client_dir and os.path.isdir(client_dir):
+                attempt.data["client_build"] = get_client_version(client_dir) or None
+            diagnostics.begin_baseline(attempt, self._diag_probe())
+            return attempt
+        except Exception as e:
+            self._log_line(f"Game Diagnostics could not record this launch: {e}\n",
+                           "err")
+            return diagnostics.NullAttempt()
+
+    def _diag_watch(self, attempt, proc, exe_lbl: str, output):
+        """Watch this attempt on its own thread. It outlives nothing it
+        needs: what it sees is on disk, for whichever EqUpdater looks next."""
+        if isinstance(attempt, diagnostics.NullAttempt):
+            return
+        try:
+            direct = exe_lbl.lower() == platforms.GAME_EXE.lower() \
+                and attempt.data["route"].get("runner") == "windows"
+            role = "game" if direct else "launcher"
+            attempt.process(role, proc.pid, exe_lbl)
+            attempt.stage("process_created")
+            attempt.event("spawned", role=role, pid=proc.pid, name=exe_lbl)
+            observer = diagnostics.Observer(
+                attempt, self._diag_probe(), proc, role, exe_lbl, output,
+                on_change=self._diag_changed,
+                output_copy=LAUNCH_OUTPUT if output else None)
+            self._diag_observers = [o for o in getattr(self, "_diag_observers", [])
+                                    if not o.done] + [observer]
+            observer.start()
+        except Exception as e:
+            self._log_line(f"Game Diagnostics could not watch this launch: {e}\n",
+                           "err")
+
+    def _diag_changed(self, _attempt=None):
+        """From an observer's thread: redraw the view if it is open."""
+        view = getattr(self, "_diag_view", None)
+        if view is not None and not getattr(self, "_destroying", False):
+            try:
+                self.after(0, view.refresh_from_disk)
+            except (tk.TclError, RuntimeError):
+                pass
+
+    def _diag_recover(self):
+        """Attempts the last EqUpdater left open: settle them with whatever
+        evidence is there now, and carry on watching a game still running."""
+        try:
+            probe = self._diag_probe()
+            store = self._diag_store()
+            for data in diagnostics.recover(store, probe):
+                diagnostics.watch_again(store, data, probe,
+                                        on_change=self._diag_changed).start()
+        except Exception as e:
+            log(f"Game Diagnostics could not read its earlier attempts: {e}")
+
+    def _open_game_diagnostics(self):
+        from . import diagnostics_ui
+        diagnostics_ui.open_view(self)
+
+    def _launch_game(self, diagnostic: bool = False):
         """Launch the game detached.
         If VanillaFixes is installed use VanillaFixes.exe (it injects dlls then
         starts WoW.exe itself). Otherwise fall back to WoW.exe directly. On
@@ -12027,6 +13184,7 @@ class EqUpdaterApp(tk.Tk):
         platforms.launch_plan)."""
         client_dir = self._game_path.get().strip()
         cfg        = load_config()
+        attempt    = self._diag_begin(client_dir, diagnostic)
 
         # The loader reads dlls.txt in a moment. Anything that edited that file
         # since the last Apply - the official launcher, a restore, a hand edit
@@ -12038,6 +13196,11 @@ class EqUpdaterApp(tk.Tk):
                                f"re-registered before launch.\n", "acct")
         except Exception as e:
             self._log_line(f"Could not check dlls.txt before launch: {e}\n", "err")
+        try:
+            for note in enforce_autoloot(client_dir):
+                self._log_line(note + "\n", "acct")
+        except Exception as e:
+            self._log_line(f"Could not check Auto Loot before launch: {e}\n", "err")
 
         # Trust VanillaFixes.exe on disk, not the config record. That record
         # is absent after a game-folder switch, after a config reset, and on
@@ -12064,6 +13227,8 @@ class EqUpdaterApp(tk.Tk):
 
         if not os.path.exists(exe):
             self._log_line(f"{exe_lbl} not found at: {exe}\n", "err")
+            attempt.block("executable", f"The launch target {exe_lbl} was not "
+                          f"found in the game folder.")
             return
 
         # One-time DXVK first-launch notice (armed when DXVK was installed).
@@ -12073,11 +13238,7 @@ class EqUpdaterApp(tk.Tk):
             from tkinter import messagebox
             messagebox.showinfo(
                 tr("DXVK mod first launch"),
-                tr("Initial shader compilation may cause temporary in-game "
-                   "stuttering during the first launch. This is a normal "
-                   "process while the game builds its shader cache.\n\n"
-                   "Users with AMD GPUs experiencing stability issues can "
-                   "switch to DXVK 2.5.3"),
+                tr("Initial shader compilation may cause temporary in-game stuttering during the first launch. This is a normal process while the game builds its shader cache.\n\nUsers with AMD GPUs experiencing stability issues can switch to DXVK 2.5.3."),
                 parent=self)
 
         # How to start it: the executable itself on Windows; on Linux the
@@ -12086,6 +13247,9 @@ class EqUpdaterApp(tk.Tk):
                                      load_config().get("game_launcher"))
         if plan.env_problems:
             from tkinter import messagebox
+            attempt.block("launch_settings",
+                          "The launcher's environment variables have lines "
+                          "that cannot be used: " + env_problem_text(plan.env_problems))
             self._log_line("Not launched: the game launcher's environment "
                            "variables have lines that cannot be used.\n",
                            "err")
@@ -12098,6 +13262,9 @@ class EqUpdaterApp(tk.Tk):
             return
         if not plan.ok:
             from tkinter import messagebox
+            attempt.block("launch_settings",
+                          "No way to run the game was found: no usable launch "
+                          "command, and no wine or umu-run on PATH.")
             self._log_line("No way to run the Windows game client was found "
                            "(no launch command set, no wine or umu-run on "
                            "PATH).\n", "err")
@@ -12109,8 +13276,12 @@ class EqUpdaterApp(tk.Tk):
                 parent=self)
             return
 
+        attempt.route(plan, exe, exe_lbl)
+        diagnostics.preflight(attempt, client_dir, exe, plan)
         problems = platforms.launch_problems(plan)
         if problems:
+            attempt.block("launch_settings", "; ".join(
+                f"{reason}: {value}" for reason, value in problems))
             self._launch_failed(
                 launch_problem_text(problems),
                 "Not launched: " + "; ".join(f"{r}: {v}" for r, v in problems)
@@ -12124,14 +13295,22 @@ class EqUpdaterApp(tk.Tk):
         if plan.runner != "windows":
             try:
                 ensure_dir(os.path.dirname(LAUNCH_OUTPUT))
-                output = LAUNCH_OUTPUT
+                output = attempt.output_path() or LAUNCH_OUTPUT
             except OSError:
                 pass
+        if diagnostic:
+            # This launch only: in its own environment, never saved anywhere.
+            extra = diagnostics.diagnostic_env(plan.runner,
+                                               attempt.folder() or APP_DATA_DIR)
+            plan.env = {**(plan.env or platforms.child_env()), **extra}
+            attempt.route(plan, exe, exe_lbl)
         try:
             proc = platforms.spawn_detached(plan.argv, cwd=plan.cwd,
                                             env=plan.env, output=output,
                                             console=plan.console)
         except OSError as e:
+            attempt.block("process_creation",
+                          f"{exe_lbl} could not be started: {e.strerror or e}", e)
             self._launch_failed(
                 tr("{program} could not be started: {error}",
                    program=plan.argv[0], error=e.strerror or e),
@@ -12140,11 +13319,12 @@ class EqUpdaterApp(tk.Tk):
         try:
             how = "" if plan.runner == "windows" else f" with {plan.runner}"
             self._log_line(f"Launched {exe_lbl}{how}!\n", "ok")
+            self._diag_watch(attempt, proc, exe_lbl, output)
             if output:
                 self._watch_launch(proc, plan.argv, output, 0)
             # Briefly disable PLAY so a double-click can't spawn two clients.
             self._set_btn_busy(tr("PLAY"))
-            self._status_var.set(tr("Launching..."))
+            self._status_var.set(tr("Launching…"))
             # Optionally minimize (close) the updater to the taskbar shortly after launch
             if self._cfg.get("close_on_launch", False):
                 self.after(1000, self.iconify) # self._on_close and return
@@ -12263,7 +13443,7 @@ class EqUpdaterApp(tk.Tk):
                 self._maybe_install_default_addons()
         else:
             self._client_ready = False
-            self._status_error(tr("Update failed — check the log"),
+            self._status_error(tr("Update failed – check the log"),
                                self._show_logs)
             self._draw_progress(0.0)
             self._set_btn_update()

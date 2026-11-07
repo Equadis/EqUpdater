@@ -812,7 +812,7 @@ class GradientButton(tk.Canvas):
         self._enabled = True
         self._hover = False
         self._pressed = False
-        # A strip at the left edge that is its own button (set_split).
+        # A strip at the right edge that is its own button (set_split).
         self._split_w = 0
         self._split_command = None
         self._split_hover = False
@@ -854,15 +854,19 @@ class GradientButton(tk.Canvas):
         self._paint()
 
     def set_split(self, width: int = 0, command=None) -> None:
-        """Give the left ``width`` pixels their own arrow and command; the
+        """Give the right ``width`` pixels their own arrow and command; the
         rest of the button keeps its own. 0 takes the strip away."""
         self._split_w = int(width)
         self._split_command = command
         self._split_hover = self._split_pressed = False
         self._paint()
 
+    def _split_x(self) -> int:
+        """Where the arrow's strip begins."""
+        return self._width_px - self._split_w
+
     def _in_split(self, x: int) -> bool:
-        return bool(self._split_w) and x < self._split_w
+        return bool(self._split_w) and x >= self._split_x()
 
     def _invoke_split(self) -> None:
         if self._enabled and self._split_w and self._split_command:
@@ -935,7 +939,7 @@ class GradientButton(tk.Canvas):
             lit = "#000000" if self._split_pressed else "#ffffff"
             for y in range(1, self._height_px - 1):
                 t = (y - 1) / max(1, inner_h - 1)
-                self.create_line(1, y, self._split_w, y,
+                self.create_line(self._split_x(), y, self._width_px - 1, y,
                                  fill=_mix(_mix(top, bottom, t), lit, .14))
         self.create_rectangle(0, 0, self._width_px - 1, self._height_px - 1,
                               outline=border, width=1)
@@ -944,16 +948,16 @@ class GradientButton(tk.Canvas):
                                   outline=_mix(border, "#ffffff", .35), width=1)
         yoff = 1 if self._pressed and self._enabled else 0
         font = self._font_factory() if self._font_factory else None
-        self.create_text((self._split_w + self._width_px) // 2,
+        self.create_text((self._width_px - self._split_w) // 2,
                          self._height_px // 2 + yoff,
                          text=self._text, fill=fg, font=font)
         if self._split_w:
-            self.create_line(self._split_w, 1, self._split_w,
-                             self._height_px - 1, fill=border)
+            sx = self._split_x()
+            self.create_line(sx, 1, sx, self._height_px - 1, fill=border)
             # Drawn, not a glyph: the same arrow in every font and at any
             # scale.
             half = max(3, self._split_w // 4)
-            cx, cy = self._split_w // 2, self._height_px // 2
+            cx, cy = sx + self._split_w // 2, self._height_px // 2
             self.create_polygon(cx - half, cy - half // 2, cx + half,
                                 cy - half // 2, cx, cy + half - half // 2,
                                 fill=fg, outline=fg)

@@ -7,12 +7,12 @@ STRINGS = {
     "A copy of the current folder is saved to {backups} first.\n\nReplace it with the latest from:\n    {source}":
         "Сначала копия текущей папки будет сохранена в {backups}.\n\nЗаменить её последней версией из:\n    {source}",
     "A different source is recommended for this addon:\n{source}\n\nSwitching forks is a choice, not an update, so nothing happens until you ask.":
-        "Для этого аддона рекомендуется другой источник:\n{source}\n\nСмена форка — это выбор, а не обновление, поэтому ничего не произойдёт, пока вы сами не попросите.",
+        "Для этого аддона рекомендуется другой источник:\n{source}\n\nСмена форка – это выбор, а не обновление, поэтому ничего не произойдёт, пока вы сами не попросите.",
     "A direct link must end in .mpq": "Прямая ссылка должна заканчиваться на .mpq",
     "ADD CUSTOM GIT ADDON": "ДОБАВИТЬ СВОЙ GIT-АДДОН",
     "ADDONS": "АДДОНЫ",
     "ANNOUNCEMENTS": "ОБЪЯВЛЕНИЯ",
-    "API rate limit exceeded — try again in 1 hour": "Превышен лимит запросов к API — попробуйте снова через 1 час",
+    "API rate limit exceeded – try again in 1 hour": "Превышен лимит запросов к API – попробуйте снова через 1 час",
     "AVAILABLE": "ДОСТУПНО",
     "Add custom git addon": "Добавить свой git-аддон",
     "Add game folder to Defender exclusions": "Добавить папку игры в исключения Defender",
@@ -29,17 +29,14 @@ STRINGS = {
     "Allows game sounds to play in the background.": "Звуки игры воспроизводятся и в фоновом режиме.",
     "Animated background": "Анимированный фон",
     "Announcements": "Объявления",
-    "Anything listed under “not being changed” stays exactly as it is. Each one can still be dealt with individually from its own tab.":
-        "Всё, что перечислено в разделе «Не изменяется», останется как есть. Каждый пункт можно обработать отдельно на его вкладке.",
     "Apply": "Применить",
     "Applying tweaks…": "Применение твиков…",
     "Applying…": "Применение…",
     "Apr": "апр.",
     "Aug": "авг.",
     "Auto Loot": "Автосбор добычи",
-    "Blocked by antivirus — open Settings (⚙) → 'Add game folder to Defender exclusions', then retry":
-        "Заблокировано антивирусом — откройте Настройки (⚙) → «Добавить папку игры в исключения Defender» и повторите попытку",
-    "Buy Me a Coffee": "Угостить меня кофе",
+    "Blocked by antivirus – open Settings (⚙) → 'Add game folder to Defender exclusions', then retry":
+        "Заблокировано антивирусом – откройте Настройки (⚙) → «Добавить папку игры в исключения Defender» и повторите попытку",
     "By {author}": "Автор: {author}",
     "CAMERA": "КАМЕРА",
     "CHANGELOG": "СПИСОК ИЗМЕНЕНИЙ",
@@ -54,7 +51,6 @@ STRINGS = {
     "Close the game first": "Сначала закройте игру",
     "Conflicting mods": "Несовместимые моды",
     "Could not derive addon folder name.": "Не удалось определить имя папки аддона.",
-    "Could not reach the addon's source": "Не удалось связаться с источником аддона",
     "Could not resolve remote commit": "Не удалось определить удалённый коммит",
     "DOWNLOAD MIRROR": "СЕРВЕР ЗАГРУЗКИ",
     "DXVK mod first launch": "Первый запуск с модом DXVK",
@@ -63,9 +59,9 @@ STRINGS = {
     "Different revision": "Другая ревизия",
     "Different source": "Другой источник",
     "Differs from source": "Отличается от источника",
-    "Distance at which nameplates are visible. [0 - 41]": "Расстояние, на котором видны индикаторы здоровья. [0 - 41]",
-    "Downloaded archive is corrupted (possibly blocked by antivirus) — retry, or use Settings (⚙) → 'Add game folder to Defender exclusions'":
-        "Загруженный архив повреждён (возможно, заблокирован антивирусом) — повторите попытку или используйте Настройки (⚙) → «Добавить папку игры в исключения Defender»",
+    "Distance at which nameplates are visible. [0–41]": "Расстояние, на котором видны индикаторы здоровья. [0 – 41]",
+    "Downloaded archive is corrupted (possibly blocked by antivirus) – retry, or use Settings (⚙) → 'Add game folder to Defender exclusions'":
+        "Загруженный архив повреждён (возможно, заблокирован антивирусом) – повторите попытку или используйте Настройки (⚙) → «Добавить папку игры в исключения Defender»",
     "Downloading addons…": "Загрузка аддонов…",
     "Downloading mods…": "Загрузка модов…",
     "Downloading the game": "Загрузка игры",
@@ -74,10 +70,8 @@ STRINGS = {
     "Eliminates stuttering and animation lag and enables mod loading. Required by other mods.":
         "Устраняет подтормаживания и задержки анимации и включает загрузку модов. Нужен другим модам.",
     "Enable this mod only if the game doesn't detect your monitor's native resolution.\n\nVanillaMultiMonitorFix may interfere with correct resolution detection. By default, it's recommended to first try launching the game with DXVK, which may fix the resolution detection issue.\n\nEnable VanillaMultiMonitorFix only if you're actually experiencing resolution issues.":
-        "Включайте этот мод, только если игра не определяет родное разрешение вашего монитора.\n\nVanillaMultiMonitorFix может мешать правильному определению разрешения. Рекомендуется сначала попробовать запустить игру с DXVK — это может решить проблему с определением разрешения.\n\nВключайте VanillaMultiMonitorFix, только если у вас действительно есть проблемы с разрешением.",
+        "Включайте этот мод, только если игра не определяет родное разрешение вашего монитора.\n\nVanillaMultiMonitorFix может мешать правильному определению разрешения. Рекомендуется сначала попробовать запустить игру с DXVK – это может решить проблему с определением разрешения.\n\nВключайте VanillaMultiMonitorFix, только если у вас действительно есть проблемы с разрешением.",
     "Enables Vulkan-based rendering for improved performance.": "Включает отрисовку через Vulkan для повышения производительности.",
-    "EqUpdater did not install this pack and does not know where it came from, so it cannot check it for updates. Link its source below; linking changes no files.":
-        "EqUpdater не устанавливал этот пакет и не знает, откуда он взялся, поэтому не может проверять для него обновления. Привяжите источник ниже; привязка не изменяет файлы.",
     "Essential mod": "Основной мод",
     "Every tweak goes back to its default value, and WoW.exe is patched with the defaults now.":
         "Все твики вернутся к значениям по умолчанию, и WoW.exe сразу будет пропатчен этими значениями.",
@@ -99,23 +93,19 @@ STRINGS = {
     "GENERAL": "ОБЩИЕ",
     "GRAPHICS": "ГРАФИКА",
     "Language": "Язык",
-    "Language selection for both in-game and EqUpdater Client.":
-        "Выбор языка для игры и клиента EqUpdater.",
+    "The language of the game and of EqUpdater.": "Выбор языка для игры и клиента EqUpdater.",
     "Game folder changed": "Папка игры изменена",
-    "Grass and small rocks rendering distance. [0 - 300]": "Дальность отрисовки травы и мелких камней. [0 - 300]",
+    "How far grass and small rocks are drawn. [0–300]": "Дальность отрисовки травы и мелких камней. [0 – 300]",
     "Ground Clutter Distance": "Дальность мелких деталей",
     "INSTALLED": "УСТАНОВЛЕНО",
-    "INSTALLED MANUALLY": "УСТАНОВЛЕНО ВРУЧНУЮ",
     "Iceland": "Исландия",
     "Ignore speech.mpq": "Игнорировать speech.mpq",
     "Ignore updates": "Не обновлять",
     "Ignored": "Игнорируется",
-    "Ignores verification and updates for speech.mpq, allowing custom speech sounds":
-        "Пропускает проверку и обновление speech.mpq, чтобы можно было использовать свою озвучку",
+    "Ignores verification and updates for speech.mpq, allowing custom speech sounds.": "Пропускает проверку и обновление speech.mpq, чтобы можно было использовать свою озвучку",
     "Increases the maximum supported texture resolution and improves memory allocation.":
         "Увеличивает максимальное разрешение текстур и улучшает распределение памяти.",
-    "Initial shader compilation may cause temporary in-game stuttering during the first launch. This is a normal process while the game builds its shader cache.\n\nUsers with AMD GPUs experiencing stability issues can switch to DXVK 2.5.3":
-        "При первом запуске компиляция шейдеров может вызывать временные подтормаживания в игре. Это нормально: игра создаёт кэш шейдеров.\n\nЕсли у вас видеокарта AMD и игра работает нестабильно, можно перейти на DXVK 2.5.3",
+    "Initial shader compilation may cause temporary in-game stuttering during the first launch. This is a normal process while the game builds its shader cache.\n\nUsers with AMD GPUs experiencing stability issues can switch to DXVK 2.5.3.": "При первом запуске компиляция шейдеров может вызывать временные подтормаживания в игре. Это нормально: игра создаёт кэш шейдеров.\n\nЕсли у вас видеокарта AMD и игра работает нестабильно, можно перейти на DXVK 2.5.3",
     "Install": "Установить",
     "Install essential mods": "Устанавливать основные моды",
     "Install essential mods?": "Установить основные моды?",
@@ -127,8 +117,7 @@ STRINGS = {
     "Installed from a different repository than the one now configured.":
         "Установлено из другого репозитория, а не из выбранного сейчас.",
     "Installed from a different repository than the one now recommended. Switching forks is a choice, not an update.":
-        "Установлено из другого репозитория, а не из рекомендуемого сейчас. Смена форка — это выбор, а не обновление.",
-    "Installed manually": "Установлено вручную",
+        "Установлено из другого репозитория, а не из рекомендуемого сейчас. Смена форка – это выбор, а не обновление.",
     "Installed {local}; the configured source offers {remote}.": "Установлено: {local}; выбранный источник предлагает {remote}.",
     "Installing {name}…": "Установка {name}…",
     "Installing…": "Установка…",
@@ -138,7 +127,7 @@ STRINGS = {
     "Jul": "июл.",
     "Jun": "июн.",
     "LINK TEXTURE PACK SOURCE": "ПРИВЯЗКА ИСТОЧНИКА ТЕКСТУР",
-    "Launching...": "Запуск…",
+    "Launching…": "Запуск…",
     "Let {app} update this addon from {source}. Your current files are not changed now.":
         "Разрешить {app} обновлять этот аддон из {source}. Ваши текущие файлы сейчас не изменятся.",
     "Link": "Привязать",
@@ -156,15 +145,14 @@ STRINGS = {
     "Manage": "Управлять",
     "Manage {name} with {app}?": "Управлять {name} через {app}?",
     "Mar": "мар.",
-    "Matches the pack its source publishes.": "Совпадает с пакетом, который публикует источник.",
-    "Maximum camera zoom-out distance. [50 - 100]": "Максимальное отдаление камеры. [50 - 100]",
+    "Maximum camera zoom-out distance. [50–100]": "Максимальное отдаление камеры. [50 – 100]",
     "May": "мая",
     "Minimize {app} on game launch": "Сворачивать {app} при запуске игры",
     "Missing .toc file": "Нет файла .toc",
     "Missing dependencies: {names}": "Не хватает зависимостей: {names}",
-    "Mod errors — check MODS tab": "Ошибки модов — см. вкладку МОДЫ",
+    "Mod errors – check the MODS tab": "Ошибки модов – см. вкладку МОДЫ",
     "Modified locally": "Изменено локально",
-    "Mods marked with {star} are essential": "Моды, отмеченные {star}, — основные",
+    "Mods marked with {star} are essential": "Моды, отмеченные {star}, – основные",
     "Moving bubbles behind the window. Off shows a still image and uses less CPU.":
         "Движущиеся пузырьки на фоне окна. Если выключено, показывается статичная картинка и меньше нагружается процессор.",
     "NEWS": "НОВОСТИ",
@@ -172,11 +160,8 @@ STRINGS = {
     "No announcements available.": "Объявлений нет.",
     "No changelog entries available.": "Записей об изменениях нет.",
     "No1600x1200 mod may cause the game to crash on launch on some systems.\n\nVanillaMultiMonitorFix is the recommended resolution fix. Use No1600x1200 only if VanillaMultiMonitorFix doesn't solve your problem.\n\nEnable No1600x1200 anyway?":
-        "На некоторых системах мод No1600x1200 может приводить к вылету игры при запуске.\n\nРекомендуемое исправление разрешения — VanillaMultiMonitorFix. Используйте No1600x1200, только если VanillaMultiMonitorFix не решает проблему.\n\nВсё равно включить No1600x1200?",
-    "Not being changed:": "Не изменяется:",
-    "Not linked": "Не привязано",
+        "На некоторых системах мод No1600x1200 может приводить к вылету игры при запуске.\n\nРекомендуемое исправление разрешения – VanillaMultiMonitorFix. Используйте No1600x1200, только если VanillaMultiMonitorFix не решает проблему.\n\nВсё равно включить No1600x1200?",
     "Not versioned": "Без версии",
-    "Nothing can be safely updated right now.": "Сейчас нечего безопасно обновить.",
     "Nothing here.": "Здесь ничего нет.",
     "Nothing to update · {count} held back": "Обновлять нечего · отложено: {count}",
     "Nov": "нояб.",
@@ -209,13 +194,11 @@ STRINGS = {
     "Reset": "Сбросить",
     "Reset tweaks?": "Сбросить твики?",
     "Restart {app}?": "Перезапустить {app}?",
-    "Reverses the auto-loot behavior to always auto-loot.": "Меняет поведение автосбора: добыча собирается автоматически всегда.",
     "Right-click to install {version} anyway.": "Щёлкните правой кнопкой, чтобы всё равно установить {version}.",
     "Right-click to replace them anyway.": "Щёлкните правой кнопкой, чтобы всё равно их заменить.",
     "SESSION LOG": "ЖУРНАЛ СЕАНСА",
     "SETTINGS": "НАСТРОЙКИ",
     "SOUND": "ЗВУК",
-    "SUPPORT ME": "ПОДДЕРЖАТЬ МЕНЯ",
     "Select game client folder": "Выберите папку клиента игры",
     "Sep": "сент.",
     "Show logs": "Показать журнал",
@@ -225,23 +208,19 @@ STRINGS = {
     "Source not confirmed": "Источник не подтверждён",
     "Source: not linked": "Источник: не привязан",
     "Source: {source}": "Источник: {source}",
-    "Stop managing this addon. The files stay exactly where they are; {app} simply stops offering updates for it.":
-        "Прекратить управление этим аддоном. Файлы останутся на месте; {app} просто перестанет предлагать для него обновления.",
     "Switch source for {name}?": "Сменить источник для {name}?",
     "TROUBLESHOOTING": "УСТРАНЕНИЕ НЕПОЛАДОК",
     "TWEAKS": "ТВИКИ",
-    "Terrain and world objects rendering distance. [100 - 10,000]": "Дальность отрисовки местности и объектов мира. [100 - 10 000]",
+    "How far terrain and world objects are drawn. [100–10,000]": "Дальность отрисовки местности и объектов мира. [100 – 10 000]",
     "Texture packs can be linked to a GitHub, Codeberg or OctoWoW Git repository, or to dl.octowow.st.":
         "Пакеты текстур можно привязать к репозиторию GitHub, Codeberg или OctoWoW Git либо к dl.octowow.st.",
     "That download is not an .mpq file.": "Эта загрузка не является файлом .mpq.",
     "The current files are backed up to {backups} first.": "Сначала текущие файлы будут сохранены в {backups}.",
     "The files here differ from the ones EqUpdater installed.": "Файлы здесь отличаются от тех, что установил EqUpdater.",
-    "The installed commit and the remote one do not contain each other - another branch, a fork, or rebased history.":
-        "Установленный и удалённый коммиты не содержат друг друга — другая ветка, форк или переписанная история.",
+    "The installed commit and the remote one do not contain each other – another branch, a fork, or rebased history.": "Установленный и удалённый коммиты не содержат друг друга – другая ветка, форк или переписанная история.",
     "The installed commit is ahead of the source's. EqUpdater will not roll it back.":
         "Установленный коммит новее, чем в источнике. EqUpdater не будет его откатывать.",
-    "The installed copy came from different history - another branch or fork. Its contents may differ substantially.":
-        "Установленная версия взята из другой истории — другой ветки или форка. Её содержимое может сильно отличаться.",
+    "The installed copy came from different history – another branch or fork. Its contents may differ substantially.": "Установленная версия взята из другой истории – другой ветки или форка. Её содержимое может сильно отличаться.",
     "The installed copy is NEWER than the source's. Replacing it is a downgrade.":
         "Установленная версия НОВЕЕ, чем в источнике. Замена будет откатом на старую версию.",
     "The source has a different version, but whether it is newer or older than yours could not be checked.":
@@ -253,7 +232,7 @@ STRINGS = {
     "The link must start with https://": "Ссылка должна начинаться с https://",
     "The source could not be checked, so nothing is replaced.": "Не удалось проверить источник, поэтому ничего не заменяется.",
     "The source publishes no checksum, so EqUpdater cannot prove this file is its copy. Replace installs the source's copy, keeps yours as a .bak file, and tracks updates from then on.":
-        "Источник не публикует контрольную сумму, поэтому EqUpdater не может подтвердить, что этот файл — его копия. «Заменить» установит версию из источника, сохранит ваш файл как .bak и с этого момента будет отслеживать обновления.",
+        "Источник не публикует контрольную сумму, поэтому EqUpdater не может подтвердить, что этот файл – его копия. «Заменить» установит версию из источника, сохранит ваш файл как .bak и с этого момента будет отслеживать обновления.",
     "These files differ from the ones EqUpdater installed. Automatic updates are held back so your changes survive.":
         "Эти файлы отличаются от тех, что установил EqUpdater. Автоматические обновления отложены, чтобы ваши изменения сохранились.",
     "These files differ from the ones EqUpdater installed. Automatic updates are held back.":
@@ -262,21 +241,15 @@ STRINGS = {
         "Этот файл изменился с тех пор, как EqUpdater его установил или привязал. Автоматические обновления отложены.",
     "This is a DOWNGRADE: {local} is installed and {remote} is what the source offers.":
         "Это ОТКАТ НА СТАРУЮ ВЕРСИЮ: установлена {local}, а источник предлагает {remote}.",
-    "This is not the file its source publishes now. An MPQ carries no version, so it could be older, newer or edited - it is left alone. Replace installs the source's copy and keeps yours as a .bak file.":
-        "Это не тот файл, который сейчас публикует источник. У MPQ нет версии, поэтому файл может быть старше, новее или изменён — он остаётся как есть. «Заменить» установит версию из источника и сохранит ваш файл как .bak.",
-    "Tweaks failed — check the log": "Ошибка твиков — см. журнал",
+    "This is not the file its source publishes now. An MPQ carries no version, so it could be older, newer or edited – it is left alone. Replace installs the source's copy and keeps yours as a .bak file.": "Это не тот файл, который сейчас публикует источник. У MPQ нет версии, поэтому файл может быть старше, новее или изменён – он остаётся как есть. «Заменить» установит версию из источника и сохранит ваш файл как .bak.",
+    "Tweaks failed – check the log": "Ошибка твиков – см. журнал",
     "UPDATE": "ОБНОВИТЬ",
-    "UPDATE ALL": "ОБНОВИТЬ ВСЁ",
     "URL must be https from an allowed host.": "Адрес должен начинаться с https и вести на разрешённый хост.",
     "Unable to verify": "Не удаётся проверить",
-    "Unlink": "Отвязать",
-    "Up to date": "Актуально",
     "Update": "Обновить",
-    "Update All": "Обновить всё",
     "Update all": "Обновить всё",
     "Update available!": "Доступно обновление!",
-    "Update failed — check the log": "Ошибка обновления — см. журнал",
-    "Updates to install: {count}": "Будет установлено обновлений: {count}",
+    "Update failed – check the log": "Ошибка обновления – см. журнал",
     "Updating game files…": "Обновление файлов игры…",
     "Updating {name}…": "Обновление {name}…",
     "Updating…": "Обновление…",
@@ -303,8 +276,7 @@ STRINGS = {
         "Автоматически: ничего не найдено. Установите Wine или укажите команду запуска.",
     "Environment variables":
         "Переменные окружения",
-    "Optional. One NAME=value per line, given only to the game when PLAY starts it - for example DXVK_HUD=fps.":
-        "Необязательно. По одной NAME=значение в строке; передаются только игре, когда её запускает PLAY, — например DXVK_HUD=fps.",
+    "Optional. One NAME=value per line, given only to the game when PLAY starts it – for example DXVK_HUD=fps.": "Необязательно. По одной NAME=значение в строке; передаются только игре, когда её запускает PLAY, – например DXVK_HUD=fps.",
     "Line {line}: write it as NAME=value.":
         "Строка {line}: запишите в виде NAME=значение.",
     "Line {line}: a name starts with a letter or _ and has only letters, digits and _.":
@@ -318,8 +290,7 @@ STRINGS = {
         "Выбирает сервер входа OctoWoW, который отвечает первым, и игровой сервер с самым низким пингом. Настройки и журнал лежат в папке mods.",
     "Sound Channels":
         "Звуковые каналы",
-    "How many sounds can play at once. More keeps sounds from cutting out in busy fights. [12 - 64]":
-        "Сколько звуков может звучать одновременно. Больше — звуки не обрываются в напряжённых боях. [12 - 64]",
+    "How many sounds can play at once. More keeps sounds from cutting out in busy fights. [12–64]": "Сколько звуков может звучать одновременно. Больше – звуки не обрываются в напряжённых боях. [12 – 64]",
     "OctoLogin":
         "OctoLogin",
     "dlls.txt lists {entry}, but the file is missing":
@@ -351,7 +322,7 @@ STRINGS = {
     "Two builds of one mod":
         "Две сборки одного мода",
     "{dll} from {source} and {dll} from {other} are two builds of the same mod. Only one can be loaded.\n\nTurn off the one from {other} and use {source}?":
-        "{dll} из {source} и {dll} из {other} — две сборки одного и того же мода. Загружаться может только одна.\n\nОтключить сборку из {other} и использовать {source}?",
+        "{dll} из {source} и {dll} из {other} – две сборки одного и того же мода. Загружаться может только одна.\n\nОтключить сборку из {other} и использовать {source}?",
     "Load more": "Загрузить ещё",
     "Loading…": "Загрузка…",
     "Open in Browser": "Открыть в браузере",
@@ -407,28 +378,27 @@ STRINGS = {
     "updates ignored": "обновления отключены",
     "{app} can install these client mods:\n\n{mods}\n\nThey are DLLs the game loads at start-up, downloaded from each mod's own release page. Nothing is installed unless you say yes.\n\nYou can change this later in Settings → Install essential mods, or pick mods one at a time on the MODS tab.\n\nInstall them now?":
         "{app} может установить эти моды клиента:\n\n{mods}\n\nЭто DLL, которые игра загружает при запуске; они скачиваются со страницы релизов каждого мода. Без вашего согласия ничего не устанавливается.\n\nПозже это можно изменить в Настройки → Устанавливать основные моды или выбрать моды по одному на вкладке МОДЫ.\n\nУстановить их сейчас?",
-    "{app} did not install this and will not change it.": "{app} не устанавливал это и не будет изменять.",
     "{app} downloads the game with aria2c, the same tool the official launcher uses.\n\nYou may be asked to allow aria2c through the firewall. You can safely reject the request, but download speeds may be slightly lower.\n\nThis message is shown only once.":
-        "{app} загружает игру с помощью aria2c — той же программы, что использует официальный лаунчер.\n\nВозможно, брандмауэр спросит, разрешить ли aria2c доступ. Запрос можно спокойно отклонить, но скорость загрузки может быть немного ниже.\n\nЭто сообщение показывается только один раз.",
+        "{app} загружает игру с помощью aria2c – той же программы, что использует официальный лаунчер.\n\nВозможно, брандмауэр спросит, разрешить ли aria2c доступ. Запрос можно спокойно отклонить, но скорость загрузки может быть немного ниже.\n\nЭто сообщение показывается только один раз.",
     "{app} list ({file})": "список {app} ({file})",
     "{app} restarts to show its text in the language you chose.\n\nRestart now?":
         "{app} перезапустится, чтобы показать текст на выбранном языке.\n\nПерезапустить сейчас?",
-    "{app} — Logs": "{app} — журнал",
+    "{app} – Logs": "{app} – журнал",
     "{description} Suggested for your display: {value}.": "{description} Рекомендуется для вашего экрана: {value}.",
     "{error} · showing cached content": "{error} · показано сохранённое содержимое",
     "{file} will be replaced with the copy from:\n    {source}\n\nYour current file is not deleted. It is renamed to\n    {file}.<date>.bak\nin the Data folder, where the game ignores it. Rename it back to undo.\n\nReplace it?":
         "{file} будет заменён версией из:\n    {source}\n\nВаш текущий файл не удаляется. Он будет переименован в\n    {file}.<дата>.bak\nв папке Data, где игра его не учитывает. Чтобы отменить, переименуйте его обратно.\n\nЗаменить?",
     "{font} (not installed)": "{font} (не установлен)",
     "{name} ({file}) from the {app} list": "{name} ({file}) из списка {app}",
-    "{name} and {other} both affect the game's resolution detection and can't be used together — only one can be active at a time.\n\nVanillaMultiMonitorFix is recommended if you experience resolution issues in the game.\n\nReplace {other} with {name}?":
-        "{name} и {other} оба влияют на определение разрешения игры и не могут использоваться вместе — активен может быть только один.\n\nПри проблемах с разрешением в игре рекомендуется VanillaMultiMonitorFix.\n\nЗаменить {other} на {name}?",
+    "{name} and {other} both affect the game's resolution detection and can't be used together – only one can be active at a time.\n\nVanillaMultiMonitorFix is recommended if you experience resolution issues in the game.\n\nReplace {other} with {name}?":
+        "{name} и {other} оба влияют на определение разрешения игры и не могут использоваться вместе – активен может быть только один.\n\nПри проблемах с разрешением в игре рекомендуется VanillaMultiMonitorFix.\n\nЗаменить {other} на {name}?",
     "{name} is already installed and {app} did not install it.\n\nManaging it means {app} may offer updates for it from the configured source. Your current files are not changed now, and a newer local build will still never be replaced automatically.\n\nManage it?":
         "{name} уже установлен, но не через {app}.\n\nЕсли {app} будет им управлять, он сможет предлагать обновления из выбранного источника. Ваши текущие файлы сейчас не изменятся, а более новая локальная сборка никогда не будет заменена автоматически.\n\nУправлять?",
     "{name} is currently tracked from:\n    {current}\n\nSwitch to:\n    {new}\n\nThis does not change any files now. The next update for this addon will come from the new repository, which may be a different project with different content.\n\nSwitch?":
         "{name} сейчас отслеживается из:\n    {current}\n\nПереключить на:\n    {new}\n\nСейчас файлы не изменятся. Следующее обновление аддона придёт из нового репозитория, который может оказаться другим проектом с другим содержимым.\n\nПереключить?",
     "{name} is installed and {app} did not install it.\n\nManaging it means {app} will track:\n    {source}\n\nYour current files are not changed now. {app} will tell you when that source has a newer version, and will never replace files you have edited without asking.\n\nManage it?":
         "{name} установлен, но не через {app}.\n\nЕсли {app} будет им управлять, он будет отслеживать:\n    {source}\n\nВаши текущие файлы сейчас не изменятся. {app} сообщит, когда в источнике появится новая версия, и никогда не заменит отредактированные вами файлы без спроса.\n\nУправлять?",
-    "{section} unavailable: {reason}": "{section} — недоступно: {reason}",
+    "{section} unavailable: {reason}": "{section} – недоступно: {reason}",
     'Checking the connection…':
         'Проверка соединения…',
     'Client build looks correct ({version})':
@@ -520,7 +490,7 @@ STRINGS = {
     '{file} sets the realm more than once ({hosts})':
         '{file} задаёт сервер больше одного раза ({hosts})',
     '{file} uses a non-standard address ({host}); it may be stale, for example left behind by an interrupted official launcher session':
-        '{file} использует нестандартный адрес ({host}); возможно, он устарел — например, остался после прерванной сессии официального лаунчера',
+        '{file} использует нестандартный адрес ({host}); возможно, он устарел – например, остался после прерванной сессии официального лаунчера',
     '{file} uses the old address {host}':
         '{file} использует старый адрес {host}',
     '{file} uses {host}':
@@ -562,16 +532,16 @@ STRINGS = {
         'Недостаточно места на диске для файлов аддона.',
     'Open the log for details?':
         'Открыть журнал с подробностями?',
-    'Some addons failed — see the message for details':
-        'Некоторые аддоны не установлены — подробности в сообщении',
+    'Some addons failed – see the message for details':
+        'Некоторые аддоны не установлены – подробности в сообщении',
     'The AddOns folder exists twice with different copies of this addon. Choose which to keep, then try again.':
         'Папка AddOns существует дважды с разными копиями этого аддона. Выберите, какую оставить, и повторите попытку.',
     "The addon's address is not on an allowed git host.":
         'Адрес аддона не относится к разрешённому git-хостингу.',
     'The file from {host} is not a valid addon archive. Try again later.':
         'Файл с {host} не является корректным архивом аддона. Повторите попытку позже.',
-    "The files were blocked or removed while being written — usually antivirus. Open Settings (⚙) → 'Add game folder to Defender exclusions', then retry.":
-        'Файлы были заблокированы или удалены во время записи — обычно это антивирус. Откройте Настройки (⚙) → «Добавить папку игры в исключения Defender» и повторите попытку.',
+    "The files were blocked or removed while being written – usually antivirus. Open Settings (⚙) → 'Add game folder to Defender exclusions', then retry.":
+        'Файлы были заблокированы или удалены во время записи – обычно это антивирус. Откройте Настройки (⚙) → «Добавить папку игры в исключения Defender» и повторите попытку.',
     'The installed copy was left as it was.':
         'Установленная копия осталась без изменений.',
     'The other {n} finished.':
@@ -626,8 +596,6 @@ STRINGS = {
         'Вставьте ссылку на репозиторий или релиз мода.',
     'RELEASE LINK':
         'ССЫЛКА НА РЕЛИЗ',
-    'Remove this custom mod':
-        'Удалить этот свой мод',
     'Remove {name}?':
         'Удалить {name}?',
     'That is not a .dll file name EqUpdater can use.':
@@ -681,9 +649,9 @@ STRINGS = {
     'PROTONPATH does not exist:\n{value}':
         'PROTONPATH не существует:\n{value}',
     'The Wine prefix is a file, not a folder:\n{value}':
-        'Префикс Wine — это файл, а не папка:\n{value}',
+        'Префикс Wine – это файл, а не папка:\n{value}',
     'The Wine prefix is not a full path:\n{value}':
-        'Префикс Wine — не полный путь:\n{value}',
+        'Префикс Wine – не полный путь:\n{value}',
     "The Wine prefix's parent folder does not exist:\n{value}":
         'Родительская папка префикса Wine не существует:\n{value}',
     'The launcher program does not exist or cannot be run:\n{value}':
@@ -692,8 +660,7 @@ STRINGS = {
         'Не удалось запустить {program}: {error}',
     '{program} stopped at once (exit code {code}).':
         '{program} сразу завершился (код выхода {code}).',
-    "Click to replace them with {version}, after a warning. Untick the mod and Apply to remove it.":
-        "Нажмите, чтобы заменить их на {version} (после предупреждения). Чтобы удалить мод, снимите флажок и примените.",
+    "Click to replace them with {version}. You are asked first.": "Нажмите, чтобы заменить их на {version} (после предупреждения). Чтобы удалить мод, снимите флажок и примените.",
     "Could not check the latest release: {reason}.":
         "Не удалось проверить последний выпуск: {reason}.",
     "EqUpdater cannot tell which version is installed now. If yours is newer, or a custom build, this replaces it with an older one.":
@@ -724,8 +691,149 @@ STRINGS = {
         "у источника нет опубликованных выпусков",
     "version unknown":
         "версия неизвестна",
-    "Default — {file}":
-        "По умолчанию — {file}",
+    "Default – {file}":
+        "По умолчанию – {file}",
     "No launch files found":
         "Файлы запуска не найдены",
+    "Open repository in browser":
+        "Открыть репозиторий в браузере",
+    "API rate limit reached until {time}":
+        "Лимит API исчерпан до {time}",
+    "Could not check the addon's source: {reason}. Your installed files are not changed.":
+        "Не удалось проверить источник аддона: {reason}. Установленные файлы не изменены.",
+    "the source lists no commits":
+        "в источнике нет коммитов",
+    "On: looting takes everything, and Shift opens the loot window. Off: looting opens the window, and Shift takes everything. This wins over addons with an auto-loot of their own.":
+        "Вкл.: при обыске всё забирается, а Shift открывает окно добычи. Выкл.: открывается окно добычи, а Shift забирает всё. Эта настройка важнее аддонов с собственной автодобычей.",
+    "Cancel":
+        "Отмена",
+    "Check for new evidence":
+        "Искать новые данные",
+    "Checking for new evidence…":
+        "Поиск новых данных…",
+    "Confirmed problems":
+        "Подтверждённые проблемы",
+    "Coverage":
+        "Охват",
+    "Crash report":
+        "Отчёт о сбое",
+    "Deep check":
+        "Глубокая проверка",
+    "Duration":
+        "Длительность",
+    "Export support ZIP…":
+        "Экспорт ZIP для поддержки…",
+    "Final outcome unavailable":
+        "Итоговый результат недоступен",
+    "Folder scan":
+        "Проверка папки",
+    "GAME DIAGNOSTICS":
+        "ДИАГНОСТИКА ИГРЫ",
+    "Game Diagnostics…":
+        "Диагностика игры…",
+    "Handed to another program; the result cannot be verified":
+        "Передано другой программе; результат проверить нельзя",
+    "Include MPQ archives":
+        "Включая архивы MPQ",
+    "Information":
+        "Сведения",
+    "Last launch":
+        "Последний запуск",
+    "Launch":
+        "Запуск",
+    "Launch blocked before anything started":
+        "Запуск заблокирован до старта чего-либо",
+    "Launch history":
+        "История запусков",
+    "Launch with diagnostics":
+        "Запустить с диагностикой",
+    "No game folder is set.":
+        "Папка игры не указана.",
+    "No launch has been recorded yet.":
+        "Запусков пока не записано.",
+    "Not included:":
+        "Не включено:",
+    "Observed loaded":
+        "Замечено загруженным",
+    "Possible conflicts":
+        "Возможные конфликты",
+    "Reading the client manifest…":
+        "Чтение манифеста клиента…",
+    "Recently changed launch files":
+        "Недавно изменённые файлы запуска",
+    "Route":
+        "Способ запуска",
+    "Saved to {path}":
+        "Сохранено: {path}",
+    "Scan OctoWoW folder":
+        "Проверить папку OctoWoW",
+    "Scanning…":
+        "Проверка…",
+    "Show last scan":
+        "Показать последнюю проверку",
+    "Still being observed":
+        "Наблюдение продолжается",
+    "Stopping…":
+        "Остановка…",
+    "The launcher exited, and WoW.exe was never observed":
+        "Загрузчик завершился, а WoW.exe так и не появился",
+    "The launcher is running, and WoW.exe was not observed":
+        "Загрузчик работает, а WoW.exe не появился",
+    "The launcher started and exited with an error":
+        "Загрузчик запустился и завершился с ошибкой",
+    "The launcher started and reported a problem":
+        "Загрузчик запустился и сообщил о проблеме",
+    "The report could not be written: {error}":
+        "Не удалось записать отчёт: {error}",
+    "The scan stopped early; the results cover what it reached.":
+        "Проверка остановлена раньше времени; результаты охватывают только пройденное.",
+    "This report will contain:":
+        "Этот отчёт будет содержать:",
+    "This starts the game once with extra logging, for this launch only. Your settings are not changed.":
+        "Игра запустится один раз с дополнительным журналированием, только для этого запуска. Настройки не изменятся.",
+    "Timeline":
+        "Хронология",
+    "What happened after you pressed PLAY, a check of the game folder, and a report you can send for help.":
+        "Что произошло после нажатия ИГРАТЬ, проверка папки игры и отчёт, который можно отправить за помощью.",
+    "WoW.exe closed before its startup could be confirmed":
+        "WoW.exe закрылся до подтверждения запуска",
+    "WoW.exe closed normally":
+        "WoW.exe закрылся нормально",
+    "WoW.exe closed with an error code":
+        "WoW.exe закрылся с кодом ошибки",
+    "WoW.exe closed; how it ended is not known":
+        "WoW.exe закрылся; неизвестно, как именно",
+    "WoW.exe crashed":
+        "Сбой WoW.exe",
+    "WoW.exe is running":
+        "WoW.exe работает",
+    "Writing the report…":
+        "Запись отчёта…",
+    "Your user name, folder paths and passwords are removed. Nothing is sent anywhere: you choose who gets the file.":
+        "Имя пользователя, пути к папкам и пароли удаляются. Ничего никуда не отправляется: вы сами решаете, кому передать файл.",
+    "Manage what is already installed?": "Управлять уже установленным?",
+    "Manage all ({count})": "Управлять всеми ({count})",
+    "{app} found {mods} mods and {addons} addons it did not install, from OctoLauncher or by hand.\n\nManaging them means {app} can update and remove them. Your current files are not changed now. Anything it cannot prove is safe to update stays as it is until you choose, and a build newer than the source's is never replaced automatically.\n\nManage them all?": "{app} нашёл моды ({mods}) и аддоны ({addons}), которые не устанавливал: из OctoLauncher или вручную.\n\nЕсли передать их под управление, {app} сможет обновлять и удалять их. Сейчас ваши файлы не изменятся. То, что нельзя безопасно обновить с уверенностью, останется как есть, пока вы не решите, а версия новее, чем у источника, никогда не заменяется автоматически.\n\nУправлять всеми?",
+    "Discord": "Discord",
+    "Update all addons and mods (1 update available)": "Обновить все аддоны и моды (доступно обновлений: 1)",
+    "Update all addons and mods ({count} updates available)": "Обновить все аддоны и моды (доступно обновлений: {count})",
+    "Anything listed under “not being changed” stays exactly as it is. Each one can still be dealt with individually from its own tab.": "Всё, что перечислено в разделе «Не изменяется», останется как есть. Каждый пункт можно обработать отдельно на его вкладке.",
+    "Not being changed:": "Не изменяется:",
+    "Nothing can be safely updated right now.": "Сейчас нечего безопасно обновить.",
+    "Update all": "Обновить всё",
+    "Updates to install: {count}": "Будет установлено обновлений: {count}",
+    "Add the game folder to Defender exclusions?": "Добавить папку игры в исключения Defender?",
+    "Donate through Ko-Fi!": "Поддержать через Ko-Fi!",
+    "Download from repository": "Скачать из репозитория",
+    "Show less": "Свернуть",
+    "Show more": "Показать больше",
+    "Stop managing. Your files are kept.": "Прекратить управление. Ваши файлы останутся.",
+    "Uninstall": "Удалить",
+    "Uninstall {name}?": "Удалить {name}?",
+    "{file} is deleted from the game's Data folder.": "{file} будет удалён из папки Data игры.",
+    "{name}'s files are deleted from the game folder and it is taken out of dlls.txt.": "Файлы {name} будут удалены из папки игры, а запись – из dlls.txt.",
+    "Try again": "Повторить",
+    "EqUpdater will not replace it.": "EqUpdater не будет её заменять.",
+    "EqUpdater did not install this pack and does not know where it came from, so it cannot check it for updates. Linking its source changes no files.": "EqUpdater не устанавливал этот пакет и не знает, откуда он, поэтому не может проверять обновления. Привязка источника не меняет файлы.",
+    "INSTALLED LOCALLY": "УСТАНОВЛЕНЫ ЛОКАЛЬНО",
 }

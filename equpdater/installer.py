@@ -1,6 +1,6 @@
 """The Windows release: one .exe that installs EqUpdater and starts it.
 
-EqUpdater-vX.Y.Z-Windows.exe is this program with the folder build of
+EqUpdater-vX.Y.Z-Windows-Installer.exe is this program with the folder build of
 EqUpdater packed inside it (EqUpdater-app.zip). Run, it
 
 1. unpacks the build next to the permanent home,

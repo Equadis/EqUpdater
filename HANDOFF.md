@@ -433,7 +433,7 @@ and Wine's store is empty. dl.octowow.st verifies with certifi alone.)
 
 **Release artifacts** (`.github/workflows/release.yml`, on a published
 release; pull requests build them as workflow artifacts):
-- `EqUpdater-vX.Y.Z-Windows.exe` - `build.py --setup`: a one-file
+- `EqUpdater-vX.Y.Z-Windows-Installer.exe` - `build.py --setup`: a one-file
   installer (`equpdater/installer.py`, entry `EqUpdaterSetup.py`) holding
   the folder build; installs it with `deploy`, Start-menu entry, desktop
   shortcut on request, starts it. The app stays a folder build (no %TEMP%
