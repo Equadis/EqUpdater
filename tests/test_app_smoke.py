@@ -266,6 +266,18 @@ class TestAppStarts(unittest.TestCase):
         for d in dividers:
             self.assertEqual(int(d.cget("height")), self.app._px(1))
 
+    def windows_plan(self):
+        """PLAY's plan as on Windows, on every system: the program itself.
+        A Linux CI machine has no Wine, and there PLAY would stop at "no way
+        to run the game" -- a dialog nobody answers, which hung the Linux run
+        for 2.1.4."""
+        from unittest import mock
+        P = self.app_mod.platforms
+        return mock.patch.object(
+            P, "launch_plan",
+            lambda client, exe, settings=None, **k: P.LaunchPlan(
+                [exe], client, None, "windows"))
+
     def play(self, client, spawn, diagnostic=False):
         """Press PLAY with process creation replaced, and return the record."""
         from unittest import mock
@@ -273,7 +285,10 @@ class TestAppStarts(unittest.TestCase):
         self.app._game_path.set(client)
         self.addCleanup(self.app._game_path.set, before)
         with mock.patch.object(self.app_mod.platforms, "spawn_detached", spawn), \
+                self.windows_plan(), \
                 mock.patch("tkinter.messagebox.showerror"), \
+                mock.patch("tkinter.messagebox.showinfo"), \
+                mock.patch("tkinter.messagebox.askyesno", return_value=False), \
                 mock.patch.object(self.app_mod, "enforce_autoloot", lambda c: []):
             self.app._launch_game(diagnostic=diagnostic)
         return self.app._diag_store().recent(1)[0]
@@ -310,6 +325,9 @@ class TestAppStarts(unittest.TestCase):
         with mock.patch.object(self.app_mod.diagnostics, "Attempt",
                                side_effect=OSError("disk full")), \
                 mock.patch.object(self.app_mod.platforms, "spawn_detached", spawn), \
+                self.windows_plan(), \
+                mock.patch("tkinter.messagebox.showerror"), \
+                mock.patch("tkinter.messagebox.showinfo"), \
                 mock.patch.object(self.app_mod, "enforce_autoloot", lambda c: []):
             before = self.app._game_path.get()
             self.app._game_path.set(client)
@@ -813,8 +831,13 @@ class TestAppStarts(unittest.TestCase):
         self.assertEqual(self.app_mod.load_config()["launch_default"],
                          "Launch.bat")
 
-        # The choice is what starts, the way that file has to start.
-        with mock.patch.object(self.app_mod.platforms, "spawn_detached") as spawn:
+        # The choice is what starts, the way that file has to start. (Off
+        # Windows, with no Wine on a CI machine, as Windows would start it.)
+        import contextlib
+        plan = (contextlib.nullcontext() if self.app_mod.platforms.WINDOWS
+                else self.windows_plan())
+        with mock.patch.object(self.app_mod.platforms, "spawn_detached") as spawn, \
+                plan, mock.patch("tkinter.messagebox.showerror"):
             app._launch_game()
         self.assertEqual(spawn.call_count, 1)
         if self.app_mod.platforms.WINDOWS:
