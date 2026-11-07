@@ -16,7 +16,7 @@ STRINGS = {
     "API rate limit exceeded – try again in 1 hour": "超出 API 请求限制——请 1 小时后再试",
     "AVAILABLE": "可安装",
     "Add custom git addon": "添加自定义 git 插件",
-    "Add game folder to Defender exclusions": "将游戏文件夹添加到 Defender 排除项",
+    "Exclude from Defender": "从 Defender 中排除",
     "Addon URL is not from an allowed git host": "插件地址不属于允许的 git 托管站点",
     "Addon error": "插件错误",
     "Addons marked with {star} are recommended": "标有 {star} 的插件为推荐插件",
@@ -36,8 +36,7 @@ STRINGS = {
     "Apr": "4月",
     "Aug": "8月",
     "Auto Loot": "自动拾取",
-    "Blocked by antivirus – open Settings (⚙) → 'Add game folder to Defender exclusions', then retry":
-        "被杀毒软件拦截——请打开设置（⚙）→“将游戏文件夹添加到 Defender 排除项”，然后重试",
+    "Blocked by antivirus – open Settings (⚙) → 'Exclude from Defender', then retry": "被杀毒软件拦截——请打开设置（⚙）→“从 Defender 中排除”，然后重试",
     "By {author}": "作者：{author}",
     "CAMERA": "镜头",
     "CHANGELOG": "更新日志",
@@ -61,8 +60,7 @@ STRINGS = {
     "Different source": "来源不同",
     "Differs from source": "与来源不同",
     "Distance at which nameplates are visible. [0–41]": "姓名板可见的距离。[\u0001–\u0002]",
-    "Downloaded archive is corrupted (possibly blocked by antivirus) – retry, or use Settings (⚙) → 'Add game folder to Defender exclusions'":
-        "下载的压缩包已损坏（可能被杀毒软件拦截）——请重试，或使用设置（⚙）→“将游戏文件夹添加到 Defender 排除项”",
+    "Downloaded archive is corrupted (possibly blocked by antivirus) – retry, or use Settings (⚙) → 'Exclude from Defender'": "下载的压缩包已损坏（可能被杀毒软件拦截）——请重试，或使用设置（⚙）→“从 Defender 中排除”",
     "Downloading addons…": "正在下载插件…",
     "Downloading mods…": "正在下载模组…",
     "Downloading the game": "下载游戏",
@@ -202,7 +200,7 @@ STRINGS = {
     "SOUND": "声音",
     "Select game client folder": "选择游戏客户端文件夹",
     "Sep": "9月",
-    "Show logs": "查看日志",
+    "Show Session Log": "显示会话日志",
     "Simple sans-serif.": "简洁的无衬线字体。",
     "Somewhere else:": "其他来源：",
     "Sound in Background": "后台声音",
@@ -541,8 +539,7 @@ STRINGS = {
         '该插件的地址不在允许的 git 托管站点上。',
     'The file from {host} is not a valid addon archive. Try again later.':
         '来自 {host} 的文件不是有效的插件压缩包。请稍后重试。',
-    "The files were blocked or removed while being written – usually antivirus. Open Settings (⚙) → 'Add game folder to Defender exclusions', then retry.":
-        "文件在写入时被拦截或删除——通常是杀毒软件所致。请打开设置 (⚙) →“将游戏文件夹加入 Defender 排除项”，然后重试。",
+    "The files were blocked or removed while being written – usually antivirus. Open Settings (⚙) → 'Exclude from Defender', then retry.": "文件在写入时被拦截或删除——通常是杀毒软件所致。请打开设置 (⚙) →“从 Defender 中排除”，然后重试。",
     'The installed copy was left as it was.':
         '已安装的版本保持不变。',
     'The other {n} finished.':
@@ -730,8 +727,7 @@ STRINGS = {
         "文件夹扫描",
     "GAME DIAGNOSTICS":
         "游戏诊断",
-    "Game Diagnostics…":
-        "游戏诊断…",
+    "Game Diagnostics": "游戏诊断",
     "Handed to another program; the result cannot be verified":
         "已交给其他程序；无法验证结果",
     "Include MPQ archives":
@@ -842,4 +838,12 @@ STRINGS = {
     "An interrupted download or an antivirus can leave it like this.": "下载中断或杀毒软件可能导致这种情况。",
     "Reinstall VanillaFixes now?": "现在重新安装 VanillaFixes?",
     "Run Settings → Verify game files to repair it.": "运行“设置 → 校验游戏文件”来修复它。",
+    "Read more": "阅读全文",
+    "Checks every game file against the official client and repairs any that are damaged or missing. Installed mods are left alone.": "将每个游戏文件与官方客户端比对，修复损坏或缺失的文件。已安装的模组不受影响。",
+    "Everything EqUpdater has done since it started: downloads, installs, updates and errors.": "EqUpdater 自启动以来所做的一切：下载、安装、更新和错误。",
+    "Adds the game folder to Windows Defender's exclusions, so mods are not wrongly flagged or removed. Windows asks for administrator rights.": "将游戏文件夹添加到 Windows Defender 排除项，避免模组被误报或删除。Windows 会请求管理员权限。",
+    "How the game is started on Linux: the launch command, the Wine prefix and environment variables.": "Linux 上游戏的启动方式：启动命令、Wine 前缀和环境变量。",
+    "Deletes the game's WDB cache before each launch: the item and creature data the server sent. Clearing it fixes stale names and tooltips; the game builds it again as you play.": "每次启动前删除游戏的 WDB 缓存，即服务器发送的物品和生物数据。这可以修复过期的名称和提示；游戏会在你游玩时重新生成。",
+    "Minimizes {app} to the taskbar a moment after the game starts.": "游戏启动片刻后将 {app} 最小化到任务栏。",
+    "When on, the recommended addons (marked ★ on the Addons tab) are installed wherever they are missing. Addons already in the client are never replaced.": "开启后，推荐插件（在插件标签页标有 ★）会在缺失时自动安装。客户端中已有的插件绝不会被替换。",
 }

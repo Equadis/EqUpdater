@@ -3767,12 +3767,9 @@ def describe_install_error(e: Exception) -> str:
             and getattr(e, "errno", None) in (2, 13, 22)):
         # The archive/file vanished or got locked mid-operation — on Windows
         # that's almost always the antivirus quarantining the download.
-        return N_("Blocked by antivirus – open Settings (⚙) → "
-                  "'Add game folder to Defender exclusions', then retry")
+        return N_("Blocked by antivirus – open Settings (⚙) → 'Exclude from Defender', then retry")
     if isinstance(e, zipfile.BadZipFile):
-        return N_("Downloaded archive is corrupted (possibly blocked by "
-                  "antivirus) – retry, or use Settings (⚙) → "
-                  "'Add game folder to Defender exclusions'")
+        return N_("Downloaded archive is corrupted (possibly blocked by antivirus) – retry, or use Settings (⚙) → 'Exclude from Defender'")
     return str(e)
 
 
@@ -3812,9 +3809,7 @@ ADDON_FAILURES = {
     "source": N_("The addon's address is not on an allowed git host."),
     "no_space": N_("Not enough disk space to write the addon files."),
     "permission": N_("No permission to write to the AddOns folder."),
-    "antivirus": N_("The files were blocked or removed while being written – "
-                    "usually antivirus. Open Settings (⚙) → 'Add game "
-                    "folder to Defender exclusions', then retry."),
+    "antivirus": N_("The files were blocked or removed while being written – usually antivirus. Open Settings (⚙) → 'Exclude from Defender', then retry."),
     "write": N_("Could not write the addon files ({error})."),
     "unknown": N_("Unexpected error ({error})."),
 }
@@ -4580,7 +4575,27 @@ def _news_open(req, timeout):
 NEWS_FIRST_POST_TTL = 24 * 3600
 
 
-def fetch_patch_notes() -> list:
+def _changelog_rows(limit: int) -> tuple:
+    """The ``limit`` newest-started topics of the Changelog forum, reading
+    further listing pages while there are fewer, and whether there are more
+    beyond them. A topic pinned to every page is counted once."""
+    rows, seen, start = [], set(), 0
+    while start is not None and len(rows) <= limit:
+        page, start = fetch_forum_page(CHANGELOG_FORUM_ID, start,
+                                       opener=_news_open, user_agent=UA,
+                                       timeout=NEWS_TIMEOUT)
+        for row in page:
+            if row.topic_id not in seen:
+                seen.add(row.topic_id)
+                rows.append(row)
+    return rows[:limit], len(rows) > limit or start is not None
+
+
+#: Whether the Changelog forum has topics past the ones last read.
+CHANGELOG_MORE = {"more": False}
+
+
+def fetch_patch_notes(limit: int = NEWS_CHANGELOG_COUNT) -> list:
     """The newest topics of OctoWoW's Patch Notes and Changelog forum (f=4),
     newest-started first: title, start date, author and link from the
     listing, and each topic's *opening* post as its preview.
@@ -4591,9 +4606,7 @@ def fetch_patch_notes() -> list:
     with its last known preview, or none; a DDoS check on one stops the
     rest from being asked. Raises news.ForumError when the listing itself
     cannot be read."""
-    rows = fetch_topic_list(CHANGELOG_FORUM_ID, NEWS_CHANGELOG_COUNT,
-                            opener=_news_open, user_agent=UA,
-                            timeout=NEWS_TIMEOUT)
+    rows, CHANGELOG_MORE["more"] = _changelog_rows(limit)
     cache = load_config().get("news_first_posts", {})
     now = time.time()
     fresh, items, blocked = {}, [], False
@@ -4852,7 +4865,7 @@ class EqUpdaterApp(tk.Tk):
         self._worker: UpdateWorker | None = None
         self._log_q:  queue.Queue = queue.Queue()
         self._prog_q: queue.Queue = queue.Queue()
-        # Session log lives in memory; the "Show logs" window renders it.
+        # Session log lives in memory; the "Show Session Log" window renders it.
         self._log_buffer: list = []
         self._logwin = None
         self._logwin_text = None
@@ -6065,7 +6078,8 @@ class EqUpdaterApp(tk.Tk):
         def worker():
             items, err = None, ""
             try:
-                items = fetch_patch_notes()
+                items = fetch_patch_notes(
+                    getattr(self, "_patch_limit", NEWS_CHANGELOG_COUNT))
             except Exception as exc:
                 err = _news_error(N_("Changelog"), exc)
 
@@ -6269,11 +6283,11 @@ class EqUpdaterApp(tk.Tk):
             lnk.bind("<Enter>", lambda e, w=lnk: w.configure(fg=C_GOLD_LT))
             lnk.bind("<Leave>", lambda e, w=lnk: w.configure(fg=C_GOLD))
 
-    #: How many lines of a changelog entry show before "Show more".
+    #: How many lines of a changelog entry show before "Read more".
     CHANGELOG_PREVIEW_LINES = 14
 
     def _acc_clamp(self, key, iid, item, txt):
-        """A long changelog entry opens to its first lines and a "Show more"
+        """A long changelog entry opens to its first lines and a "Read more"
         under them; "Show less" puts it back. A short one shows whole, with
         neither. Follows the text's own height as the column is resized."""
         lst = self._acc_lists[key]
@@ -6298,7 +6312,7 @@ class EqUpdaterApp(tk.Tk):
                     txt.configure(height=want)
                 if long:
                     toggle.configure(text=tr("Show less") if iid in full
-                                     else tr("Show more"))
+                                     else tr("Read more"))
                     if not toggle.winfo_manager():
                         toggle.pack(fill="x", after=txt,
                                     pady=(self._px(4), 0))
@@ -6759,7 +6773,32 @@ class EqUpdaterApp(tk.Tk):
         if opened is None:                      # the newest, until changed
             opened = self._patch_open = {str(items[0].get("id", ""))}
         self._render_accordion(f, "patch", items, opened, self._patch_toggle,
-                               wrap_w=wrap_w, title_size=10)
+                               wrap_w=wrap_w, title_size=10,
+                               footer=self._patch_footer)
+
+    def _patch_footer(self, inner):
+        """Under the Changelog: Show more while the forum has older posts."""
+        if getattr(self, "_patch_loading", False) and \
+                getattr(self, "_patch_limit", 0) > len(self._patch_items or []):
+            tk.Label(inner, text=tr("Loading changelog…"), font=self._font(9),
+                     fg=C_TEXT_DIM, bg=C_PANEL).pack(pady=self._px(10))
+            return
+        if not CHANGELOG_MORE["more"]:
+            return
+        btn = tk.Label(inner, text=tr("Show more"),
+                       font=self._font(10, bold=True), fg=C_TEXT,
+                       bg=C_PANEL_BDR, cursor="hand2",
+                       padx=self._px(16), pady=self._px(4))
+        btn.pack(pady=self._px(12))
+        btn.bind("<Button-1>", lambda e: self._patch_more())
+        btn.bind("<Enter>", lambda e: btn.configure(bg=C_GOLD, fg="#000"))
+        btn.bind("<Leave>", lambda e: btn.configure(bg=C_PANEL_BDR, fg=C_TEXT))
+
+    def _patch_more(self):
+        """Eight older Changelog posts, under the ones shown."""
+        self._patch_limit = max(getattr(self, "_patch_limit", 0),
+                                len(self._patch_items or [])) + NEWS_CHANGELOG_COUNT
+        self._load_patch_notes()
 
     def _patch_toggle(self, iid: str):
         opened = getattr(self, "_patch_open", None) or set()
@@ -11287,7 +11326,7 @@ class EqUpdaterApp(tk.Tk):
         """Show an error in the status line as a link: an arrow after it,
         and a click runs ``action`` -- the log, the message, the tab the
         text points at."""
-        shown = f"{text} \u2192"
+        shown = f"{text} \u2197"
         self._status_action = action
         self._status_action_text = shown
         self._status_var.set(shown)
@@ -11999,37 +12038,58 @@ class EqUpdaterApp(tk.Tk):
                 for w in (ic, tl):
                     self._add_tooltip(w, tip)
 
-        _titem("✓", tr("Verify game files"), self._settings_verify)
+        _titem("✓", tr("Verify game files"), self._settings_verify,
+               tip=tr("Checks every game file against the official client and "
+                      "repairs any that are damaged or missing. Installed mods "
+                      "are left alone."))
         _titem("✚", tr("Login Doctor"), self._open_login_doctor,
                tip=tr("Checks this computer for common login problems: the game client, its login settings, OctoLogin and the connection to OctoWoW. It can repair the login settings."))
-        _titem("⚑", tr("Game Diagnostics…"), self._open_game_diagnostics,
+        _titem("⚑", tr("Game Diagnostics"), self._open_game_diagnostics,
                tip=tr("What happened after you pressed PLAY, a check of the "
                       "game folder, and a report you can send for help."))
-        _titem("☰", tr("Show logs"), self._show_logs)
+        _titem("☰", tr("Show Session Log"), self._show_logs,
+               tip=tr("Everything EqUpdater has done since it started: "
+                      "downloads, installs, updates and errors."))
         if platforms.WINDOWS:
-            _titem("⛊", tr("Add game folder to Defender exclusions"),
-                   self._allow_through_antivirus)
+            _titem("⛊", tr("Exclude from Defender"),
+                   self._allow_through_antivirus,
+                   tip=tr("Adds the game folder to Windows Defender's exclusions, "
+                          "so mods are not wrongly flagged or removed. Windows asks "
+                          "for administrator rights."))
         else:
-            _titem("⚙", tr("Game launcher…"), self._open_game_launcher)
+            _titem("⚙", tr("Game launcher…"), self._open_game_launcher,
+                   tip=tr("How the game is started on Linux: the launch command, "
+                          "the Wine prefix and environment variables."))
 
         tk.Label(rcol, text=tr("GENERAL"),
                  font=self._font(10, bold=True),
                  fg=C_GOLD, bg=P_BG).pack(anchor="w")
-        tk.Checkbutton(rcol, text=" " + tr("Clear WDB on game launch"),
+        cb_wdb = tk.Checkbutton(rcol, text=" " + tr("Clear WDB on game launch"),
                        variable=self._clear_wdb_var,
                        command=self._toggle_clear_wdb,
                        font=self._font(10), fg=C_TEXT, bg=P_BG,
                        activebackground=P_BG, activeforeground=C_TEXT,
                        selectcolor=P_INP, highlightthickness=0, bd=0,
-                       cursor="hand2").pack(anchor="w", pady=(self._px(10), 0))
-        tk.Checkbutton(rcol, text=" " + tr("Minimize {app} on game launch",
+                       cursor="hand2")
+        cb_wdb.pack(anchor="w", pady=(self._px(10), 0))
+        self._add_tooltip(
+            cb_wdb,
+            tr("Deletes the game's WDB cache before each launch: the item and "
+               "creature data the server sent. Clearing it fixes stale names "
+               "and tooltips; the game builds it again as you play."))
+        cb_minimize = tk.Checkbutton(rcol, text=" " + tr("Minimize {app} on game launch",
                                                  app=branding.APP_TITLE),
                        variable=self._close_on_launch_var,
                        command=self._toggle_close_on_launch,
                        font=self._font(10), fg=C_TEXT, bg=P_BG,
                        activebackground=P_BG, activeforeground=C_TEXT,
                        selectcolor=P_INP, highlightthickness=0, bd=0,
-                       cursor="hand2").pack(anchor="w", pady=(self._px(10), 0))
+                       cursor="hand2")
+        cb_minimize.pack(anchor="w", pady=(self._px(10), 0))
+        self._add_tooltip(
+            cb_minimize,
+            tr("Minimizes {app} to the taskbar a moment after the game starts.",
+               app=branding.APP_TITLE))
         cb_auto_mods = tk.Checkbutton(
             rcol, text=" " + tr("Install essential mods"),
             variable=self._auto_mods_var, command=self._toggle_auto_mods,
@@ -12042,13 +12102,19 @@ class EqUpdaterApp(tk.Tk):
             tr("Off by default. When on, the essential mods (VanillaFixes "
                "and the DLLs it loads) are installed wherever they are "
                "missing. Mods already in the client are never replaced."))
-        tk.Checkbutton(rcol, text=" " + tr("Install recommended addons"),
+        cb_auto_addons = tk.Checkbutton(rcol, text=" " + tr("Install recommended addons"),
                        variable=self._auto_addons_var,
                        command=self._toggle_auto_addons,
                        font=self._font(10), fg=C_TEXT, bg=P_BG,
                        activebackground=P_BG, activeforeground=C_TEXT,
                        selectcolor=P_INP, highlightthickness=0, bd=0,
-                       cursor="hand2").pack(anchor="w", pady=(self._px(10), 0))
+                       cursor="hand2")
+        cb_auto_addons.pack(anchor="w", pady=(self._px(10), 0))
+        self._add_tooltip(
+            cb_auto_addons,
+            tr("When on, the recommended addons (marked ★ on the Addons tab) "
+               "are installed wherever they are missing. Addons already in "
+               "the client are never replaced."))
         cb_animated_bg = tk.Checkbutton(
             rcol, text=" " + tr("Animated background"),
             variable=self._animated_bg_var,

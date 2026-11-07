@@ -16,7 +16,7 @@ STRINGS = {
     "API rate limit exceeded – try again in 1 hour": "Limite da API excedido – tente novamente em 1 hora",
     "AVAILABLE": "DISPONÍVEIS",
     "Add custom git addon": "Adicionar addon git próprio",
-    "Add game folder to Defender exclusions": "Adicionar a pasta do jogo às exclusões do Defender",
+    "Exclude from Defender": "Excluir do Defender",
     "Addon URL is not from an allowed git host": "A URL do addon não é de um servidor git permitido",
     "Addon error": "Erro no addon",
     "Addons marked with {star} are recommended": "Addons marcados com {star} são recomendados",
@@ -36,8 +36,7 @@ STRINGS = {
     "Apr": "abr.",
     "Aug": "ago.",
     "Auto Loot": "Saque automático",
-    "Blocked by antivirus – open Settings (⚙) → 'Add game folder to Defender exclusions', then retry":
-        "Bloqueado pelo antivírus – abra Configurações (⚙) → “Adicionar a pasta do jogo às exclusões do Defender” e tente novamente",
+    "Blocked by antivirus – open Settings (⚙) → 'Exclude from Defender', then retry": "Bloqueado pelo antivírus – abra Configurações (⚙) → “Excluir do Defender” e tente novamente",
     "By {author}": "Por {author}",
     "CAMERA": "CÂMERA",
     "CHANGELOG": "MUDANÇAS",
@@ -61,8 +60,7 @@ STRINGS = {
     "Different source": "Fonte diferente",
     "Differs from source": "Diferente da fonte",
     "Distance at which nameplates are visible. [0–41]": "Distância em que as placas de nome ficam visíveis. [0 – 41]",
-    "Downloaded archive is corrupted (possibly blocked by antivirus) – retry, or use Settings (⚙) → 'Add game folder to Defender exclusions'":
-        "O arquivo baixado está corrompido (talvez bloqueado pelo antivírus) – tente novamente ou use Configurações (⚙) → “Adicionar a pasta do jogo às exclusões do Defender”",
+    "Downloaded archive is corrupted (possibly blocked by antivirus) – retry, or use Settings (⚙) → 'Exclude from Defender'": "O arquivo baixado está corrompido (talvez bloqueado pelo antivírus) – tente novamente ou use Configurações (⚙) → “Excluir do Defender”",
     "Downloading addons…": "Baixando addons…",
     "Downloading mods…": "Baixando mods…",
     "Downloading the game": "Baixando o jogo",
@@ -202,7 +200,7 @@ STRINGS = {
     "SOUND": "SOM",
     "Select game client folder": "Selecione a pasta do cliente do jogo",
     "Sep": "set.",
-    "Show logs": "Ver registro",
+    "Show Session Log": "Mostrar registro da sessão",
     "Simple sans-serif.": "Sem serifa simples.",
     "Somewhere else:": "Outro lugar:",
     "Sound in Background": "Som em segundo plano",
@@ -541,8 +539,7 @@ STRINGS = {
         'O endereço do addon não está em um host git permitido.',
     'The file from {host} is not a valid addon archive. Try again later.':
         'O arquivo de {host} não é um pacote de addon válido. Tente novamente mais tarde.',
-    "The files were blocked or removed while being written – usually antivirus. Open Settings (⚙) → 'Add game folder to Defender exclusions', then retry.":
-        "Os arquivos foram bloqueados ou removidos durante a gravação – geralmente pelo antivírus. Abra Configurações (⚙) → 'Adicionar a pasta do jogo às exclusões do Defender' e tente novamente.",
+    "The files were blocked or removed while being written – usually antivirus. Open Settings (⚙) → 'Exclude from Defender', then retry.": "Os arquivos foram bloqueados ou removidos durante a gravação – geralmente pelo antivírus. Abra Configurações (⚙) → 'Excluir do Defender' e tente novamente.",
     'The installed copy was left as it was.':
         'A cópia instalada não foi alterada.',
     'The other {n} finished.':
@@ -730,8 +727,7 @@ STRINGS = {
         "Verificação da pasta",
     "GAME DIAGNOSTICS":
         "DIAGNÓSTICO DO JOGO",
-    "Game Diagnostics…":
-        "Diagnóstico do jogo…",
+    "Game Diagnostics": "Diagnóstico do jogo",
     "Handed to another program; the result cannot be verified":
         "Entregue a outro programa; o resultado não pode ser verificado",
     "Include MPQ archives":
@@ -842,4 +838,12 @@ STRINGS = {
     "An interrupted download or an antivirus can leave it like this.": "Um download interrompido ou um antivírus pode deixá-lo assim.",
     "Reinstall VanillaFixes now?": "Reinstalar o VanillaFixes agora?",
     "Run Settings → Verify game files to repair it.": "Use Configurações → Verificar arquivos do jogo para repará-lo.",
+    "Read more": "Ler mais",
+    "Checks every game file against the official client and repairs any that are damaged or missing. Installed mods are left alone.": "Verifica cada arquivo do jogo com o cliente oficial e repara os danificados ou ausentes. Os mods instalados não são alterados.",
+    "Everything EqUpdater has done since it started: downloads, installs, updates and errors.": "Tudo o que o EqUpdater fez desde que foi aberto: downloads, instalações, atualizações e erros.",
+    "Adds the game folder to Windows Defender's exclusions, so mods are not wrongly flagged or removed. Windows asks for administrator rights.": "Adiciona a pasta do jogo às exclusões do Windows Defender, para que os mods não sejam marcados ou removidos por engano. O Windows pede permissão de administrador.",
+    "How the game is started on Linux: the launch command, the Wine prefix and environment variables.": "Como o jogo é iniciado no Linux: o comando de inicialização, o prefixo do Wine e as variáveis de ambiente.",
+    "Deletes the game's WDB cache before each launch: the item and creature data the server sent. Clearing it fixes stale names and tooltips; the game builds it again as you play.": "Apaga o cache WDB do jogo antes de cada inicialização: os dados de itens e criaturas enviados pelo servidor. Isso corrige nomes e dicas desatualizados; o jogo o recria enquanto você joga.",
+    "Minimizes {app} to the taskbar a moment after the game starts.": "Minimiza o {app} para a barra de tarefas logo depois que o jogo inicia.",
+    "When on, the recommended addons (marked ★ on the Addons tab) are installed wherever they are missing. Addons already in the client are never replaced.": "Quando ativado, os addons recomendados (marcados com ★ na aba Addons) são instalados onde estiverem faltando. Addons já presentes no cliente nunca são substituídos.",
 }

@@ -15,7 +15,7 @@ STRINGS = {
     "API rate limit exceeded – try again in 1 hour": "API-Limit überschritten – versuche es in 1 Stunde erneut",
     "AVAILABLE": "VERFÜGBAR",
     "Add custom git addon": "Eigenes Git-Addon hinzufügen",
-    "Add game folder to Defender exclusions": "Spielordner zu den Defender-Ausnahmen hinzufügen",
+    "Exclude from Defender": "Von Defender ausschließen",
     "Addon URL is not from an allowed git host": "Die Addon-URL stammt nicht von einem erlaubten Git-Host",
     "Addon error": "Addon-Fehler",
     "Addons marked with {star} are recommended": "Mit {star} markierte Addons werden empfohlen",
@@ -35,8 +35,7 @@ STRINGS = {
     "Apr": "Apr.",
     "Aug": "Aug.",
     "Auto Loot": "Automatisch plündern",
-    "Blocked by antivirus – open Settings (⚙) → 'Add game folder to Defender exclusions', then retry":
-        "Vom Virenschutz blockiert – öffne Einstellungen (⚙) → „Spielordner zu den Defender-Ausnahmen hinzufügen“ und versuche es erneut",
+    "Blocked by antivirus – open Settings (⚙) → 'Exclude from Defender', then retry": "Vom Virenschutz blockiert – öffne Einstellungen (⚙) → „Von Defender ausschließen“ und versuche es erneut",
     "By {author}": "Von {author}",
     "CAMERA": "KAMERA",
     "CHANGELOG": "ÄNDERUNGEN",
@@ -60,8 +59,7 @@ STRINGS = {
     "Different source": "Andere Quelle",
     "Differs from source": "Weicht von der Quelle ab",
     "Distance at which nameplates are visible. [0–41]": "Entfernung, bis zu der Namensplaketten sichtbar sind. [0 – 41]",
-    "Downloaded archive is corrupted (possibly blocked by antivirus) – retry, or use Settings (⚙) → 'Add game folder to Defender exclusions'":
-        "Das heruntergeladene Archiv ist beschädigt (möglicherweise vom Virenschutz blockiert) – versuche es erneut oder nutze Einstellungen (⚙) → „Spielordner zu den Defender-Ausnahmen hinzufügen“",
+    "Downloaded archive is corrupted (possibly blocked by antivirus) – retry, or use Settings (⚙) → 'Exclude from Defender'": "Das heruntergeladene Archiv ist beschädigt (möglicherweise vom Virenschutz blockiert) – versuche es erneut oder nutze Einstellungen (⚙) → „Von Defender ausschließen“",
     "Downloading addons…": "Addons werden heruntergeladen…",
     "Downloading mods…": "Mods werden heruntergeladen…",
     "Downloading the game": "Das Spiel wird heruntergeladen",
@@ -201,7 +199,7 @@ STRINGS = {
     "SOUND": "SOUND",
     "Select game client folder": "Ordner des Spielclients auswählen",
     "Sep": "Sep.",
-    "Show logs": "Protokoll anzeigen",
+    "Show Session Log": "Sitzungsprotokoll anzeigen",
     "Simple sans-serif.": "Schlichte serifenlose Schrift.",
     "Somewhere else:": "Woanders:",
     "Sound in Background": "Sound im Hintergrund",
@@ -540,8 +538,7 @@ STRINGS = {
         'Die Adresse des Addons liegt nicht auf einem erlaubten Git-Host.',
     'The file from {host} is not a valid addon archive. Try again later.':
         'Die Datei von {host} ist kein gültiges Addon-Archiv. Versuche es später erneut.',
-    "The files were blocked or removed while being written – usually antivirus. Open Settings (⚙) → 'Add game folder to Defender exclusions', then retry.":
-        'Die Dateien wurden beim Schreiben blockiert oder entfernt – meist durch einen Virenscanner. Öffne Einstellungen (⚙) → „Spielordner zu den Defender-Ausnahmen hinzufügen“ und versuche es erneut.',
+    "The files were blocked or removed while being written – usually antivirus. Open Settings (⚙) → 'Exclude from Defender', then retry.": "Die Dateien wurden beim Schreiben blockiert oder entfernt – meist durch einen Virenscanner. Öffne Einstellungen (⚙) → „Von Defender ausschließen“ und versuche es erneut.",
     'The installed copy was left as it was.':
         'Die installierte Version wurde nicht verändert.',
     'The other {n} finished.':
@@ -729,8 +726,7 @@ STRINGS = {
         "Ordnerprüfung",
     "GAME DIAGNOSTICS":
         "SPIELDIAGNOSE",
-    "Game Diagnostics…":
-        "Spieldiagnose…",
+    "Game Diagnostics": "Spieldiagnose",
     "Handed to another program; the result cannot be verified":
         "An ein anderes Programm übergeben; das Ergebnis lässt sich nicht prüfen",
     "Include MPQ archives":
@@ -841,4 +837,12 @@ STRINGS = {
     "An interrupted download or an antivirus can leave it like this.": "Ein unterbrochener Download oder ein Virenscanner kann das verursachen.",
     "Reinstall VanillaFixes now?": "VanillaFixes jetzt neu installieren?",
     "Run Settings → Verify game files to repair it.": "Führe Einstellungen → Spieldateien überprüfen aus, um es zu reparieren.",
+    "Read more": "Weiterlesen",
+    "Checks every game file against the official client and repairs any that are damaged or missing. Installed mods are left alone.": "Prüft jede Spieldatei mit dem offiziellen Client und repariert beschädigte oder fehlende. Installierte Mods bleiben unverändert.",
+    "Everything EqUpdater has done since it started: downloads, installs, updates and errors.": "Alles, was EqUpdater seit dem Start getan hat: Downloads, Installationen, Updates und Fehler.",
+    "Adds the game folder to Windows Defender's exclusions, so mods are not wrongly flagged or removed. Windows asks for administrator rights.": "Fügt den Spielordner zu den Ausnahmen von Windows Defender hinzu, damit Mods nicht fälschlich gemeldet oder entfernt werden. Windows fragt nach Administratorrechten.",
+    "How the game is started on Linux: the launch command, the Wine prefix and environment variables.": "Wie das Spiel unter Linux gestartet wird: Startbefehl, Wine-Präfix und Umgebungsvariablen.",
+    "Deletes the game's WDB cache before each launch: the item and creature data the server sent. Clearing it fixes stale names and tooltips; the game builds it again as you play.": "Löscht vor jedem Start den WDB-Cache des Spiels: die vom Server gesendeten Gegenstands- und Kreaturdaten. Das behebt veraltete Namen und Tooltips; das Spiel baut ihn beim Spielen neu auf.",
+    "Minimizes {app} to the taskbar a moment after the game starts.": "Minimiert {app} kurz nach dem Spielstart in die Taskleiste.",
+    "When on, the recommended addons (marked ★ on the Addons tab) are installed wherever they are missing. Addons already in the client are never replaced.": "Wenn aktiv, werden die empfohlenen Addons (im Addons-Tab mit ★ markiert) überall installiert, wo sie fehlen. Bereits vorhandene Addons werden nie ersetzt.",
 }

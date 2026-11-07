@@ -15,7 +15,7 @@ STRINGS = {
     "API rate limit exceeded – try again in 1 hour": "Превышен лимит запросов к API – попробуйте снова через 1 час",
     "AVAILABLE": "ДОСТУПНО",
     "Add custom git addon": "Добавить свой git-аддон",
-    "Add game folder to Defender exclusions": "Добавить папку игры в исключения Defender",
+    "Exclude from Defender": "Исключить из Defender",
     "Addon URL is not from an allowed git host": "Адрес аддона не относится к разрешённому git-хостингу",
     "Addon error": "Ошибка аддона",
     "Addons marked with {star} are recommended": "Аддоны, отмеченные {star}, рекомендуются",
@@ -35,8 +35,7 @@ STRINGS = {
     "Apr": "апр.",
     "Aug": "авг.",
     "Auto Loot": "Автосбор добычи",
-    "Blocked by antivirus – open Settings (⚙) → 'Add game folder to Defender exclusions', then retry":
-        "Заблокировано антивирусом – откройте Настройки (⚙) → «Добавить папку игры в исключения Defender» и повторите попытку",
+    "Blocked by antivirus – open Settings (⚙) → 'Exclude from Defender', then retry": "Заблокировано антивирусом – откройте Настройки (⚙) → «Исключить из Defender» и повторите попытку",
     "By {author}": "Автор: {author}",
     "CAMERA": "КАМЕРА",
     "CHANGELOG": "СПИСОК ИЗМЕНЕНИЙ",
@@ -60,8 +59,7 @@ STRINGS = {
     "Different source": "Другой источник",
     "Differs from source": "Отличается от источника",
     "Distance at which nameplates are visible. [0–41]": "Расстояние, на котором видны индикаторы здоровья. [0 – 41]",
-    "Downloaded archive is corrupted (possibly blocked by antivirus) – retry, or use Settings (⚙) → 'Add game folder to Defender exclusions'":
-        "Загруженный архив повреждён (возможно, заблокирован антивирусом) – повторите попытку или используйте Настройки (⚙) → «Добавить папку игры в исключения Defender»",
+    "Downloaded archive is corrupted (possibly blocked by antivirus) – retry, or use Settings (⚙) → 'Exclude from Defender'": "Загруженный архив повреждён (возможно, заблокирован антивирусом) – повторите попытку или используйте Настройки (⚙) → «Исключить из Defender»",
     "Downloading addons…": "Загрузка аддонов…",
     "Downloading mods…": "Загрузка модов…",
     "Downloading the game": "Загрузка игры",
@@ -201,7 +199,7 @@ STRINGS = {
     "SOUND": "ЗВУК",
     "Select game client folder": "Выберите папку клиента игры",
     "Sep": "сент.",
-    "Show logs": "Показать журнал",
+    "Show Session Log": "Показать журнал сеанса",
     "Simple sans-serif.": "Простой шрифт без засечек.",
     "Somewhere else:": "Другой источник:",
     "Sound in Background": "Звук в фоне",
@@ -540,8 +538,7 @@ STRINGS = {
         'Адрес аддона не относится к разрешённому git-хостингу.',
     'The file from {host} is not a valid addon archive. Try again later.':
         'Файл с {host} не является корректным архивом аддона. Повторите попытку позже.',
-    "The files were blocked or removed while being written – usually antivirus. Open Settings (⚙) → 'Add game folder to Defender exclusions', then retry.":
-        'Файлы были заблокированы или удалены во время записи – обычно это антивирус. Откройте Настройки (⚙) → «Добавить папку игры в исключения Defender» и повторите попытку.',
+    "The files were blocked or removed while being written – usually antivirus. Open Settings (⚙) → 'Exclude from Defender', then retry.": "Файлы были заблокированы или удалены во время записи – обычно это антивирус. Откройте Настройки (⚙) → «Исключить из Defender» и повторите попытку.",
     'The installed copy was left as it was.':
         'Установленная копия осталась без изменений.',
     'The other {n} finished.':
@@ -729,8 +726,7 @@ STRINGS = {
         "Проверка папки",
     "GAME DIAGNOSTICS":
         "ДИАГНОСТИКА ИГРЫ",
-    "Game Diagnostics…":
-        "Диагностика игры…",
+    "Game Diagnostics": "Диагностика игры",
     "Handed to another program; the result cannot be verified":
         "Передано другой программе; результат проверить нельзя",
     "Include MPQ archives":
@@ -841,4 +837,12 @@ STRINGS = {
     "An interrupted download or an antivirus can leave it like this.": "Так бывает после прерванной загрузки или из-за антивируса.",
     "Reinstall VanillaFixes now?": "Переустановить VanillaFixes сейчас?",
     "Run Settings → Verify game files to repair it.": "Запустите «Настройки → Проверить файлы игры», чтобы исправить это.",
+    "Read more": "Читать дальше",
+    "Checks every game file against the official client and repairs any that are damaged or missing. Installed mods are left alone.": "Сверяет каждый файл игры с официальным клиентом и восстанавливает повреждённые или отсутствующие. Установленные моды не трогаются.",
+    "Everything EqUpdater has done since it started: downloads, installs, updates and errors.": "Всё, что EqUpdater сделал с момента запуска: загрузки, установки, обновления и ошибки.",
+    "Adds the game folder to Windows Defender's exclusions, so mods are not wrongly flagged or removed. Windows asks for administrator rights.": "Добавляет папку игры в исключения Защитника Windows, чтобы моды не помечались и не удалялись по ошибке. Windows запросит права администратора.",
+    "How the game is started on Linux: the launch command, the Wine prefix and environment variables.": "Как игра запускается в Linux: команда запуска, префикс Wine и переменные окружения.",
+    "Deletes the game's WDB cache before each launch: the item and creature data the server sent. Clearing it fixes stale names and tooltips; the game builds it again as you play.": "Удаляет кэш WDB игры перед каждым запуском: данные о предметах и существах, присланные сервером. Это исправляет устаревшие названия и подсказки; игра заново соберёт его по ходу игры.",
+    "Minimizes {app} to the taskbar a moment after the game starts.": "Сворачивает {app} на панель задач вскоре после запуска игры.",
+    "When on, the recommended addons (marked ★ on the Addons tab) are installed wherever they are missing. Addons already in the client are never replaced.": "Если включено, рекомендуемые аддоны (отмечены ★ на вкладке «Аддоны») устанавливаются там, где их нет. Уже установленные аддоны никогда не заменяются.",
 }

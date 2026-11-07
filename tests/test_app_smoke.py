@@ -1597,7 +1597,7 @@ class TestAnimatedBackgroundSetting(unittest.TestCase):
         a._status_error("Tweaks failed – check the log",
                         lambda: opened.append(1))
         self.assertEqual(a._bg_canvas.itemcget(item, "text"),
-                         "Tweaks failed – check the log \u2192")
+                         "Tweaks failed – check the log \u2197")
         a._status_hover(True)
         self.assertEqual(a._bg_canvas.itemcget(item, "fill"), self.m.C_GOLD)
         a._status_click()
@@ -2020,7 +2020,7 @@ class TestNewsCadence(unittest.TestCase):
             calls["announcements"] += 1
             return item
 
-        def patch():
+        def patch(*_limit):
             calls["patch"] += 1
             return [item]
         m.fetch_featured_post, m.fetch_patch_notes = featured, patch

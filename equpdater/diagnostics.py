@@ -149,7 +149,9 @@ class Redactor:
     def __init__(self, client_dir: str = "", home: str | None = None):
         self._literals = []
         home = os.path.expanduser("~") if home is None else home
-        user = os.path.basename((home or "").rstrip("\\/"))
+        # Either slash: a Windows profile path has no "/" for basename to
+        # split on when this runs on Linux (a Windows log read there).
+        user = re.split(r"[\\/]", (home or "").rstrip("\\/"))[-1]
         for value, name in ((client_dir, "<client>"), (home, "<home>"),
                             (user, "<user>")):
             value = (value or "").rstrip("\\/")
@@ -159,8 +161,16 @@ class Redactor:
             if value.startswith("/"):    # how Wine writes a Unix path
                 forms.add("Z:" + value.replace("/", "\\"))
             for form in forms:
-                self._literals.append((re.compile(re.escape(form), re.I), name))
-        self._literals.sort(key=lambda p: -len(p[0].pattern))
+                pattern = re.escape(form)
+                if name == "<user>":
+                    # A whole name, not part of a word: a player called
+                    # "runner" must not turn "runner_missing" into
+                    # "<user>_missing" (the CI machine's user is "runner").
+                    pattern = r"(?<![\w])" + pattern + r"(?![\w])"
+                self._literals.append((re.compile(pattern, re.I), name, len(form)))
+        # Longest text first: a home folder before the user name inside it.
+        self._literals.sort(key=lambda p: -p[2])
+        self._literals = [(pattern, name) for pattern, name, _n in self._literals]
 
     def text(self, value) -> str:
         out = "" if value is None else str(value)

@@ -1231,7 +1231,7 @@ class TestAnnouncementsList(unittest.TestCase):
                    if isinstance(w, self.m.tk.Text))
         toggle = [w for w in body.winfo_children()
                   if isinstance(w, self.m.tk.Label) and w.winfo_manager()
-                  and w.cget("text") in (self.m.tr("Show more"),
+                  and w.cget("text") in (self.m.tr("Read more"),
                                          self.m.tr("Show less"))]
         return txt, toggle
 
@@ -1241,7 +1241,7 @@ class TestAnnouncementsList(unittest.TestCase):
         txt, toggle = self.text_and_toggle()
         limit = self.m.EqUpdaterApp.CHANGELOG_PREVIEW_LINES
         self.assertEqual(int(txt.cget("height")), limit)
-        self.assertEqual([t.cget("text") for t in toggle], [self.m.tr("Show more")])
+        self.assertEqual([t.cget("text") for t in toggle], [self.m.tr("Read more")])
         toggle[0].event_generate("<Button-1>")
         txt, toggle = self.text_and_toggle()
         self.assertGreaterEqual(int(txt.cget("height")), 120)
@@ -1249,6 +1249,37 @@ class TestAnnouncementsList(unittest.TestCase):
         toggle[0].event_generate("<Button-1>")
         txt, toggle = self.text_and_toggle()
         self.assertEqual(int(txt.cget("height")), limit)
+
+    def test_the_changelog_shows_more_posts_on_request(self):
+        """Show more under the list reads eight older posts, from the next
+        forum page when the first runs out, and goes when there are none."""
+        from unittest import mock
+        rows = [news.TopicRow(topic_id=t, title=f"T{t}", author="A",
+                              created_at=None,
+                              url=news.topic_url(t)) for t in range(40, 0, -1)]
+        pages = {0: (rows[:25], 25), 25: (rows[25:], None)}
+        asked = []
+
+        def page(forum, start, **k):
+            asked.append(start)
+            return pages[start]
+        with mock.patch.object(self.m, "fetch_forum_page", side_effect=page), \
+                mock.patch.object(self.m, "fetch_first_post",
+                                  side_effect=self.m.ForumError("x", "u", "w")):
+            items = self.m.fetch_patch_notes(8)
+            self.assertEqual(len(items), 8)
+            self.assertTrue(self.m.CHANGELOG_MORE["more"])
+            self.app._patch_items, self.app._patch_open = items, None
+            self.app._render_patch_notes(items)
+            self.assertIn(self.m.tr("Show more"), self.entries("patch")[1])
+            items = self.m.fetch_patch_notes(32)        # two pages
+            self.assertEqual(len(items), 32)
+            self.assertEqual(asked[-2:], [0, 25])
+            items = self.m.fetch_patch_notes(48)        # all there is
+            self.assertEqual(len(items), 40)
+            self.assertFalse(self.m.CHANGELOG_MORE["more"])
+            self.app._render_patch_notes(items)
+            self.assertNotIn(self.m.tr("Show more"), self.entries("patch")[1])
 
     def test_a_short_changelog_entry_has_neither(self):
         self.app._patch_open = None

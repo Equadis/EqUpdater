@@ -278,7 +278,7 @@ memory, an addon that clicks the loot buttons itself, or anything while
 `!EqLootGate` is disabled in the AddOns list.
 
 ### Game Diagnostics
-- **Settings → Troubleshooting → Game Diagnostics…** keeps a record of each
+- **Settings → Troubleshooting → Game Diagnostics** keeps a record of each
   PLAY across restarts: what was started, whether `WoW.exe` then appeared, and
   how it ended, stating what was seen and no more. A launcher exiting cleanly
   is not reported as the game starting.
