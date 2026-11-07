@@ -50,11 +50,11 @@ Nothing else is needed: no Python, no build tools.
   are found, and one question (or **Manage all**) brings them under
   EqUpdater. A mod's version, or an addon's commit, is recorded only when its
   files match the published release exactly.
-- **Update everything** with the gold arrow beside PLAY. It is there only
-  when something can be updated safely.
+- **Update everything** with the gold update sign beside PLAY. It is there
+  only when something can be updated safely.
 - **Choose what PLAY starts**, **Game Diagnostics**, an **Auto Loot** setting
-  that addons cannot undo, a longer changelog under **Show more**, and News
-  headers that stay in view while you read.
+  that addons cannot undo, older changelog posts under **Show more**, and
+  News headers that stay in view while you read.
 
 <p align="center">
   <img src="docs/addons.png" alt="The ADDONS tab with its action icons" width="720">
@@ -244,8 +244,8 @@ is left as it is.
 - Switch an addon to another fork, ignore updates for one, or stop managing
   it. An addon cloned by OctoLauncher keeps its own source and commit when
   you manage it.
-- **Update everything at once** with the gold arrow beside PLAY: every
-  managed addon and mod with a proven update, and nothing else.
+- **Update everything at once** with the gold update sign beside PLAY:
+  every managed addon and mod with a proven update, and nothing else.
 - A failed install or update says why (for example the host's DDoS check,
   a timeout or a bad download), and the installed copy stays untouched until
   its replacement is in place.
@@ -321,8 +321,9 @@ memory, an addon that clicks the loot buttons itself, or anything while
   public news feed (`news.json`) stands in.
 - Changelog: the newest topics in the
   [Patch Notes and Changelog forum](https://octowow.st/forum/viewforum.php?f=4),
-  each opening to its patch notes; the newest is open. Long notes open to
-  their first lines, with **Show more** and **Show less**.
+  each opening to its patch notes; the newest is open. **Show more** under
+  the list brings older posts. Long notes open to their first lines, with
+  **Read more** and **Show less**.
 - While you read a long post, its title stays at the top of the panel; click
   it to close the post.
 - Links in posts can be clicked, and **Open in Browser ↗** opens the topic
