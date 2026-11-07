@@ -109,7 +109,7 @@ FOOTER_ICON_REST = 0.86
 #: The update-all arrow beside PLAY, and its colour under the cursor.
 UPDALL_COLOR = "#cda348"
 UPDALL_HOVER = "#dfb95f"
-UPDALL_ICON_H = 24
+UPDALL_ICON_H = 32
 #: The arrow is coloured like the UPDATE ALL button it replaced: that
 #: button's gradient (top, bottom), resting and under the cursor, its 1 px
 #: border, and the 2 px glow around it.
@@ -11400,11 +11400,11 @@ class EqUpdaterApp(tk.Tk):
     # ── update everything ────────────────────────────────────────────────────
 
     def _update_all_photos(self):
-        """The up arrow in the old UPDATE ALL button's colours: its gold
-        gradient filling the arrow, and its 1 px border and 2 px glow
-        following the arrow's outline -- the button's frame, wrapped around
-        the arrow instead of a box. Drawn at four times the size and scaled
-        down so the edges are smooth: (resting, under the cursor)."""
+        """Two curved arrows chasing each other round a circle -- the usual
+        "update" sign -- in the old UPDATE ALL button's colours: its gold
+        gradient filling them, and its 1 px border and 2 px glow following
+        their outline. Drawn at four times the size and scaled down so the
+        edges are smooth: (resting, under the cursor)."""
         h = self._px(UPDALL_ICON_H)
         if getattr(self, "_updall_height", None) == h:
             return
@@ -11412,16 +11412,32 @@ class EqUpdaterApp(tk.Tk):
         k = 4
         line, glow = max(1, self._px(1)) * k, self._px(2) * k
         pad = line + glow
+        import math
         ah = h * k
-        aw = round(ah * 0.9)
-        shaft, head = round(aw * 0.46), round(ah * 0.5)
-        W, H = aw + 2 * pad, ah + 2 * pad
+        W = H = ah + 2 * pad
         arrow = Image.new("L", (W, H), 0)
         d = ImageDraw.Draw(arrow)
-        d.polygon([(pad + aw / 2, pad), (pad + aw, pad + head), (pad, pad + head)],
-                  fill=255)
-        d.rectangle([pad + (aw - shaft) / 2, pad + head - 1,
-                     pad + (aw + shaft) / 2, pad + ah], fill=255)
+        c = W / 2
+        # A thin band: the 3 px of border and glow round it must not fill
+        # the middle of the circle or the gaps between the two arrows.
+        thick = ah * 0.11                    # the band's width
+        head_w, head_l = 1.7, 1.9            # arrowhead, in band widths
+        outer = ah * 0.5 - thick * (head_w - 0.5)   # room for the heads
+        mid = outer - thick / 2
+        # Angles run clockwise from three o'clock (y grows downwards). One
+        # band over the top, left to right; one under, right to left; each
+        # ends in a head pointing on round the circle.
+        for start, end in ((220, 320), (40, 140)):
+            d.arc([c - outer, c - outer, c + outer, c + outer], start, end,
+                  fill=255, width=round(thick))
+            a = math.radians(end)
+            px, py = c + mid * math.cos(a), c + mid * math.sin(a)
+            nx, ny = math.cos(a), math.sin(a)          # out from the centre
+            tx, ty = -math.sin(a), math.cos(a)         # along the circle
+            half, length = thick * head_w, thick * head_l
+            d.polygon([(px + nx * half - tx * k, py + ny * half - ty * k),
+                       (px - nx * half - tx * k, py - ny * half - ty * k),
+                       (px + tx * length, py + ty * length)], fill=255)
         # Rounded, not cut: the arrow's corners softened, and each layer
         # around it grown with round corners. Blurring a mask and cutting it
         # at the middle rounds its corners in place; cutting it low grows it
@@ -11433,7 +11449,7 @@ class EqUpdaterApp(tk.Tk):
         def grow(mask, by):
             return mask.filter(ImageFilter.GaussianBlur(by / 1.5)).point(
                 lambda v: 255 if v > 17 else 0)
-        arrow = soften(arrow, 1.0 * k)
+        arrow = soften(arrow, 0.3 * k)
         bordered = grow(arrow, line)
         glowed = grow(bordered, glow)
         ring = ImageChops.subtract(bordered, arrow)
