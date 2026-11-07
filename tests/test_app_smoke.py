@@ -966,7 +966,10 @@ class TestAppStarts(unittest.TestCase):
         with mock.patch("tkinter.messagebox.askyesno", return_value=True), \
                 mock.patch.object(m, "_fetch_release_cached") as lookup:
             self.app._mod_uninstall("nampower")
-        lookup.assert_not_called()
+        # None for this mod. (A background check of another mod's release
+        # can land meanwhile -- on a slow CI machine, it did.)
+        self.assertNotIn("nampower", [c.args[0].get("id") for c in
+                                      lookup.call_args_list if c.args])
         self.assertFalse(os.path.exists(os.path.join(client, "nampower.dll")))
         self.assertFalse(os.path.exists(os.path.join(client, "dlls.txt")))
         rec = m.load_config()["mods"]["nampower"]
