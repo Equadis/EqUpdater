@@ -1188,7 +1188,8 @@ class UpdateWorker:
             ("alwaysAutoLoot", "bytes", None, [
                 (off, bytes([lootgate.JNZ if always_loot else lootgate.JZ]))
                 for off in lootgate.AUTOLOOT_OFFSETS
-            ]),
+            ] + [(lootgate.SHIFT_LOOT_OFFSET,
+                  bytes([lootgate.JMP if always_loot else lootgate.JZ]))]),
             # cameraSkipFix is baked into the torrent's WoW.exe, so we don't
             # apply it. skillUiGateHijack and octowowUrlAllowlist below are
             # baked in too, but the official launcher still applies these 2
@@ -4479,15 +4480,22 @@ def enforce_autoloot(client_dir: str) -> list:
     wanted = load_tweaks_config().get("alwaysAutoLoot")
     exe = os.path.join(client_dir, "WoW.exe")
     state = lootgate.exe_state(exe)
-    if state is not None and wanted is not None and state != bool(wanted):
+    target = state if wanted is None else bool(wanted)
+    if state is not None and (state != target
+                              or not lootgate.exe_complete(exe, target)):
         if client_exe_locked(client_dir):
             notes.append("Auto Loot: WoW.exe does not match the setting, and "
                          "it is in use so it was left as it is.")
         else:
-            lootgate.set_exe_state(exe, bool(wanted))
-            notes.append(f"Auto Loot: WoW.exe did not match the setting "
-                         f"(another launcher may have patched it); set to "
-                         f"{'on' if wanted else 'off'}.")
+            lootgate.set_exe_state(exe, target)
+            notes.append(
+                f"Auto Loot: WoW.exe did not match the setting (another "
+                f"launcher, or an older EqUpdater, patched it); set to "
+                f"{'on' if target else 'off'}." if state != target else
+                f"Auto Loot: set the Shift path in WoW.exe to match "
+                f"({'on' if target else 'off'}): Shift now keeps the loot "
+                f"window open." if target else
+                "Auto Loot: put the Shift path in WoW.exe back to stock.")
     if lootgate.install(writable_addons_path(client_dir)):
         notes.append("Auto Loot: installed the gate addon.")
     return notes

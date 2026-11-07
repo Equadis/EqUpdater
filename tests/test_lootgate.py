@@ -20,13 +20,26 @@ from equpdater import lootgate  # noqa: E402
 A, B = lootgate.AUTOLOOT_OFFSETS
 
 
-def fake_exe(path, byte=lootgate.JZ, test=b"\x84\xc9"):
-    data = bytearray(B + 64)
+S = lootgate.SHIFT_LOOT_OFFSET
+
+
+def fake_exe(path, byte=lootgate.JZ, test=b"\x84\xc9", shift=lootgate.JZ):
+    """The three places the patch reads, as the client has them. ``shift``
+    stays stock unless given: OctoLauncher and EqUpdater 2.1.4 left it so."""
+    data = bytearray(S + 64)
     for off in (A, B):
         data[off - 2:off] = test
         data[off] = byte
+    data[S - 6:S] = b"\x88\x81\x30\x1d\x00\x00"
+    data[S] = shift
     with open(path, "wb") as f:
         f.write(data)
+
+
+def byte_at(path, off):
+    with open(path, "rb") as f:
+        f.seek(off)
+        return f.read(1)[0]
 
 
 class TestExeBytes(unittest.TestCase):
@@ -45,6 +58,30 @@ class TestExeBytes(unittest.TestCase):
         self.assertEqual((data[A], data[B]), (lootgate.JNZ, lootgate.JNZ))
         lootgate.set_exe_state(self.exe, False)
         self.assertIs(lootgate.exe_state(self.exe), False)
+
+    def test_on_also_stops_shift_taking_everything(self):
+        """Seen in game: Auto Loot on, Shift held, the window flashed and
+        everything was taken -- by the routine that records Shift. On, its
+        jump past the loot call is unconditional; off, it is stock."""
+        fake_exe(self.exe, lootgate.JZ)
+        lootgate.set_exe_state(self.exe, True)
+        self.assertEqual(byte_at(self.exe, S), lootgate.JMP)
+        self.assertTrue(lootgate.exe_complete(self.exe, True))
+        lootgate.set_exe_state(self.exe, False)
+        self.assertEqual(byte_at(self.exe, S), lootgate.JZ)
+        self.assertTrue(lootgate.exe_complete(self.exe, False))
+
+    def test_an_older_patch_reads_on_but_incomplete(self):
+        fake_exe(self.exe, lootgate.JNZ)            # branches only
+        self.assertIs(lootgate.exe_state(self.exe), True)
+        self.assertFalse(lootgate.exe_complete(self.exe, True))
+
+    def test_a_different_shift_routine_is_another_build(self):
+        fake_exe(self.exe, lootgate.JZ)
+        with open(self.exe, "r+b") as f:
+            f.seek(S - 1)
+            f.write(b"\x90")
+        self.assertIsNone(lootgate.exe_state(self.exe))
 
     def test_one_branch_flipped_is_not_either_state(self):
         fake_exe(self.exe, lootgate.JZ)
@@ -135,6 +172,17 @@ class TestCheckboxAndLaunch(unittest.TestCase):
         self.app.enforce_autoloot(self.dir)
         self.assertIs(lootgate.exe_state(self.exe), True)
 
+    def test_play_completes_an_older_patch(self):
+        """A client patched on by OctoLauncher or EqUpdater 2.1.4 has the
+        branches but not the Shift path: PLAY finishes the job."""
+        fake_exe(self.exe, lootgate.JNZ)
+        self.cfg["tweaks"] = {"alwaysAutoLoot": True}
+        notes = self.app.enforce_autoloot(self.dir)
+        self.assertEqual(byte_at(self.exe, S), lootgate.JMP)
+        self.assertTrue(any("Shift" in n for n in notes))
+        self.assertEqual(self.app.enforce_autoloot(self.dir),
+                         [])                         # nothing left to do
+
     def test_running_game_is_not_written_to(self):
         fake_exe(self.exe, lootgate.JNZ)
         self.cfg["tweaks"] = {"alwaysAutoLoot": False}
@@ -156,7 +204,9 @@ class TestCheckboxAndLaunch(unittest.TestCase):
         for wanted, byte in ((True, lootgate.JNZ), (False, lootgate.JZ)):
             patches = dict((p[0], p[3]) for p in worker.build_tweaks(
                 buf, {"alwaysAutoLoot": wanted}))["alwaysAutoLoot"]
-            self.assertEqual(patches, [(A, bytes([byte])), (B, bytes([byte]))])
+            shift = lootgate.JMP if wanted else lootgate.JZ
+            self.assertEqual(patches, [(A, bytes([byte])), (B, bytes([byte])),
+                                       (S, bytes([shift]))])
 
 
 HARNESS = r"""

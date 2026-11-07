@@ -99,6 +99,28 @@ JZ, JNZ = 0x74, 0x75
 #: `test cl, cl`, just before each: what says this is the same client build.
 _TEST_CL = b"\x84\xc9"
 
+#: A third way the client loots everything, which the two branches do not
+#: cover: the routine that records the Shift flag (0x5df460) also loots the
+#: open window there and then if Shift is down -- when the window opens with
+#: Shift held, or Shift is pressed while it is open. Stock, that is "Shift
+#: takes everything". With Auto Loot on, Shift is what keeps the window open,
+#: so this path took everything a moment after the window appeared. Seen in
+#: game 2026-11-07. On: the jump past the loot call is made unconditional, so
+#: the two branches alone decide. Off: stock.
+SHIFT_LOOT_OFFSET = 0x1df46e
+JMP = 0xEB
+#: `mov [ecx+0x1d30], al` just before it: the flag being recorded.
+_SHIFT_HEAD = b"\x88\x81\x30\x1d\x00\x00"
+
+
+def _shift_byte(f) -> int | None:
+    f.seek(SHIFT_LOOT_OFFSET - len(_SHIFT_HEAD))
+    head = f.read(len(_SHIFT_HEAD) + 1)
+    if len(head) < len(_SHIFT_HEAD) + 1 or head[:-1] != _SHIFT_HEAD \
+            or head[-1] not in (JZ, JMP):
+        return None
+    return head[-1]
+
 
 def install(addons_dir: str) -> bool:
     """Write the addon if it is missing or differs. Returns whether it wrote."""
@@ -136,6 +158,8 @@ def exe_state(exe_path: str) -> bool | None:
                 if len(head) < 3 or head[:2] != _TEST_CL:
                     return None
                 found.append(head[2])
+            if _shift_byte(f) is None:
+                return None
     except OSError:
         return None
     if found == [JNZ, JNZ]:
@@ -145,12 +169,25 @@ def exe_state(exe_path: str) -> bool | None:
     return None
 
 
+def exe_complete(exe_path: str, enabled: bool) -> bool:
+    """Whether the Shift path matches ``enabled`` too. OctoLauncher, and
+    EqUpdater before 2.1.5, set only the two branches."""
+    try:
+        with open(exe_path, "rb") as f:
+            return _shift_byte(f) == (JMP if enabled else JZ)
+    except OSError:
+        return False
+
+
 def set_exe_state(exe_path: str, enabled: bool) -> None:
-    """Set both branches, in place. Raises OSError when it cannot be written
-    (the game is running), and ValueError on a build it does not recognise."""
+    """Set both branches and the Shift path, in place. Raises OSError when it
+    cannot be written (the game is running), and ValueError on a build it does
+    not recognise."""
     if exe_state(exe_path) is None:
         raise ValueError("unrecognised WoW.exe")
     with open(exe_path, "r+b") as f:
         for off in AUTOLOOT_OFFSETS:
             f.seek(off)
             f.write(bytes([JNZ if enabled else JZ]))
+        f.seek(SHIFT_LOOT_OFFSET)
+        f.write(bytes([JMP if enabled else JZ]))
