@@ -1038,6 +1038,26 @@ class TestAppStarts(unittest.TestCase):
         self.assertNotIn("nampower", self.app._mod_pending_state)
         self.assertFalse(self.app._apply_btn.winfo_ismapped())
 
+    def test_play_stops_on_a_damaged_loader_and_offers_to_reinstall(self):
+        """An empty or cut-off VanillaFixes.exe is what Windows answers with
+        "WinError 193". PLAY now says what is wrong instead of trying."""
+        from unittest import mock
+        m, tr = self.app_mod, self.app_mod.tr
+        client = self.mods_folder()
+        self.addCleanup(self.app._switch_tab, self.app._active_tab)
+        with open(os.path.join(client, "WoW.exe"), "wb") as f:
+            f.write(b"MZ")
+        open(os.path.join(client, "VanillaFixes.exe"), "wb").close()
+        with mock.patch.object(m.platforms, "spawn_detached") as spawn, \
+                mock.patch("tkinter.messagebox.askyesno",
+                           return_value=True) as ask, \
+                mock.patch.object(self.app, "_mod_force_replace") as replace:
+            self.app._launch_game()
+        spawn.assert_not_called()
+        self.assertIn(tr("{program} is empty.", program="VanillaFixes.exe"),
+                      ask.call_args[0][1])
+        replace.assert_called_once_with("VanillaFixes")
+
     def test_declining_keeps_the_mod(self):
         from unittest import mock
         client = self.mods_folder("nampower.dll")

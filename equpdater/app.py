@@ -2237,6 +2237,26 @@ def _restore_mod_files(client_dir: str, stash: str, rels: list) -> bool:
         return False
 
 
+def _write_whole(dest: str, data: bytes):
+    """Write a mod file whole or not at all: a temporary file beside it,
+    moved over it once complete. A download or an antivirus interrupting the
+    write otherwise leaves a cut-off program, which Windows will not start
+    ("WinError 193")."""
+    tmp = dest + ".equpdater-new"
+    try:
+        with open(tmp, "wb") as f:
+            f.write(data)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, dest)
+    except BaseException:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        raise
+
+
 def install_mod(mod: dict, client_dir: str, release: dict | None = None) -> list:
     src     = mod["source"]
     written = []
@@ -2271,8 +2291,7 @@ def install_mod(mod: dict, client_dir: str, release: dict | None = None) -> list
             dest_rel = src.get("dest") or asset["name"]
             dest     = os.path.join(client_dir, dest_rel)
             os.makedirs(os.path.dirname(dest) or client_dir, exist_ok=True)
-            with open(dest, "wb") as f:
-                f.write(data)
+            _write_whole(dest, data)
             written.append(dest_rel)
             log(f"  Installed {dest_rel}")
         else:
@@ -2290,8 +2309,7 @@ def install_mod(mod: dict, client_dir: str, release: dict | None = None) -> list
                             continue
                         dest = os.path.join(client_dir, dest_rel)
                         os.makedirs(os.path.dirname(dest) or client_dir, exist_ok=True)
-                        with open(dest, "wb") as f:
-                            f.write(zip_data)
+                        _write_whole(dest, zip_data)
                         written.append(dest_rel)
                         log(f"  Installed {dest_rel}")
             finally:
@@ -2321,8 +2339,7 @@ def install_mod(mod: dict, client_dir: str, release: dict | None = None) -> list
             dest_rel = src.get("dest") or asset["name"]
             dest     = os.path.join(client_dir, dest_rel)
             os.makedirs(os.path.dirname(dest) or client_dir, exist_ok=True)
-            with open(dest, "wb") as f:
-                f.write(data)
+            _write_whole(dest, data)
             written.append(dest_rel)
             log(f"  Installed {dest_rel}")
         elif asset["name"].endswith(".tar.gz") or asset["name"].endswith(".tgz"):
@@ -2344,8 +2361,7 @@ def install_mod(mod: dict, client_dir: str, release: dict | None = None) -> list
                     tar_data = f_obj.read()
                     dest = os.path.join(client_dir, dest_rel)
                     os.makedirs(os.path.dirname(dest) or client_dir, exist_ok=True)
-                    with open(dest, "wb") as f:
-                        f.write(tar_data)
+                    _write_whole(dest, tar_data)
                     written.append(dest_rel)
                     log(f"  Installed {dest_rel}")
         else:
@@ -2363,8 +2379,7 @@ def install_mod(mod: dict, client_dir: str, release: dict | None = None) -> list
                             continue
                         dest = os.path.join(client_dir, dest_rel)
                         os.makedirs(os.path.dirname(dest) or client_dir, exist_ok=True)
-                        with open(dest, "wb") as f:
-                            f.write(zip_data)
+                        _write_whole(dest, zip_data)
                         written.append(dest_rel)
                         log(f"  Installed {dest_rel}")
             finally:
@@ -2389,8 +2404,7 @@ def install_mod(mod: dict, client_dir: str, release: dict | None = None) -> list
                 tar_data = tf.extractfile(tf.getmember(matched)).read()
                 dest = os.path.join(client_dir, dest_rel)
                 os.makedirs(os.path.dirname(dest) or client_dir, exist_ok=True)
-                with open(dest, "wb") as f:
-                    f.write(tar_data)
+                _write_whole(dest, tar_data)
                 written.append(dest_rel)
                 log(f"  Installed {dest_rel}")
         if src.get("pinned_version"):
@@ -2408,8 +2422,7 @@ def install_mod(mod: dict, client_dir: str, release: dict | None = None) -> list
             dest_rel = src["dest"]
             dest     = os.path.join(client_dir, dest_rel)
             os.makedirs(os.path.dirname(dest) or client_dir, exist_ok=True)
-            with open(dest, "wb") as f:
-                f.write(data)
+            _write_whole(dest, data)
             written.append(dest_rel)
             log(f"  Installed {dest_rel}")
         elif url.endswith(".tar.gz") or url.endswith(".tgz"):
@@ -2431,8 +2444,7 @@ def install_mod(mod: dict, client_dir: str, release: dict | None = None) -> list
                     tar_data = f_obj.read()
                     dest = os.path.join(client_dir, dest_rel)
                     os.makedirs(os.path.dirname(dest) or client_dir, exist_ok=True)
-                    with open(dest, "wb") as f:
-                        f.write(tar_data)
+                    _write_whole(dest, tar_data)
                     written.append(dest_rel)
                     log(f"  Installed {dest_rel}")
         else:
@@ -2450,8 +2462,7 @@ def install_mod(mod: dict, client_dir: str, release: dict | None = None) -> list
                             continue
                         dest = os.path.join(client_dir, dest_rel)
                         os.makedirs(os.path.dirname(dest) or client_dir, exist_ok=True)
-                        with open(dest, "wb") as f:
-                            f.write(zip_data)
+                        _write_whole(dest, zip_data)
                         written.append(dest_rel)
                         log(f"  Installed {dest_rel}")
             finally:
@@ -13230,6 +13241,9 @@ class EqUpdaterApp(tk.Tk):
             attempt.block("executable", f"The launch target {exe_lbl} was not "
                           f"found in the game folder.")
             return
+        if exe_lbl.lower().endswith(".exe") and self._launch_target_damaged(
+                exe, exe_lbl, attempt):
+            return
 
         # One-time DXVK first-launch notice (armed when DXVK was installed).
         if cfg.get("dxvk_notice_pending"):
@@ -13331,6 +13345,44 @@ class EqUpdaterApp(tk.Tk):
             self.after(5000, self._refresh_ready_state)
         except Exception as e:
             self._log_line(f"Failed to launch {exe_lbl}: {e}\n", "err")
+
+    def _launch_target_damaged(self, exe: str, exe_lbl: str, attempt) -> bool:
+        """Stop before starting a file that is not a whole Windows program,
+        and say what to do. Started anyway, Windows answers only "WinError
+        193: %1 is not a valid Win32 application" -- which is what players saw
+        when VanillaFixes.exe was empty or cut short. True when stopped."""
+        from tkinter import messagebox
+        try:
+            problem = platforms.program_problem(exe)
+        except OSError as e:
+            problem, size = None, None
+            self._log_line(f"Could not read {exe_lbl} before launch: {e}\n", "err")
+        if problem is None:
+            return False
+        size = os.path.getsize(exe)
+        attempt.block("executable", f"{exe_lbl} is {problem} ({size} bytes): "
+                      f"not a complete Windows program.")
+        self._log_line(f"Not launched: {exe_lbl} is {problem} ({size} bytes), "
+                       f"not a complete Windows program.\n", "err")
+        what = (tr("{program} is empty.", program=exe_lbl) if problem == "empty"
+                else tr("{program} is damaged: it is not a complete Windows "
+                        "program.", program=exe_lbl))
+        loader = exe_lbl.lower() == platforms.LOADER_EXE.lower()
+        if loader:
+            if messagebox.askyesno(
+                    tr("Cannot start the game"),
+                    what + " " + tr("An interrupted download or an antivirus "
+                                    "can leave it like this.") + "\n\n"
+                    + tr("Reinstall VanillaFixes now?"), parent=self):
+                self._switch_tab("MODS")
+                self._mod_force_replace("VanillaFixes")
+        else:
+            messagebox.showerror(
+                tr("Cannot start the game"),
+                what + " " + tr("Run Settings → Verify game files to repair "
+                                "it."), parent=self)
+        self._refresh_ready_state()
+        return True
 
     def _launch_failed(self, message: str, details: str):
         """PLAY did not start the game: the details to the log, a short

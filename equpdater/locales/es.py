@@ -836,4 +836,9 @@ STRINGS = {
     "EqUpdater will not replace it.": "EqUpdater no la reemplazará.",
     "EqUpdater did not install this pack and does not know where it came from, so it cannot check it for updates. Linking its source changes no files.": "EqUpdater no instaló este paquete y no sabe de dónde viene, así que no puede buscar actualizaciones. Vincular su fuente no cambia ningún archivo.",
     "INSTALLED LOCALLY": "INSTALADOS LOCALMENTE",
+    "{program} is empty.": "{program} está vacío.",
+    "{program} is damaged: it is not a complete Windows program.": "{program} está dañado: no es un programa de Windows completo.",
+    "An interrupted download or an antivirus can leave it like this.": "Una descarga interrumpida o un antivirus pueden dejarlo así.",
+    "Reinstall VanillaFixes now?": "¿Reinstalar VanillaFixes ahora?",
+    "Run Settings → Verify game files to repair it.": "Usa Ajustes → Verificar archivos del juego para repararlo.",
 }

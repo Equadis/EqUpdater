@@ -837,4 +837,9 @@ STRINGS = {
     "EqUpdater will not replace it.": "EqUpdater 不会替换它。",
     "EqUpdater did not install this pack and does not know where it came from, so it cannot check it for updates. Linking its source changes no files.": "EqUpdater 没有安装此包,也不知道它的来源,因此无法检查更新。关联来源不会更改任何文件。",
     "INSTALLED LOCALLY": "本地安装",
+    "{program} is empty.": "{program} 是空文件。",
+    "{program} is damaged: it is not a complete Windows program.": "{program} 已损坏：它不是完整的 Windows 程序。",
+    "An interrupted download or an antivirus can leave it like this.": "下载中断或杀毒软件可能导致这种情况。",
+    "Reinstall VanillaFixes now?": "现在重新安装 VanillaFixes?",
+    "Run Settings → Verify game files to repair it.": "运行“设置 → 校验游戏文件”来修复它。",
 }
