@@ -1,9 +1,7 @@
-"""The Auto Loot checkbox, the two bytes it sets, and the addon that keeps
-addons from undoing them.
+"""The Auto Loot checkbox and the bytes it sets in WoW.exe.
 
-The Lua runs for real when an interpreter is on PATH, against a stand-in for
-the client. What only the game can show (the native loot path itself) is the
-manual list in the README; these cover every decision EqUpdater makes."""
+What only the game can show (the loot path itself) was checked by hand; these
+cover every decision EqUpdater makes."""
 
 import os
 import shutil
@@ -21,15 +19,18 @@ A, B = lootgate.AUTOLOOT_OFFSETS
 
 
 S = lootgate.SHIFT_LOOT_OFFSET
+C = lootgate.CAVE_OFFSET
 
 
 def fake_exe(path, byte=lootgate.JZ, test=b"\x84\xc9", shift=lootgate.JZ):
-    """The three places the patch reads, as the client has them. ``shift``
+    """Every place the patch reads, as the stock client has them. ``shift``
     stays stock unless given: OctoLauncher and EqUpdater 2.1.4 left it so."""
     data = bytearray(S + 64)
     for off in (A, B):
+        data[off - 8:off - 2] = b"\x8a\x88\x30\x1d\x00\x00"
         data[off - 2:off] = test
         data[off] = byte
+    data[C:C + 12] = b"\x90" * 12
     data[S - 6:S] = b"\x88\x81\x30\x1d\x00\x00"
     data[S] = shift
     with open(path, "wb") as f:
@@ -71,6 +72,39 @@ class TestExeBytes(unittest.TestCase):
         self.assertEqual(byte_at(self.exe, S), lootgate.JZ)
         self.assertTrue(lootgate.exe_complete(self.exe, False))
 
+    def test_both_branches_ask_shift_not_the_flag(self):
+        """The flag is stale and SuperWoW writes into it: each branch calls
+        the client's own Shift check instead, whichever way it is set."""
+        fake_exe(self.exe, lootgate.JZ)
+        for on in (True, False):
+            lootgate.set_exe_state(self.exe, on)
+            with open(self.exe, "rb") as f:
+                data = f.read()
+            cave_va = C + 0x400000
+            for off in (A, B):
+                site = off - 8
+                self.assertEqual(data[site], 0xE8)
+                rel = int.from_bytes(data[site + 1:site + 5], "little", signed=True)
+                self.assertEqual(site + 0x400000 + 5 + rel, cave_va)
+                self.assertEqual(data[site + 5:off], b"\x90\x90\x90")
+            self.assertEqual(data[C:C + 2], b"\x31\xc9")          # Shift
+            rel = int.from_bytes(data[C + 3:C + 7], "little", signed=True)
+            self.assertEqual(cave_va + 7 + rel, 0x41f8f0)
+            self.assertEqual(data[C + 7:C + 10], b"\x85\xc0\xc3")
+            self.assertEqual(data[C + 10:C + 12], b"\x90\x90")   # untouched
+            self.assertTrue(lootgate.exe_complete(self.exe, on))
+            self.assertIs(lootgate.exe_state(self.exe), on)
+
+    def test_half_a_patch_is_incomplete(self):
+        """Calls into a cave that is not there would crash the game."""
+        fake_exe(self.exe, lootgate.JZ)
+        lootgate.set_exe_state(self.exe, False)
+        with open(self.exe, "r+b") as f:
+            f.seek(C)
+            f.write(b"\x90" * 10)
+        self.assertIs(lootgate.exe_state(self.exe), False)
+        self.assertFalse(lootgate.exe_complete(self.exe, False))
+
     def test_an_older_patch_reads_on_but_incomplete(self):
         fake_exe(self.exe, lootgate.JNZ)            # branches only
         self.assertIs(lootgate.exe_state(self.exe), True)
@@ -109,25 +143,21 @@ class TestExeBytes(unittest.TestCase):
         self.assertIn(lootgate.exe_state(real), (True, False))
 
 
-class TestInstall(unittest.TestCase):
-    def test_writes_once_and_repairs(self):
+class TestOldGate(unittest.TestCase):
+    def test_ours_is_removed_and_nobody_elses(self):
         with tempfile.TemporaryDirectory() as d:
-            self.assertTrue(lootgate.install(d))
-            self.assertFalse(lootgate.install(d))
-            lua = os.path.join(d, lootgate.FOLDER, "EqLootGate.lua")
-            with open(lua, "w", encoding="utf-8") as f:
-                f.write("-- edited")
-            self.assertTrue(lootgate.install(d))
-            with open(lua, encoding="utf-8") as f:
-                self.assertIn("EqLootGate", f.read())
-            self.assertEqual(sorted(os.listdir(os.path.join(d, lootgate.FOLDER))),
-                             ["!EqLootGate.toc", "EqLootGate.lua"])
-
-    def test_lua_50_safe(self):
-        # The suite's Lua is not the game's: a `...` expression or `#` passes
-        # here and kills the file in game.
-        for bad in ("...", " #", "select(", "string.gmatch", "%s*"):
-            self.assertNotIn(bad, lootgate.LUA.replace("-- ", ""), bad)
+            gate = os.path.join(d, lootgate.FOLDER)
+            os.makedirs(gate)
+            with open(os.path.join(gate, lootgate.FOLDER + ".toc"), "w") as f:
+                f.write("## Interface: 11200\n## Author: EqUpdater\n")
+            self.assertTrue(lootgate.remove_gate(d))
+            self.assertFalse(os.path.exists(gate))
+            self.assertFalse(lootgate.remove_gate(d))       # nothing there
+            os.makedirs(gate)
+            with open(os.path.join(gate, lootgate.FOLDER + ".toc"), "w") as f:
+                f.write("## Author: someone else\n")
+            self.assertFalse(lootgate.remove_gate(d))
+            self.assertTrue(os.path.isdir(gate))
 
 
 class TestCheckboxAndLaunch(unittest.TestCase):
@@ -152,9 +182,12 @@ class TestCheckboxAndLaunch(unittest.TestCase):
         # OctoLauncher left it off; the default of on must not flip it.
         fake_exe(self.exe, lootgate.JZ)
         self.assertIs(self.app.load_tweaks_config()["alwaysAutoLoot"], False)
-        self.assertEqual(self.app.enforce_autoloot(self.dir),
-                         ["Auto Loot: installed the gate addon."])
+        notes = self.app.enforce_autoloot(self.dir)
+        self.assertEqual(len(notes), 1)
+        self.assertIn("reads Shift", notes[0])
         self.assertIs(lootgate.exe_state(self.exe), False)
+        self.assertTrue(lootgate.exe_complete(self.exe, False))
+        self.assertEqual(self.app.enforce_autoloot(self.dir), [])
 
     def test_octolauncher_client_on_reads_on(self):
         fake_exe(self.exe, lootgate.JNZ)
@@ -173,13 +206,21 @@ class TestCheckboxAndLaunch(unittest.TestCase):
         self.assertIs(lootgate.exe_state(self.exe), True)
 
     def test_play_completes_an_older_patch(self):
-        """A client patched on by OctoLauncher or EqUpdater 2.1.4 has the
-        branches but not the Shift path: PLAY finishes the job."""
+        """A client patched on by OctoLauncher or an earlier EqUpdater has the
+        branches but not the rest: PLAY finishes the job, and takes away the
+        addon those EqUpdater builds installed."""
+        gate = os.path.join(self.dir, "Interface", "AddOns", lootgate.FOLDER)
+        os.makedirs(gate)
+        with open(os.path.join(gate, lootgate.FOLDER + ".toc"), "w") as f:
+            f.write("## Author: EqUpdater\n")
         fake_exe(self.exe, lootgate.JNZ)
         self.cfg["tweaks"] = {"alwaysAutoLoot": True}
         notes = self.app.enforce_autoloot(self.dir)
         self.assertEqual(byte_at(self.exe, S), lootgate.JMP)
+        self.assertTrue(lootgate.exe_complete(self.exe, True))
         self.assertTrue(any("Shift" in n for n in notes))
+        self.assertTrue(any("removed" in n for n in notes))
+        self.assertFalse(os.path.exists(gate))
         self.assertEqual(self.app.enforce_autoloot(self.dir),
                          [])                         # nothing left to do
 
@@ -200,128 +241,27 @@ class TestCheckboxAndLaunch(unittest.TestCase):
 
     def test_the_patch_uses_the_same_bytes_both_ways(self):
         worker = self.app.UpdateWorker(self.dir, None, None)
-        buf = bytearray(B + 64)
-        for wanted, byte in ((True, lootgate.JNZ), (False, lootgate.JZ)):
+        fake_exe(self.exe, lootgate.JNZ)
+        with open(self.exe, "rb") as f:
+            buf = bytearray(f.read())
+        for wanted in (True, False):
             patches = dict((p[0], p[3]) for p in worker.build_tweaks(
                 buf, {"alwaysAutoLoot": wanted}))["alwaysAutoLoot"]
-            shift = lootgate.JMP if wanted else lootgate.JZ
-            self.assertEqual(patches, [(A, bytes([byte])), (B, bytes([byte])),
-                                       (S, bytes([shift]))])
+            self.assertEqual(patches, lootgate.patches(wanted))
+            out = bytearray(buf)
+            for off, data in patches:
+                out[off:off + len(data)] = data
+            with open(self.exe, "wb") as f:
+                f.write(out)
+            self.assertIs(lootgate.exe_state(self.exe), wanted)
+            self.assertTrue(lootgate.exe_complete(self.exe, wanted))
 
-
-HARNESS = r"""
--- A stand-in for the client: only what the gate touches.
-local now = 100
-function GetTime() return now end
-local handlers = {}
-function CreateFrame() return {
-    RegisterEvent = function() end,
-    SetScript = function(self, script, fn) handlers[script] = fn end } end
-local shiftDown = nil
-function IsShiftKeyDown() return shiftDown end
-SlashCmdList = {}
-DEFAULT_CHAT_FRAME = { AddMessage = function() end }
-local swValue, looted, confirmed = 1, 0, 0     -- SuperWoW's value survives /reload
-local swCalls = 0
-if WITH_SUPERWOW then SetAutoloot = function(v) if v then swValue = v; swCalls = swCalls + 1 end return swValue end end
-LootSlot = function() looted = looted + 1 end
-ConfirmLootSlot = function() confirmed = confirmed + 1 end
-
-dofile(GATE)
-
-local function check(what, got, want)
-    if got ~= want then
-        print("FAIL " .. what .. ": got " .. tostring(got) .. ", want " .. tostring(want))
-        os.exit(1)
-    end
-end
-
-if WITH_SUPERWOW then
-    check("cleared on load", swValue, 0)
-    SetAutoloot(1)                     -- SuperAPI "Always on", every frame
-    check("addon cannot set it", swValue, 0)
-    check("still looks present", type(SetAutoloot), "function")
-    -- Shift is what the flag says: the client here does not set it itself.
-    local calls = 0
-    local real = swValue
-    handlers.OnUpdate()
-    check("Shift up: flag clear", swValue, 0)
-    shiftDown = 1
-    handlers.OnUpdate()
-    check("Shift down: flag set", swValue, 1)
-    SetAutoloot(0)                     -- SuperAPI "Always off" mid-press
-    check("addon cannot clear it", swValue, 1)
-    check("addons are told the truth", SetAutoloot(), 1)
-    shiftDown = nil
-    handlers.OnUpdate()
-    check("Shift up again: flag clear", swValue, 0)
-else
-    check("nothing invented", SetAutoloot, nil)
-    check("nothing watched", handlers.OnUpdate, nil)
-end
-
--- pfUI's autopickup: from LOOT_OPENED, in the frame the window opened.
-arg1 = nil
-handlers.OnEvent()
-LootSlot(1); ConfirmLootSlot(1)
-check("event handler loots nothing", looted + confirmed, 0)
-arg1 = "LeftButton"                    -- even with a click left in arg1
-LootSlot(1)
-check("same frame loots nothing", looted, 0)
-
--- A staged addon: OnUpdate, later frames.
-now = 100.5
-arg1 = 0.016
-LootSlot(1)
-check("OnUpdate loots nothing", looted, 0)
-
--- The player clicks an item, and accepts a bind-on-pickup popup.
-now = 101
-arg1 = "LeftButton"
-LootSlot(2)
-check("a click loots", looted, 1)
-ConfirmLootSlot(2)
-check("a click confirms", confirmed, 1)
-arg1 = "ENTER"
-ConfirmLootSlot(3)
-check("the Enter key confirms", confirmed, 2)
-if WITH_SUPERWOW then
-    -- Only on a change: two frames with Shift held set it once.
-    local before = swCalls
-    shiftDown = 1
-    handlers.OnUpdate(); handlers.OnUpdate()
-    check("set once per press", swCalls - before, 1)
-end
-SlashCmdList["EQLOOT"]()
-print("ok")
-"""
-
-
-class TestGateLua(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.lua = next((p for p in (shutil.which(n) for n in ("lua", "luajit", "lua5.1"))
-                        if p), None)
-        if not cls.lua:
-            raise unittest.SkipTest("no Lua interpreter here")
-
-    def run_gate(self, superwow):
-        with tempfile.TemporaryDirectory() as d:
-            lootgate.install(d)
-            gate = os.path.join(d, lootgate.FOLDER, "EqLootGate.lua").replace("\\", "/")
-            script = os.path.join(d, "harness.lua")
-            with open(script, "w", encoding="utf-8") as f:
-                f.write(f'GATE = "{gate}"\nWITH_SUPERWOW = {str(superwow).lower()}\n'
-                        + HARNESS)
-            return subprocess.run([self.lua, script], capture_output=True, text=True)
-
-    def test_with_superwow(self):
-        r = self.run_gate(True)
-        self.assertEqual((r.stdout.strip(), r.stderr), ("ok", ""))
-
-    def test_without_superwow(self):
-        r = self.run_gate(False)
-        self.assertEqual((r.stdout.strip(), r.stderr), ("ok", ""))
+    def test_apply_writes_nothing_into_another_build(self):
+        worker = self.app.UpdateWorker(self.dir, None, None)
+        buf = bytearray(S + 64)                     # nothing where it looks
+        patches = dict((p[0], p[3]) for p in worker.build_tweaks(
+            buf, {"alwaysAutoLoot": True}))["alwaysAutoLoot"]
+        self.assertEqual(patches, [])
 
 
 if __name__ == "__main__":

@@ -1,210 +1,185 @@
-"""Make the Auto Loot setting win over addons.
+"""The Auto Loot setting, as bytes in WoW.exe. No addon.
 
-What the setting does: it flips one branch, in two places, in WoW.exe (see
-AUTOLOOT_OFFSETS). The client asks one flag on the player, "was this looted
-with the auto-loot modifier?", and the stock branch auto-loots when the flag
-is set; flipped, it auto-loots when it is not. Plain clicks and Shift swap
-meaning, and nothing else changes.
+How the client decides, read from the code (OctoWoW 1.18.1, WoW build 5875):
+right-clicking a corpse reaches one of two branches (AUTOLOOT_OFFSETS), each
+asking a flag on the player, "was this looted with the auto-loot modifier?".
+Stock, the branch auto-loots when the flag is set. Flipped (Auto Loot on), it
+auto-loots when it is not, so plain clicks and Shift swap meaning.
 
-What undid it, read from the code that does it:
+Why that was not enough on its own:
 
-- SuperWoW's ``SetAutoloot(v)`` keeps ``v`` in the DLL and ORs it into that
-  flag before every interact. So SetAutoloot(1) means "always the Shift
-  branch": always auto-loot on a stock exe, and *never* on a flipped one.
-  SuperAPI, on EqUpdater's recommended list, offers that as a saved option and
-  says so in its tooltip ("all of these will be reversed").
-- Addons with an auto-loot of their own (pfUI's autopickup, for one) call
-  ``LootSlot`` and ``ConfirmLootSlot`` from their LOOT_OPENED handler, which
-  takes everything from a window the setting says should stay open.
+- The flag is stale. The client writes it from Shift only when the server's
+  loot reply arrives (0x5edca5), so a click reads Shift as it was at the
+  *previous* loot. Seen in game 2026-11-08: Shift changed nothing, either
+  way. In its place SuperWoW's ``SetAutoloot(v)`` ORs ``v`` into the flag
+  before every interact, which SuperAPI calls every frame from a saved
+  option, and which inverted the setting.
+- The routine that records the flag (0x5df460) also loots an open window at
+  once when Shift is down: with Auto Loot on, Shift-click flashed the window
+  and took everything (SHIFT_LOOT_OFFSET).
 
-Neither can be fixed from outside the game. Both go through a Lua global looked
-up when it is called, so a small addon loaded first (the "!" sorts ahead of
-every ordinary name) stands in front of them. It does the same thing whichever
-way the setting is: the flag then means Shift and only Shift, and the branch in
-WoW.exe is the one decision. No addon's saved settings are touched and none is
-disabled.
+The fix, all in WoW.exe: each branch asks the client's own Shift check
+(0x41f8f0, what Lua's ``IsShiftKeyDown`` calls) at the moment of the click
+instead of the flag. The two 8-byte flag reads (``mov cl,[eax+0x1d30]; test
+cl,cl``) become a call to ten bytes of code in alignment padding next to the
+first branch (CAVE_OFFSET), which leaves the answer in the flags the branch
+tests. SuperWoW's value is then never read, so no addon can turn the setting
+around. With Auto Loot on, the Shift path in 0x5df460 is closed too.
 
-It cannot help against code that does not go through those globals: see
-the limits in README.md's Auto Loot section."""
+An addon that takes items from the window itself (pfUI's autopickup) is that
+addon's own setting; nothing here stops it. 2.1.4's first builds installed an
+addon, ``!EqLootGate``, to stand in front of those calls; it is removed."""
 
 from __future__ import annotations
 
 import os
-
-FOLDER = "!EqLootGate"
-
-TOC = """## Interface: 11200
-## Title: EqUpdater Loot Gate
-## Notes: Keeps EqUpdater's Auto Loot setting in charge of looting. Installed by EqUpdater.
-## Author: EqUpdater
-EqLootGate.lua
-"""
-
-# Lua 5.0: no `...` expressions, no `#`, and getglobal-free global access.
-LUA = """-- Installed by EqUpdater; see equpdater/lootgate.py. Edits are overwritten.
-EqLootGate = { ignoredSetAutoloot = 0, ignoredLootSlot = 0 }
-local gate = EqLootGate
-
--- SuperWoW ORs this value into the client's autoloot flag before every
--- interact. OctoWoW's client does not set that flag from Shift itself (seen
--- in game: Shift changed nothing with the setting either way), so this is
--- the only way Shift reaches looting. The gate holds it at "Shift is down" --
--- set when Shift goes down or up, never every frame -- and the setting in
--- WoW.exe decides what Shift means: on, Shift opens the window; off, Shift
--- takes everything. Addons calling SetAutoloot are ignored. The value
--- outlives a /reload, so it is set on load.
-if SetAutoloot then
-    local native = SetAutoloot
-    local held = 0
-    native(0)
-    SetAutoloot = function(value)
-        if value ~= nil then
-            gate.ignoredSetAutoloot = gate.ignoredSetAutoloot + 1
-        end
-        return held
-    end
-    local shift = CreateFrame("Frame")
-    shift:SetScript("OnUpdate", function()
-        local down = 0
-        if IsShiftKeyDown() then
-            down = 1
-        end
-        if down ~= held then
-            held = down
-            native(down)
-        end
-    end)
-end
-
--- A loot window is open only when looting is manual, so taking an item from
--- it is a player's click. A click handler has a string in arg1; OnUpdate has
--- a number, and an event handler for the window runs in the frame it opened.
-local openedAt = nil
-local frame = CreateFrame("Frame")
-frame:RegisterEvent("LOOT_OPENED")
-frame:SetScript("OnEvent", function()
-    openedAt = GetTime()
-end)
-
-local function fromPlayer()
-    return type(arg1) == "string" and GetTime() ~= openedAt
-end
-
-local function guard(native)
-    return function(slot)
-        if fromPlayer() then
-            return native(slot)
-        end
-        gate.ignoredLootSlot = gate.ignoredLootSlot + 1
-    end
-end
-
-LootSlot = guard(LootSlot)
-ConfirmLootSlot = guard(ConfirmLootSlot)
-
-SLASH_EQLOOT1 = "/eqloot"
-SlashCmdList["EQLOOT"] = function()
-    DEFAULT_CHAT_FRAME:AddMessage("EqLootGate: ignored "
-        .. gate.ignoredSetAutoloot .. " SetAutoloot and "
-        .. gate.ignoredLootSlot .. " automatic loot calls from addons.")
-end
-"""
+import shutil
 
 #: The two branches in WoW.exe, as file offsets, and what they hold.
 AUTOLOOT_OFFSETS = (0x0c1ecf, 0x0c2b25)
-JZ, JNZ = 0x74, 0x75
-#: `test cl, cl`, just before each: what says this is the same client build.
-_TEST_CL = b"\x84\xc9"
+JZ, JNZ, JMP = 0x74, 0x75, 0xEB
 
-#: A third way the client loots everything, which the two branches do not
-#: cover: the routine that records the Shift flag (0x5df460) also loots the
-#: open window there and then if Shift is down -- when the window opens with
-#: Shift held, or Shift is pressed while it is open. Stock, that is "Shift
-#: takes everything". With Auto Loot on, Shift is what keeps the window open,
-#: so this path took everything a moment after the window appeared. Seen in
-#: game 2026-11-07. On: the jump past the loot call is made unconditional, so
-#: the two branches alone decide. Off: stock.
+#: .text is mapped at 0x401000 from file offset 0x1000.
+_TEXT_DELTA = 0x400000
+
+#: The flag read before each branch, stock: `mov cl,[eax+0x1d30]; test cl,cl`.
+_READ_FLAG = bytes.fromhex("8a88301d000084c9")
+SITE_OFFSETS = tuple(off - len(_READ_FLAG) for off in AUTOLOOT_OFFSETS)
+
+#: Alignment padding after the function holding the first branch: twelve
+#: `nop`s, never executed. Ten of them become the Shift check.
+CAVE_OFFSET = 0x0c1ef4
+_CAVE_STOCK = b"\x90" * 10
+#: The client's "is this modifier down" (ecx 0 = Shift), as IsShiftKeyDown
+#: and the loot reply call it. Returns non-zero when down.
+_SHIFT_CHECK_VA = 0x41f8f0
+
+
+def _rel_call(at_off: int, target_va: int) -> bytes:
+    return b"\xe8" + (target_va - (at_off + _TEXT_DELTA + 5)).to_bytes(
+        4, "little", signed=True)
+
+
+#: xor ecx,ecx; call shift check; test eax,eax; ret -- the flags carry the
+#: answer back to the branch, which tests them as it tested the flag.
+_CAVE = (b"\x31\xc9" + _rel_call(CAVE_OFFSET + 2, _SHIFT_CHECK_VA)
+         + b"\x85\xc0\xc3")
+
+
+def _site(off: int) -> bytes:
+    """call the cave, then three nops: eight bytes, as the flag read was."""
+    return _rel_call(off, CAVE_OFFSET + _TEXT_DELTA) + b"\x90\x90\x90"
+
+
+#: A third way the client loots everything: the routine that records the
+#: flag (0x5df460) also loots the open window there and then if Shift is
+#: down. Stock, that is "Shift takes everything". With Auto Loot on, Shift is
+#: what keeps the window open, so this path took everything a moment after
+#: the window appeared. Seen in game 2026-11-07. On: the jump past the loot
+#: call is made unconditional. Off: stock.
 SHIFT_LOOT_OFFSET = 0x1df46e
-JMP = 0xEB
 #: `mov [ecx+0x1d30], al` just before it: the flag being recorded.
 _SHIFT_HEAD = b"\x88\x81\x30\x1d\x00\x00"
 
+#: The addon the first 2.1.4 builds installed.
+FOLDER = "!EqLootGate"
+_GATE_MARK = b"## Author: EqUpdater"
 
-def _shift_byte(f) -> int | None:
-    f.seek(SHIFT_LOOT_OFFSET - len(_SHIFT_HEAD))
-    head = f.read(len(_SHIFT_HEAD) + 1)
-    if len(head) < len(_SHIFT_HEAD) + 1 or head[:-1] != _SHIFT_HEAD \
-            or head[-1] not in (JZ, JMP):
+
+def _layout_of(data: bytes) -> dict | None:
+    """What each patched spot holds, or None when any of them is not one of
+    the forms this client build has: another build, whose bytes mean nothing
+    here."""
+    branches, sites = [], []
+    for site, off in zip(SITE_OFFSETS, AUTOLOOT_OFFSETS):
+        head = data[site:off + 1]
+        if len(head) < len(_READ_FLAG) + 1:
+            return None
+        if head[:-1] == _READ_FLAG:
+            sites.append(False)
+        elif head[:-1] == _site(site):
+            sites.append(True)
+        else:
+            return None
+        if head[-1] not in (JZ, JNZ):
+            return None
+        branches.append(head[-1])
+    cave = data[CAVE_OFFSET:CAVE_OFFSET + len(_CAVE)]
+    if cave not in (_CAVE, _CAVE_STOCK):
         return None
-    return head[-1]
+    head = data[SHIFT_LOOT_OFFSET - len(_SHIFT_HEAD):SHIFT_LOOT_OFFSET + 1]
+    if len(head) < len(_SHIFT_HEAD) + 1             or head[:-1] != _SHIFT_HEAD or head[-1] not in (JZ, JMP):
+        return None
+    return {"branches": branches, "sites": sites, "cave": cave == _CAVE,
+            "shift": head[-1]}
 
 
-def install(addons_dir: str) -> bool:
-    """Write the addon if it is missing or differs. Returns whether it wrote."""
-    folder = os.path.join(addons_dir, FOLDER)
-    wanted = {FOLDER + ".toc": TOC, "EqLootGate.lua": LUA}
-    changed = False
-    os.makedirs(folder, exist_ok=True)
-    for name, text in wanted.items():
-        path = os.path.join(folder, name)
-        data = text.encode("utf-8")
-        try:
-            with open(path, "rb") as f:
-                if f.read() == data:
-                    continue
-        except OSError:
-            pass
-        tmp = path + ".tmp"
-        with open(tmp, "wb") as f:
-            f.write(data)
-        os.replace(tmp, path)
-        changed = True
-    return changed
+def _layout(exe_path: str) -> dict | None:
+    try:
+        with open(exe_path, "rb") as f:
+            return _layout_of(f.read(SHIFT_LOOT_OFFSET + 1))
+    except OSError:
+        return None
 
 
 def exe_state(exe_path: str) -> bool | None:
     """What WoW.exe does now: True auto-loots on a plain click, False needs
-    Shift. None when the file cannot be read, or those offsets are not those
-    branches: another client build, whose bytes mean nothing here."""
-    try:
-        with open(exe_path, "rb") as f:
-            found = []
-            for off in AUTOLOOT_OFFSETS:
-                f.seek(off - 2)
-                head = f.read(3)
-                if len(head) < 3 or head[:2] != _TEST_CL:
-                    return None
-                found.append(head[2])
-            if _shift_byte(f) is None:
-                return None
-    except OSError:
+    Shift. None when the file cannot be read, or it is another client
+    build."""
+    layout = _layout(exe_path)
+    if layout is None:
         return None
-    if found == [JNZ, JNZ]:
+    if layout["branches"] == [JNZ, JNZ]:
         return True
-    if found == [JZ, JZ]:
+    if layout["branches"] == [JZ, JZ]:
         return False
     return None
 
 
 def exe_complete(exe_path: str, enabled: bool) -> bool:
-    """Whether the Shift path matches ``enabled`` too. OctoLauncher, and
-    the first EqUpdater 2.1.4 builds, set only the two branches."""
-    try:
-        with open(exe_path, "rb") as f:
-            return _shift_byte(f) == (JMP if enabled else JZ)
-    except OSError:
-        return False
+    """Whether everything besides the two branches matches ``enabled`` too:
+    the branches read Shift, and the Shift path is closed when on.
+    OctoLauncher, and the first EqUpdater 2.1.4 builds, set less."""
+    layout = _layout(exe_path)
+    return (layout is not None and all(layout["sites"]) and layout["cave"]
+            and layout["shift"] == (JMP if enabled else JZ))
+
+
+def patches(enabled: bool) -> list:
+    """Every (file offset, bytes) the setting writes. The cave comes before
+    the calls into it."""
+    return ([(off, bytes([JNZ if enabled else JZ])) for off in AUTOLOOT_OFFSETS]
+            + [(SHIFT_LOOT_OFFSET, bytes([JMP if enabled else JZ])),
+               (CAVE_OFFSET, _CAVE)]
+            + [(site, _site(site)) for site in SITE_OFFSETS])
+
+
+def patches_for(data, enabled: bool) -> list:
+    """``patches`` for this WoW.exe's bytes, or none at all when it is
+    another build: a call into code that is not there would crash it."""
+    return patches(enabled) if _layout_of(bytes(data[:SHIFT_LOOT_OFFSET + 1]))         else []
 
 
 def set_exe_state(exe_path: str, enabled: bool) -> None:
-    """Set both branches and the Shift path, in place. Raises OSError when it
-    cannot be written (the game is running), and ValueError on a build it does
-    not recognise."""
-    if exe_state(exe_path) is None:
+    """Write the setting, in place. Raises OSError when it cannot be written
+    (the game is running), and ValueError on a build it does not recognise."""
+    if _layout(exe_path) is None:
         raise ValueError("unrecognised WoW.exe")
     with open(exe_path, "r+b") as f:
-        for off in AUTOLOOT_OFFSETS:
+        for off, data in patches(enabled):
             f.seek(off)
-            f.write(bytes([JNZ if enabled else JZ]))
-        f.seek(SHIFT_LOOT_OFFSET)
-        f.write(bytes([JMP if enabled else JZ]))
+            f.write(data)
+
+
+def remove_gate(addons_dir: str) -> bool:
+    """Delete the addon the first 2.1.4 builds installed, if it is ours.
+    Returns whether it removed it."""
+    folder = os.path.join(addons_dir, FOLDER)
+    try:
+        with open(os.path.join(folder, FOLDER + ".toc"), "rb") as f:
+            if _GATE_MARK not in f.read():
+                return False
+    except OSError:
+        return False
+    shutil.rmtree(folder, ignore_errors=True)
+    return not os.path.exists(folder)

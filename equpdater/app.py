@@ -1185,11 +1185,8 @@ class UpdateWorker:
             ("frillDistance",         "float",  0x467958,  frill),
             ("nameplateRange",        "float",  0x40c448,  nameplate),
             ("soundInBackground",     "int8",   0x3a4869,  snd_bg),
-            ("alwaysAutoLoot", "bytes", None, [
-                (off, bytes([lootgate.JNZ if always_loot else lootgate.JZ]))
-                for off in lootgate.AUTOLOOT_OFFSETS
-            ] + [(lootgate.SHIFT_LOOT_OFFSET,
-                  bytes([lootgate.JMP if always_loot else lootgate.JZ]))]),
+            ("alwaysAutoLoot", "bytes", None,
+             lootgate.patches_for(buf, always_loot)),
             # cameraSkipFix is baked into the torrent's WoW.exe, so we don't
             # apply it. skillUiGateHijack and octowowUrlAllowlist below are
             # baked in too, but the official launcher still applies these 2
@@ -1249,12 +1246,12 @@ class UpdateWorker:
         with open(exe, "wb") as f:
             f.write(buf)
         self.log("WoW.exe patched.", "ok")
-        # The other half of Auto Loot: without it an addon can undo the bytes
-        # just written. See equpdater/lootgate.py.
+        # Auto Loot no longer needs an addon; take away the one the first
+        # 2.1.4 builds installed. See equpdater/lootgate.py.
         try:
-            lootgate.install(writable_addons_path(self.out_dir))
-        except Exception as e:
-            self.log(f"Could not install the Auto Loot gate addon: {e}", "err")
+            lootgate.remove_gate(writable_addons_path(self.out_dir))
+        except Exception:
+            pass
 
     def run(self):
         # The selection is recomputed here from the live torrent so an
@@ -4472,7 +4469,7 @@ def load_tweaks_config() -> dict:
 
 
 def enforce_autoloot(client_dir: str) -> list:
-    """Make WoW.exe and the gate addon say what the Auto Loot checkbox says,
+    """Make WoW.exe say what the Auto Loot checkbox says,
     just before the game starts. OctoLauncher patches WoW.exe to its own
     setting whenever it plays, so the bytes can change behind the checkbox.
     Returns what it did, for the log. Never prevents a launch."""
@@ -4492,12 +4489,14 @@ def enforce_autoloot(client_dir: str) -> list:
                 f"Auto Loot: WoW.exe did not match the setting (another "
                 f"launcher, or an older EqUpdater, patched it); set to "
                 f"{'on' if target else 'off'}." if state != target else
-                f"Auto Loot: set the Shift path in WoW.exe to match "
-                f"({'on' if target else 'off'}): Shift now keeps the loot "
-                f"window open." if target else
-                "Auto Loot: put the Shift path in WoW.exe back to stock.")
-    if lootgate.install(writable_addons_path(client_dir)):
-        notes.append("Auto Loot: installed the gate addon.")
+                f"Auto Loot: WoW.exe now reads Shift when you loot "
+                f"(set to {'on' if target else 'off'}).")
+    try:
+        if lootgate.remove_gate(writable_addons_path(client_dir)):
+            notes.append("Auto Loot: removed the !EqLootGate addon; "
+                         "WoW.exe does its job now.")
+    except Exception:
+        pass
     return notes
 
 
