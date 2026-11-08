@@ -216,11 +216,14 @@ function GetTime() return now end
 local handlers = {}
 function CreateFrame() return {
     RegisterEvent = function() end,
-    SetScript = function(self, _, fn) handlers.event = fn end } end
+    SetScript = function(self, script, fn) handlers[script] = fn end } end
+local shiftDown = nil
+function IsShiftKeyDown() return shiftDown end
 SlashCmdList = {}
 DEFAULT_CHAT_FRAME = { AddMessage = function() end }
 local swValue, looted, confirmed = 1, 0, 0     -- SuperWoW's value survives /reload
-if WITH_SUPERWOW then SetAutoloot = function(v) if v then swValue = v end return swValue end end
+local swCalls = 0
+if WITH_SUPERWOW then SetAutoloot = function(v) if v then swValue = v; swCalls = swCalls + 1 end return swValue end end
 LootSlot = function() looted = looted + 1 end
 ConfirmLootSlot = function() confirmed = confirmed + 1 end
 
@@ -238,13 +241,28 @@ if WITH_SUPERWOW then
     SetAutoloot(1)                     -- SuperAPI "Always on", every frame
     check("addon cannot set it", swValue, 0)
     check("still looks present", type(SetAutoloot), "function")
+    -- Shift is what the flag says: the client here does not set it itself.
+    local calls = 0
+    local real = swValue
+    handlers.OnUpdate()
+    check("Shift up: flag clear", swValue, 0)
+    shiftDown = 1
+    handlers.OnUpdate()
+    check("Shift down: flag set", swValue, 1)
+    SetAutoloot(0)                     -- SuperAPI "Always off" mid-press
+    check("addon cannot clear it", swValue, 1)
+    check("addons are told the truth", SetAutoloot(), 1)
+    shiftDown = nil
+    handlers.OnUpdate()
+    check("Shift up again: flag clear", swValue, 0)
 else
     check("nothing invented", SetAutoloot, nil)
+    check("nothing watched", handlers.OnUpdate, nil)
 end
 
 -- pfUI's autopickup: from LOOT_OPENED, in the frame the window opened.
 arg1 = nil
-handlers.event()
+handlers.OnEvent()
 LootSlot(1); ConfirmLootSlot(1)
 check("event handler loots nothing", looted + confirmed, 0)
 arg1 = "LeftButton"                    -- even with a click left in arg1
@@ -267,6 +285,13 @@ check("a click confirms", confirmed, 1)
 arg1 = "ENTER"
 ConfirmLootSlot(3)
 check("the Enter key confirms", confirmed, 2)
+if WITH_SUPERWOW then
+    -- Only on a change: two frames with Shift held set it once.
+    local before = swCalls
+    shiftDown = 1
+    handlers.OnUpdate(); handlers.OnUpdate()
+    check("set once per press", swCalls - before, 1)
+end
 SlashCmdList["EQLOOT"]()
 print("ok")
 """

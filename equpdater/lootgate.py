@@ -46,17 +46,34 @@ EqLootGate = { ignoredSetAutoloot = 0, ignoredLootSlot = 0 }
 local gate = EqLootGate
 
 -- SuperWoW ORs this value into the client's autoloot flag before every
--- interact. Held at 0, the flag means Shift and nothing else, and the setting
--- in WoW.exe decides. The value outlives a /reload, so it is cleared on load.
+-- interact. OctoWoW's client does not set that flag from Shift itself (seen
+-- in game: Shift changed nothing with the setting either way), so this is
+-- the only way Shift reaches looting. The gate holds it at "Shift is down" --
+-- set when Shift goes down or up, never every frame -- and the setting in
+-- WoW.exe decides what Shift means: on, Shift opens the window; off, Shift
+-- takes everything. Addons calling SetAutoloot are ignored. The value
+-- outlives a /reload, so it is set on load.
 if SetAutoloot then
     local native = SetAutoloot
+    local held = 0
     native(0)
     SetAutoloot = function(value)
         if value ~= nil then
             gate.ignoredSetAutoloot = gate.ignoredSetAutoloot + 1
         end
-        return 0
+        return held
     end
+    local shift = CreateFrame("Frame")
+    shift:SetScript("OnUpdate", function()
+        local down = 0
+        if IsShiftKeyDown() then
+            down = 1
+        end
+        if down ~= held then
+            held = down
+            native(down)
+        end
+    end)
 end
 
 -- A loot window is open only when looting is manual, so taking an item from

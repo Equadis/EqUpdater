@@ -266,16 +266,19 @@ is left as it is.
   Channels** (12–64) and the game's language.
 - **Reset** asks before putting everything back to defaults.
 
-**Auto Loot** is yours to decide, whatever an addon says. EqUpdater flips one
-branch in `WoW.exe`, so a plain click loots everything and Shift opens the
-window (or the other way round). SuperWoW's `SetAutoloot` feeds the same flag,
-and addons with their own auto-loot take items from the window, so a small
-addon, `!EqLootGate`, loads first and stops both, without changing any addon's
-settings. PLAY puts `WoW.exe` back if another launcher changed it, and a client
-EqUpdater has not patched yet keeps what it had until you choose. `/eqloot` in
-game counts what it stopped. It cannot stop a DLL that writes to the game's
-memory, an addon that clicks the loot buttons itself, or anything while
-`!EqLootGate` is disabled in the AddOns list.
+**Auto Loot** is yours to decide, whatever an addon says. On, a plain click
+takes everything and Shift opens the window; off, the other way round.
+EqUpdater patches the loot decision in `WoW.exe`, and a small addon,
+`!EqLootGate`, loads first and does the rest without changing any addon's
+settings: OctoWoW's client does not read Shift for looting by itself, so the
+gate tells it through SuperWoW whenever Shift goes down or up, and it ignores
+addons that set SuperWoW's auto-loot themselves (SuperAPI) or take items from
+the window (pfUI's autopickup). PLAY puts `WoW.exe` back if another launcher
+changed it, and a client EqUpdater has not patched yet keeps what it had until
+you choose. `/eqloot` in game counts what it stopped. Shift needs SuperWoW;
+without it a plain click is all there is. It cannot stop a DLL that writes to
+the game's memory, an addon that clicks the loot buttons itself, or anything
+while `!EqLootGate` is disabled in the AddOns list.
 
 ### Game Diagnostics
 - **Settings → Troubleshooting → Game Diagnostics** keeps a record of each
