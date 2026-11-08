@@ -845,4 +845,9 @@ STRINGS = {
     "Deletes the game's WDB cache before each launch: the item and creature data the server sent. Clearing it fixes stale names and tooltips; the game builds it again as you play.": "Löscht vor jedem Start den WDB-Cache des Spiels: die vom Server gesendeten Gegenstands- und Kreaturdaten. Das behebt veraltete Namen und Tooltips; das Spiel baut ihn beim Spielen neu auf.",
     "Minimizes {app} to the taskbar a moment after the game starts.": "Minimiert {app} kurz nach dem Spielstart in die Taskleiste.",
     "When on, the recommended addons (marked ★ on the Addons tab) are installed wherever they are missing. Addons already in the client are never replaced.": "Wenn aktiv, werden die empfohlenen Addons (im Addons-Tab mit ★ markiert) überall installiert, wo sie fehlen. Bereits vorhandene Addons werden nie ersetzt.",
+    "THEME": "THEMA",
+    "Modern": "Modern",
+    "Classic (2004)": "Klassisch (2004)",
+    "The Classic theme has a still background.": "Das klassische Thema hat einen unbewegten Hintergrund.",
+    "{app} restarts to show the theme you chose.\n\nRestart now?": "{app} wird neu gestartet, um das gewählte Thema anzuzeigen.\n\nJetzt neu starten?",
 }

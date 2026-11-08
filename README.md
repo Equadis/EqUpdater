@@ -342,6 +342,11 @@ that addon's setting; turn it off there.
   uses a still image and almost no CPU).
 - Fonts: **Arial** (default), **Friz Quadrata** or **OpenDyslexic**, switched
   live in Settings. All three come with EqUpdater; nothing to install.
+- Themes (Settings → **Theme**): **Modern** (the default) or **Classic
+  (2004)**, which dresses EqUpdater as the original World of Warcraft
+  installer: black-metal frame, Dark Portal scenery, stone buttons, gold
+  trim. Switching offers a restart. It changes how things look and nothing
+  else. Without its artwork (`assets/classic`) EqUpdater starts in Modern.
 - Dark title bar to match (Windows).
 - Resizable, and it remembers its size. Bigger shows more news; at its
   smallest it is just the tabs and the PLAY/UPDATE buttons.

@@ -42,6 +42,7 @@ from functools import cache
 import tkinter as tk
 from tkinter import filedialog
 
+from . import theme as themes
 from . import (branding, diagnostics, gamepaths, gitlocal, i18n, logindoctor,
                lootgate, mpq, octolauncher, platforms)
 from .i18n import N_, tr
@@ -59,6 +60,7 @@ from .news import (ANNOUNCEMENTS_FORUM_ID, CHANGELOG_FORUM_ID,
                    ForumBlockedError, ForumError, fetch_first_post,
                    fetch_forum_page, fetch_latest_post, fetch_news_feed,
                    fetch_topic_list, is_challenge_page, newest_first)
+from .skin import SkinMixin, STONE_INK
 from .ui import (AnimatedBackground, FontManager, GradientButton, prepare_fonts,
                  GradientPalette, apply_edge_fades, cover_background,
                  BackdropCanvas, blend, edge_fade_layers, photo_image,
@@ -138,21 +140,58 @@ C_ERR        = "#d17a7a"
 C_MOD_HL     = "#a8b83c"
 C_NEW        = "#ff3b3b"     # NEW! on a News post
 
+# ── themes ───────────────────────────────────────────────────────────────────
+#
+# The C_* names above are the Modern theme's palette. ``apply_theme`` rebinds
+# them from the chosen theme before anything is drawn; every colour the app
+# uses is read through these names, so a theme is a palette plus, for Classic,
+# the artwork in ``theme.ClassicArt``. A theme is chosen once, at start-up
+# (Settings -> Theme offers a restart), because hundreds of live widgets
+# carry their colours.
+
+#: The theme in force, and (for a skinned theme) its artwork.
+THEME = themes.THEMES[themes.DEFAULT]
+ART = None
+
+
+def apply_theme(key) -> "themes.Theme":
+    """Make ``key`` the theme in force: rebind the palette constants. Returns
+    the theme actually applied -- Modern when Classic's artwork is missing."""
+    global THEME, ART
+    global C_BG, C_PANEL, C_PANEL_ALT, C_PANEL_BDR, C_HDR, C_DIVIDER, C_GOLD
+    global C_GOLD_LT, C_PURPLE, C_TEXT, C_TEXT_DIM, C_LOG_BG, C_OK, C_ERR
+    global C_MOD_HL, C_NEW
+    THEME = themes.resolve(key)
+    ART = themes.classic_art() if THEME.skinned else None
+    c = THEME.colors
+    C_BG, C_PANEL, C_PANEL_ALT = c["bg"], c["panel"], c["panel_alt"]
+    C_PANEL_BDR, C_HDR, C_DIVIDER = c["panel_bdr"], c["hdr"], c["divider"]
+    C_GOLD, C_GOLD_LT, C_PURPLE = c["gold"], c["gold_lt"], c["purple"]
+    C_TEXT, C_TEXT_DIM, C_LOG_BG = c["text"], c["text_dim"], c["log_bg"]
+    C_OK, C_ERR, C_MOD_HL, C_NEW = c["ok"], c["err"], c["mod_hl"], c["new"]
+    return THEME
+
+
+def skinned() -> bool:
+    """Is the Classic artwork in use?"""
+    return ART is not None
+
+
 PLAY_GRADIENT = GradientPalette(
     top="#4d8049", bottom="#396637",
     hover_top="#5b9155", hover_bottom="#427640",
     disabled_top="#24344a", disabled_bottom="#1a293e",
-    border="#6f9d69", hover_border="#8aba84")
+    border="#6f9d69", hover_border="#8aba84", skin_fg="#fbd78c")
 UPDATE_GRADIENT = GradientPalette(
     top="#d2a84e", bottom="#b8872f",
     hover_top="#e0ba62", hover_bottom="#c7963b",
     disabled_top="#28354a", disabled_bottom="#1c293d",
-    border="#e0bd6d", hover_border="#f0d18a")
+    border="#e0bd6d", hover_border="#f0d18a", skin_fg="#ffb347")
 BUSY_GRADIENT = GradientPalette(
     top="#293a53", bottom="#1b2a40",
     hover_top="#293a53", hover_bottom="#1b2a40",
     disabled_top="#293a53", disabled_bottom="#1b2a40",
-    border="#304966", disabled_fg=C_TEXT_DIM)
+    border="#304966", disabled_fg=C_TEXT_DIM, skin_fg="#a99f82")
 
 FONT_MONO   = ("Consolas", 9) if platforms.WINDOWS else ("Monospace", 9)
 
@@ -4750,7 +4789,7 @@ class SlimScrollbar(tk.Canvas):
         if self.command:
             self.command("moveto", first)
 
-class EqUpdaterApp(tk.Tk):
+class EqUpdaterApp(SkinMixin, tk.Tk):
     def __init__(self):
         # Give EqUpdater its own Windows taskbar identity before Tk creates
         # the native window. This prevents Windows from grouping it under an
@@ -4834,6 +4873,12 @@ class EqUpdaterApp(tk.Tk):
         # the user just added it themselves.
         self._av_excluded = False
         self._cfg        = load_config()
+        # The theme, before any colour is read. A theme the artwork for
+        # which is missing falls back to Modern (see themes.resolve).
+        self._theme = apply_theme(self._cfg.get("theme"))
+        self._art = ART
+        if self._theme.skinned:
+            log(f"Theme: {self._theme.label}", "dim")
         # First launch: the player picks a language before anything is drawn
         # in one, so the window opens in it -- no restart. "ask_language" in
         # the config asks once more on an existing install (support, testing)
@@ -4857,8 +4902,18 @@ class EqUpdaterApp(tk.Tk):
         font_choice = accessibility.get("font_choice")
         if not font_choice:
             font_choice = "opendyslexic" if accessibility.get("dyslexic_font") else "arial"
+            # A theme may prefer a face (Classic: Friz Quadrata) until the
+            # player chooses one themselves.
+            if self._theme.font and not accessibility.get("dyslexic_font"):
+                font_choice = self._theme.font
         self._fonts = FontManager(self, font_choice)
+        #: The margin left each side of the content panels.
+        self._inset = self._px(self._theme.panel_inset)
         self._font_choice_var = tk.StringVar(value=self._fonts.choice)
+        #: What is stored, which is not always what is showing: Classic
+        #: stays chosen while its artwork is missing.
+        self._theme_var = tk.StringVar(
+            value=themes.normalize(self._cfg.get("theme")))
         self._gradient_buttons = []
         # Pending reconcile mode (None = none): _offer_reconcile surfaces the
         # Update button and the Update the user clicks runs an integrity pass
@@ -5039,6 +5094,9 @@ class EqUpdaterApp(tk.Tk):
         # Everything is positioned and built — reveal the centered window.
         self.deiconify()
 
+    def _win_w(self) -> int:
+        return WIN_W
+
     def _px(self, *vals):
         """Scale design pixels (authored at 96 DPI) to the current DPI. Returns
         an int for one arg, a tuple for several – handy for canvas coordinate
@@ -5164,6 +5222,8 @@ class EqUpdaterApp(tk.Tk):
             rest, lit = "#8a4a4a", C_ERR
         if kind == "download":
             rest = C_OK
+        if self._art is not None:
+            rest, lit = STONE_INK[kind]
         w = self._px(2)
         c = tk.Canvas(parent, width=self._px(20), height=self._px(18),
                       bg=parent.cget("bg"), highlightthickness=0,
@@ -5204,9 +5264,28 @@ class EqUpdaterApp(tk.Tk):
         c.bind("<Button-1>", lambda _e: command(), add="+")
         c.bind("<Enter>", lambda _e: paint(lit), add="+")
         c.bind("<Leave>", lambda _e: paint(rest), add="+")
+        if self._art is not None:
+            self._skin_icon(c, kind)
         c._action_kind = kind
         self._set_tooltip(c, tip)
         return c
+
+    def _text_action(self, parent, text, command, *, fg, hover, bold=True,
+                     padx=None):
+        """A text action packed on the right of a row: coloured text that
+        lights up under the cursor (Modern), a stone button (Classic).
+        ``command`` takes the click event. Returns the widget, for a tooltip."""
+        if self._art is not None:
+            return self._stone_button(parent, text, command, bold=bold,
+                                      fg=None if fg in (C_TEXT_DIM, C_GOLD)
+                                      else fg, padx=None)
+        w = tk.Label(parent, text=text, font=self._font(10, bold=bold),
+                     fg=fg, bg=C_PANEL, cursor="hand2")
+        w.pack(side="right", padx=padx if padx is not None else self._px(4))
+        w.bind("<Button-1>", command)
+        w.bind("<Enter>", lambda _e: w.configure(fg=hover))
+        w.bind("<Leave>", lambda _e: w.configure(fg=fg))
+        return w
 
     def _set_tooltip(self, widget, text: str):
         """A tooltip whose text can change without stacking another handler.
@@ -5280,10 +5359,19 @@ class EqUpdaterApp(tk.Tk):
         cv = self._hdr_canvas
         tag = f"nav_{tab}"
         cv.delete(tag)
-        cx, cy = self._nav_pos[tab], self._px(54)
+        cx, cy = self._nav_pos[tab], self._tab_cy()
         font = self._font(11, bold=True)
         label = tr(tab)
-        if tab == self._active_tab:
+        if self._art is not None:
+            # A stone button, wider than its text by the hit box's margins.
+            width = self._nav_text_w[tab] + self._px(30)
+            self._draw_tab_classic(tab, hover, width, cx)
+            active = tab == self._active_tab
+            cv.create_text(cx + 1, cy + 2, text=label,
+                           font=font, fill="#000000", tags=tag)
+            cv.create_text(cx, cy + 1, text=label, font=font, tags=tag,
+                           fill=C_GOLD_LT if (active or hover) else C_TEXT)
+        elif tab == self._active_tab:
             for r, col in ((self._px(2), "#42340f"), (self._px(1), "#7a5c1d")):
                 for dx, dy in ((-r, 0), (r, 0), (0, -r), (0, r),
                                (-r, -r), (r, -r), (-r, r), (r, r)):
@@ -5306,6 +5394,9 @@ class EqUpdaterApp(tk.Tk):
         if count:
             bx = cx + self._nav_text_w[tab] // 2 + self._px(11)
             by = cy - self._px(11)
+            if self._art is not None:           # on the stone's corner
+                bx = cx + self._nav_text_w[tab] // 2 + self._px(15)
+                by = cy - self._px(15)
             # Canvas oval, not a ● glyph: the oval gives exact geometric
             # control so the number always centers, consistently across OSes.
             # (A filled-circle glyph antialiases nicely but its disk isn't
@@ -5417,10 +5508,16 @@ class EqUpdaterApp(tk.Tk):
             WIN_W, WIN_H, C_BG,
             top=(self._px(120), 0.45),
             bottom=(FOOT_H + self._px(70), 0.9))
-        self._bg_pil = cover_background(
-            self._background_path(), WIN_W, WIN_H, darken=0.93)
-        if self._bg_pil is not None:
-            apply_edge_fades(self._bg_pil, self._bg_fades)
+        if self._art is not None:
+            # The Dark Portal scene, its statues and the frame, drawn for
+            # this size from the theme's artwork.
+            self._bg_pil = self._classic_scene(
+                WIN_W, WIN_H, WIN_H - FOOT_H - self._px(10))
+        else:
+            self._bg_pil = cover_background(
+                self._background_path(), WIN_W, WIN_H, darken=0.93)
+            if self._bg_pil is not None:
+                apply_edge_fades(self._bg_pil, self._bg_fades)
         self._bg_photo = photo_image(self._bg_pil, master=self)
         self._bg_current = self._bg_photo
         if self._bg_photo is not None:
@@ -5431,10 +5528,13 @@ class EqUpdaterApp(tk.Tk):
                                tags="bg")
         # A tiny dark veil keeps the bright bubble highlights from fighting
         # with edge text while leaving the supplied artwork clearly visible.
-        self._bg_frame = c.create_rectangle(0, 0, WIN_W - 1, WIN_H - 1, fill="",
-                                            outline=C_PANEL_BDR, tags="bg")
+        self._bg_frame = c.create_rectangle(
+            0, 0, WIN_W - 1, WIN_H - 1, fill="",
+            outline="" if self._art is not None else C_PANEL_BDR, tags="bg")
         c.tag_lower("bg")
         self._bg_size = (WIN_W, WIN_H)
+        if self._art is not None:
+            self._draw_panel_chrome(WIN_W, WIN_H, FOOT_H)
         if self._cfg.get("animated_background", True) \
                 and not getattr(self, "_resizing", False):
             self._start_bg_animation()
@@ -5444,6 +5544,8 @@ class EqUpdaterApp(tk.Tk):
         file missing, unreadable, not animated -- leaves the static image in
         place and says why in the session log."""
         self._stop_bg_animation()
+        if self._art is not None:
+            return                      # the Classic scenery does not move
         path = self._animated_background_path()
         if not path:
             log("Animated background unavailable: %s not found; using the "
@@ -5479,6 +5581,8 @@ class EqUpdaterApp(tk.Tk):
         screen -- the still, or the animation's PhotoImage, whose frames
         then appear in those panels too."""
         self._bg_current = photo
+        if self._art is not None:
+            return          # panels are stone, not see-through
         for backdrop in getattr(self, "_bg_backdrops", ()):
             try:
                 backdrop.set_image(photo)
@@ -5593,8 +5697,7 @@ class EqUpdaterApp(tk.Tk):
         self._hdr_h       = HDR_H
         self._layout_nav()
 
-        self._hdr_regions["gear"] = (WIN_W - self._px(36), self._px(2),
-                                     WIN_W - self._px(2), self._px(34))
+        self._hdr_regions["gear"] = self._gear_box()
         self._draw_gear()
 
         # The wordmark is a clickable header element too (opens the repo).
@@ -5637,9 +5740,11 @@ class EqUpdaterApp(tk.Tk):
         self._auto_mods_retrigger = False
         self._auto_addons_retrigger = False
 
-    def _logo_icon(self):
+    def _logo_icon(self, height=None):
         """The app icon at wordmark height, made once. None if unavailable."""
-        if not hasattr(self, "_logo_icon_photo"):
+        height = height or self._px(40)
+        if getattr(self, "_logo_icon_h", None) != height:
+            self._logo_icon_h = height
             self._logo_icon_photo = None
             path = next((p for p in branding.icon_candidates()
                          if p.lower().endswith(".png") and os.path.exists(p)),
@@ -5648,7 +5753,7 @@ class EqUpdaterApp(tk.Tk):
                 from PIL import Image, ImageTk
                 with Image.open(path) as im:
                     im = im.convert("RGBA")
-                    h = self._px(40)
+                    h = height
                     w = max(1, round(im.width * h / im.height))
                     self._logo_icon_photo = ImageTk.PhotoImage(
                         im.resize((w, h), Image.Resampling.LANCZOS),
@@ -5660,6 +5765,9 @@ class EqUpdaterApp(tk.Tk):
     def _draw_logo(self, hover: bool = False):
         cv = self._hdr_canvas
         cv.delete("logo")
+        if self._art is not None:
+            self._draw_logo_classic(hover)
+            return
         x = self._px(24)
         icon = self._logo_icon()
         if icon is not None:
@@ -5680,7 +5788,7 @@ class EqUpdaterApp(tk.Tk):
         font = tkfont.Font(font=self._font(11, bold=True))
         pad = self._px(18)                       # clickable margin each side
         widths = [font.measure(tr(t)) for t in tabs]
-        right = WIN_W - self._px(40)             # panels' right edge
+        right = WIN_W - self._inset              # panels' right edge
         x = right + pad - sum(w + 2 * pad for w in widths)
         for tab, text_w in zip(tabs, widths):
             w = text_w + 2 * pad
@@ -5699,7 +5807,10 @@ class EqUpdaterApp(tk.Tk):
         self._hdr_regions.pop("update", None)
         if not self._update_available:
             return
-        cv.create_text(self._logo_cx, self._logo_y + self._px(26),
+        label_y = self._logo_y + self._px(26)
+        if self._art is not None:           # just under the plaque
+            label_y = getattr(self, "_logo_bottom", label_y) - self._px(2)
+        cv.create_text(self._logo_cx, label_y,
                        text=tr("Update available!"),
                        font=self._font(10, bold=True),
                        fill=C_GOLD_LT if hover else C_GOLD,
@@ -5712,6 +5823,9 @@ class EqUpdaterApp(tk.Tk):
     def _draw_gear(self, hover: bool = False):
         cv = self._hdr_canvas
         cv.delete("gear_icon")
+        if self._art is not None:
+            self._draw_gear_classic(hover)
+            return
         cv.create_text(WIN_W - self._px(10), self._px(8), text="⚙",
                        font=self._font(13),
                        fill=C_GOLD if hover else C_TEXT_DIM,
@@ -5766,7 +5880,8 @@ class EqUpdaterApp(tk.Tk):
     def _build_panel(self):
         # A backdrop, not a plain frame: the gap between the two news panels
         # shows the (animated) window background instead of a flat colour.
-        panel = BackdropCanvas(self, bg=C_BG)
+        panel = BackdropCanvas(self, bg=C_PANEL if self._art is not None
+                               else C_BG)
         self._bg_backdrops = [panel]
         self._place_panel(panel)
         panel.set_image(getattr(self, "_bg_current", None))
@@ -5803,7 +5918,8 @@ class EqUpdaterApp(tk.Tk):
         """A tab's panel between the header and the footer, relative to the
         window so it follows every resize."""
         top = self._px(119)
-        panel.place(x=self._px(40), y=top, relwidth=1.0, width=-self._px(80),
+        panel.place(x=self._inset, y=top, relwidth=1.0,
+                    width=-self._px(2 * self._theme.panel_inset),
                     relheight=1.0, height=-(top + FOOT_H + self._px(10)))
 
     def _all_panels(self) -> list:
@@ -5848,7 +5964,7 @@ class EqUpdaterApp(tk.Tk):
     def _news_column_widths(self):
         """The two News columns' widths for the window's current width:
         Announcements 60 %, the Changelog the rest, a gap between."""
-        inner_w = WIN_W - self._px(40) * 2
+        inner_w = WIN_W - self._inset * 2
         self._news_left_w = int(inner_w * 0.60)
         self._news_right_w = inner_w - self._news_left_w - self._news_gap
 
@@ -5925,11 +6041,12 @@ class EqUpdaterApp(tk.Tk):
         self._update_panel_visibility()
         self._bg_canvas.configure(width=WIN_W, height=WIN_H)
         self._bg_canvas.coords(self._bg_frame, 0, 0, WIN_W - 1, WIN_H - 1)
+        if self._art is not None:
+            self._draw_panel_chrome(WIN_W, WIN_H, FOOT_H)
         self._layout_nav()
-        self._hdr_regions["gear"] = (WIN_W - self._px(36), self._px(2),
-                                     WIN_W - self._px(2), self._px(34))
+        self._hdr_regions["gear"] = self._gear_box()
         self._draw_gear()
-        self._pb_width = max(self._px(60), WIN_W - self._px(400) - self._px(40))
+        self._pb_width = max(self._px(60), WIN_W - self._px(400) - self._inset)
         self._layout_footer()
         self._news_column_widths()
         self._place_news_columns()
@@ -8056,6 +8173,15 @@ class EqUpdaterApp(tk.Tk):
         lbl.configure(text=text, fg=colour,
                       cursor="hand2" if mode in ("act", "adopt", "recover",
                                                  "retry") else "arrow")
+        if self._art is not None:
+            # An offer to act is drawn as a bevelled stone plate; a plain
+            # statement stays plain text.
+            live_mode = mode in ("act", "adopt", "recover", "retry")
+            lbl.configure(bg="#1d3149" if live_mode else C_PANEL,
+                          relief="ridge" if live_mode else "flat",
+                          bd=self._px(2) if live_mode else 0,
+                          padx=self._px(8) if live_mode else 1,
+                          highlightthickness=0)
         self._set_tooltip(lbl, tip)
         lbl.pack(side="right", padx=(self._px(2), self._px(8)))
 
@@ -9287,12 +9413,10 @@ class EqUpdaterApp(tk.Tk):
             text, colour, tip = self._MPQ_STATES[state]
             text, tip = tr(text), tr(tip)
             if replace:
-                rep = tk.Label(top, text=tr("Replace…"), font=self._font(10),
-                               fg=C_TEXT_DIM, bg=C_PANEL, cursor="hand2")
-                rep.pack(side="right", padx=self._px(8))
-                rep.bind("<Button-1>", lambda e, cb=replace: cb())
-                rep.bind("<Enter>", lambda e, w=rep: w.configure(fg=C_ERR))
-                rep.bind("<Leave>", lambda e, w=rep: w.configure(fg=C_TEXT_DIM))
+                rep = self._text_action(
+                    top, tr("Replace…"), lambda e, cb=replace: cb(),
+                    fg=C_TEXT_DIM, hover=C_ERR, bold=False,
+                    padx=self._px(8))
                 self._set_tooltip(
                     rep, tr("Install the source's copy over this one. You "
                             "are asked first, and your file is kept."))
@@ -10413,22 +10537,25 @@ class EqUpdaterApp(tk.Tk):
         f = self._mods_inner
         self._mod_sections_open = getattr(self, "_mod_sections_open", {})
         is_open = self._mod_sections_open.get(title, True)
-        hdr = tk.Frame(f, bg=C_PANEL)
+        hb = C_PANEL_ALT if self._art is not None else C_PANEL
+        hdr = tk.Frame(f, bg=hb, **(
+            {"highlightthickness": 1, "highlightbackground": "#6b5222"}
+            if self._art is not None else {}))
         hdr.pack(fill="x", pady=(self._px(10), self._px(2)))
         arrow = tk.Label(hdr, text="▾" if is_open else "▸",
                          font=self._font(14, bold=True),
-                         fg=C_GOLD, bg=C_PANEL, cursor="hand2", width=2)
+                         fg=C_GOLD, bg=hb, cursor="hand2", width=2)
         arrow.pack(side="left")
         lbl = tk.Label(hdr, text=tr(title), font=self._font(12, bold=True),
-                       fg=C_GOLD, bg=C_PANEL, cursor="hand2")
+                       fg=C_GOLD, bg=hb, cursor="hand2")
         lbl.pack(side="left")
         tk.Label(hdr, text=f"  {count}", font=self._font(10),
-                 fg=C_TEXT_DIM, bg=C_PANEL).pack(side="left")
+                 fg=C_TEXT_DIM, bg=hb).pack(side="left")
         if title == "INSTALLED LOCALLY" and count and self._found_mods():
             every = tk.Label(hdr, text=tr("Manage all ({count})",
                                           count=len(self._found_mods())),
                              font=self._font(10, bold=True), fg=C_MOD_HL,
-                             bg=C_PANEL, cursor="hand2")
+                             bg=hb, cursor="hand2")
             every.pack(side="right", padx=self._px(4))
             every.bind("<Button-1>", lambda _e: self._manage_all_found())
             every.bind("<Enter>", lambda _e, w=every: w.configure(fg=C_GOLD_LT))
@@ -10803,23 +10930,27 @@ class EqUpdaterApp(tk.Tk):
         f = self._addons_inner
         is_open = self._addon_sections_open.get(title, True)
 
-        hdr = tk.Frame(f, bg=C_PANEL)
+        # Classic: the section title sits on a stone band with gold trim.
+        hb = C_PANEL_ALT if self._art is not None else C_PANEL
+        hdr = tk.Frame(f, bg=hb, **(
+            {"highlightthickness": 1, "highlightbackground": "#6b5222"}
+            if self._art is not None else {}))
         hdr.pack(fill="x", pady=(self._px(10), self._px(2)))
         arrow = tk.Label(hdr, text="▾" if is_open else "▸",
                          font=self._font(14, bold=True),
-                         fg=C_GOLD, bg=C_PANEL, cursor="hand2", width=2)
+                         fg=C_GOLD, bg=hb, cursor="hand2", width=2)
         arrow.pack(side="left")
         lbl = tk.Label(hdr, text=tr(title),
                        font=self._font(12, bold=True),
-                       fg=C_GOLD, bg=C_PANEL, cursor="hand2")
+                       fg=C_GOLD, bg=hb, cursor="hand2")
         lbl.pack(side="left")
         tk.Label(hdr, text=f"  {len(rows)}", font=self._font(10),
-                 fg=C_TEXT_DIM, bg=C_PANEL).pack(side="left")
+                 fg=C_TEXT_DIM, bg=hb).pack(side="left")
         if title == "INSTALLED LOCALLY" and self._found_addons():
             every = tk.Label(hdr, text=tr("Manage all ({count})",
                                           count=len(self._found_addons())),
                              font=self._font(10, bold=True), fg=C_MOD_HL,
-                             bg=C_PANEL, cursor="hand2")
+                             bg=hb, cursor="hand2")
             every.pack(side="right", padx=self._px(4))
             every.bind("<Button-1>", lambda _e: self._manage_all_found())
             every.bind("<Enter>", lambda _e, w=every: w.configure(fg=C_GOLD_LT))
@@ -10934,9 +11065,18 @@ class EqUpdaterApp(tk.Tk):
 
         desc = strip_wow_colors(toc.get("Notes")
                                 or rec.get("description") or "")
-        tk.Label(row, text=desc, font=self._font(10), fg=C_TEXT_DIM,
-                 bg=C_PANEL, wraplength=self._px(430), justify="left",
-                 anchor="w").pack(side="left", fill="x", expand=True)
+        dl = tk.Label(row, text=desc, font=self._font(10), fg=C_TEXT_DIM,
+                      bg=C_PANEL, wraplength=self._px(430) if self._art is None
+                      else self._px(220), justify="left", anchor="w")
+        dl.pack(side="left", fill="x", expand=True)
+        if self._art is not None:
+            # The narrower Classic panel: the description wraps to the room
+            # the buttons leave it, so it is never clipped under them.
+            def fit(e, w=dl):
+                room = max(self._px(120), e.width - self._px(8))
+                if abs(int(float(w.cget("wraplength"))) - room) > self._px(3):
+                    w.configure(wraplength=room)
+            dl.bind("<Configure>", fit)
 
         if rec.get("error"):
             tk.Label(f, text=f"  ⚠  {tr(rec['error'])}",
@@ -10997,13 +11137,10 @@ class EqUpdaterApp(tk.Tk):
             return
 
         if rec.get("check_failed") and not rec.get("error"):
-            btn = tk.Label(row, text=tr("can't check"),
-                           font=self._font(10, bold=True), fg=C_GOLD,
-                           bg=C_PANEL, cursor="hand2")
-            btn.pack(side="right", padx=self._px(4))
-            btn.bind("<Button-1>", lambda _e: self._addons_verify(force=True))
-            btn.bind("<Enter>", lambda _e, w=btn: w.configure(fg=C_GOLD_LT))
-            btn.bind("<Leave>", lambda _e, w=btn: w.configure(fg=C_GOLD))
+            btn = self._text_action(
+                row, tr("can't check"),
+                lambda _e: self._addons_verify(force=True),
+                fg=C_GOLD, hover=C_GOLD_LT)
             self._set_tooltip(btn, tr("Nothing is changed. Click to check again."))
             return
 
@@ -11020,13 +11157,9 @@ class EqUpdaterApp(tk.Tk):
             # establishes that the catalogue copy and this copy are even the
             # same addon.
             if rec.get("suggested_git") or rec.get("git"):
-                btn = tk.Label(row, text=tr("Manage"),
-                               font=self._font(10, bold=True),
-                               fg=C_MOD_HL, bg=C_PANEL, cursor="hand2")
-                btn.pack(side="right", padx=self._px(4))
-                btn.bind("<Button-1>", lambda e, r=rec: self._addon_adopt(r))
-                btn.bind("<Enter>", lambda e, w=btn: w.configure(fg=C_GOLD_LT))
-                btn.bind("<Leave>", lambda e, w=btn: w.configure(fg=C_MOD_HL))
+                btn = self._text_action(
+                    row, tr("Manage"), lambda e, r=rec: self._addon_adopt(r),
+                    fg=C_MOD_HL, hover=C_GOLD_LT)
                 self._set_tooltip(
                     btn, tr("Let {app} update this addon from {source}. Your "
                             "current files are not changed now.",
@@ -11035,12 +11168,9 @@ class EqUpdaterApp(tk.Tk):
             return
 
         if status == "updateAvailable" and installed:
-            upd = tk.Label(row, text=tr("Update"), font=self._font(10, bold=True),
-                           fg=C_GOLD, bg=C_PANEL, cursor="hand2")
-            upd.pack(side="right", padx=self._px(4))
-            upd.bind("<Button-1>", lambda e, r=rec: self._addon_apply([r]))
-            upd.bind("<Enter>", lambda e, w=upd: w.configure(fg=C_GOLD_LT))
-            upd.bind("<Leave>", lambda e, w=upd: w.configure(fg=C_GOLD))
+            upd = self._text_action(
+                row, tr("Update"), lambda e, r=rec: self._addon_apply([r]),
+                fg=C_GOLD, hover=C_GOLD_LT)
             if rec.get("installed_sha") and rec.get("remote_sha"):
                 self._set_tooltip(upd, "%s → %s"
                                   % (short_sha(rec["installed_sha"]),
@@ -11062,14 +11192,10 @@ class EqUpdaterApp(tk.Tk):
             # beside the explanation rather than instead of it, and it warns
             # again before it does anything.
             if addon_offers_replace(rec):
-                rep = tk.Label(row, text=tr("Replace…"),
-                               font=self._font(10), fg=C_TEXT_DIM,
-                               bg=C_PANEL, cursor="hand2")
-                rep.pack(side="right", padx=self._px(4))
-                rep.bind("<Button-1>",
-                         lambda e, r=rec: self._addon_force_replace(r))
-                rep.bind("<Enter>", lambda e, w=rep: w.configure(fg=C_ERR))
-                rep.bind("<Leave>", lambda e, w=rep: w.configure(fg=C_TEXT_DIM))
+                rep = self._text_action(
+                    row, tr("Replace…"),
+                    lambda e, r=rec: self._addon_force_replace(r),
+                    fg=C_TEXT_DIM, hover=C_ERR, bold=False)
                 self._set_tooltip(
                     rep, tr("Overwrite this addon with the latest from its "
                             "source. A backup is taken first, and you are "
@@ -11244,14 +11370,28 @@ class EqUpdaterApp(tk.Tk):
             self._draw_nav_tab("ADDONS")
         self._refresh_update_all_btn()
 
+    def _bevel(self, lbl, on: bool):
+        """Classic: a label that offers an action is a bevelled stone plate;
+        otherwise plain text on the panel. Modern: nothing."""
+        if self._art is None:
+            return
+        lbl.configure(bg="#1d3149" if on else C_PANEL,
+                      relief="ridge" if on else "flat",
+                      bd=self._px(2) if on else 0,
+                      padx=self._px(10) if on else 1,
+                      pady=self._px(2) if on else 0,
+                      fg=C_GOLD_LT if on else lbl.cget("fg"))
+
     def _refresh_addons_footer(self):
         lbl = self._addons_right_lbl
         st  = self._addons_status
+        self._bevel(lbl, False)
         if st["state"] == "verifying" or self._addons_busy:
             lbl.configure(text=tr("Checking…"), fg=C_TEXT_DIM, cursor="arrow")
         elif any(r["status"] == "updateAvailable"
                  for r in st["addons"].values()):
             lbl.configure(text=tr("Update all"), fg=C_OK, cursor="hand2")
+            self._bevel(lbl, True)
         else:
             # "Nothing to update" rather than "everything up to date": with
             # unmanaged or held-back addons on the page the second is not
@@ -11300,13 +11440,19 @@ class EqUpdaterApp(tk.Tk):
         # Thin halo frame around the button gives a soft glow that follows
         # the button state (gold for UPDATE, green for PLAY).
         self._btn_mode = "update"
-        self._btn_glow = tk.Frame(c, bg="#5a4828")
+        # Classic: no halo, a taller stone button, a bigger face.
+        classic = self._art is not None
+        self._btn_h = self._px(46 if classic else 38)
+        self._glow_pad = 0 if classic else self._px(2)
+        self._btn_font_size = 15 if classic else 11
+        self._btn_glow = tk.Frame(c, bg=C_BG if classic else "#5a4828")
         self._upd_btn = GradientButton(
-            self._btn_glow, width=self._px(132), height=self._px(38),
+            self._btn_glow, width=self._px(132), height=self._btn_h,
             text=tr("UPDATE"), palette=UPDATE_GRADIENT,
             command=self._btn_click, bg=C_BG,
-            font_factory=lambda: self._font(11, bold=True))
-        self._upd_btn.pack(padx=self._px(2), pady=self._px(2))
+            font_factory=lambda: self._font(self._btn_font_size, bold=True),
+            skin=self._button_photo if classic else None)
+        self._upd_btn.pack(padx=self._glow_pad, pady=self._glow_pad)
         self._gradient_buttons.append(self._upd_btn)
         self._foot_items["btn"] = c.create_window(
             0, 0, window=self._btn_glow, anchor="nw")
@@ -11316,7 +11462,7 @@ class EqUpdaterApp(tk.Tk):
              fill=C_TEXT_DIM)
 
         self._pb_x0 = self._px(400)
-        self._pb_width = WIN_W - self._px(400) - self._px(40)
+        self._pb_width = WIN_W - self._px(400) - self._inset
         self._pb_val = 0.0
         self._pb_y = 0
         self._prog_label_var = tk.StringVar(value="")
@@ -11378,6 +11524,17 @@ class EqUpdaterApp(tk.Tk):
             resting = full.copy()
             resting.putalpha(full.getchannel("A").point(
                 lambda a: round(a * FOOTER_ICON_REST)))
+            if self._art is not None:
+                # Classic: each logo sits on a stone button.
+                bw, bh = width + self._px(20), height + self._px(14)
+
+                def on_stone(icon, state, bw=bw, bh=bh, iw=width, ih=height):
+                    stone = self._art.button(False, bw, bh, state).copy()
+                    stone.alpha_composite(
+                        icon, ((bw - iw) // 2, (bh - ih) // 2))
+                    return stone
+                resting, full = (on_stone(resting, "up"),
+                                 on_stone(full, "hover"))
             photos[key] = (ImageTk.PhotoImage(resting, master=self),
                            ImageTk.PhotoImage(full, master=self))
         self._footer_icons = photos
@@ -11685,6 +11842,11 @@ class EqUpdaterApp(tk.Tk):
         self._update_all_chain = False
         self._refresh_update_all_btn()
 
+    def _set_glow(self, colour: str):
+        """The halo round the main button (Modern); Classic has none."""
+        if self._art is None:
+            self._btn_glow.configure(bg=colour)
+
     def _layout_footer(self):
         """Place the footer from the current font's line height, so a larger
         face (OpenDyslexic) pushes the buttons down instead of under the
@@ -11697,20 +11859,22 @@ class EqUpdaterApp(tk.Tk):
         status_font = self._font(10, bold=True)
         line = tkfont.Font(font=status_font).metrics("linespace")
         y0 = WIN_H - FOOT_H
-        x = self._px(40)
+        x = self._inset
         status_y = y0 + self._px(6)
         btn_y = status_y + line + self._px(6)
         # As wide as the longest word it can show, in this language and face,
         # and never so wide that it reaches the progress bar.
-        btn_font = tkfont.Font(font=self._font(11, bold=True))
+        btn_font = tkfont.Font(font=self._font(self._btn_font_size, bold=True))
         widest = max(btn_font.measure(tr(t)) for t in (
             "UPDATE", "PLAY", "Installing…", "Patching…",
             "Checking…", "Verifying…", "Updating…"))
         btn_w = min(self._px(170), max(self._px(132), widest + self._px(20)))
+        if self._art is not None:
+            btn_w = max(self._px(190), widest + self._px(60))
         if getattr(self, "_upd_btn", None) is not None:
             self._upd_btn.set_width(btn_w)
-        glow_w = btn_w + 2 * self._px(2)
-        glow_h = self._px(38) + 2 * self._px(2)
+        glow_w = btn_w + 2 * self._glow_pad
+        glow_h = self._btn_h + 2 * self._glow_pad
         btn_bottom = btn_y + glow_h
 
         c.coords(items["status"], x, status_y)
@@ -11737,13 +11901,16 @@ class EqUpdaterApp(tk.Tk):
         c.coords(items["progress"], self._pb_x0 + self._pb_width // 2,
                  self._pb_y - self._px(6))
         c.itemconfigure(items["progress"], font=self._font(10))
-        c.coords(items["version"], WIN_W - self._px(10), WIN_H - self._px(6))
+        # Classic: clear of the frame's ornaments, in line with the panel.
+        edge = self._inset if self._art is not None else self._px(10)
+        low = self._px(18) if self._art is not None else self._px(6)
+        c.coords(items["version"], WIN_W - edge, WIN_H - low)
         if "coffee" in items:
             # Above the version, side by side, the right one's edge on the
             # version's: Discord, then the Ko-fi cup.
             self._footer_icon_photos()
             bottom = c.bbox(items["version"])[1] - self._px(6)
-            right = WIN_W - self._px(10)
+            right = WIN_W - edge
             for key in ("coffee", "discord"):
                 photo = self._footer_icons[key][0]
                 c.itemconfigure(items[key], image=photo)
@@ -11934,9 +12101,14 @@ class EqUpdaterApp(tk.Tk):
         self.bind("<Escape>", lambda e: self._close_settings())
 
         P_BG, P_HDR, P_BDR, P_INP = C_PANEL, C_HDR, C_PANEL_BDR, "#0f0b16"
+        if self._art is not None:
+            P_HDR, P_INP = C_PANEL_ALT, THEME.colors["entry_bg"]
         MW, MH = self._px(800), self._px(500)
-        panel = tk.Frame(ov, bg=P_BG, highlightthickness=1,
-                         highlightbackground=P_BDR, highlightcolor=P_BDR)
+        # Classic: the same gold-and-black trim as the content panels.
+        panel = tk.Frame(ov, bg=P_BG,
+                         highlightthickness=self._px(3 if self._art else 1),
+                         highlightbackground=C_GOLD if self._art else P_BDR,
+                         highlightcolor=C_GOLD if self._art else P_BDR)
         panel.place(relx=0.5, rely=0.5, anchor="center", y=-self._px(20),
                     width=MW, height=MH)
 
@@ -12134,6 +12306,23 @@ class EqUpdaterApp(tk.Tk):
             cb_animated_bg,
             tr("Moving bubbles behind the window. Off shows a still image "
                "and uses less CPU."))
+        if self._art is not None:
+            cb_animated_bg.configure(state="disabled", cursor="arrow")
+            self._add_tooltip(
+                cb_animated_bg, tr("The Classic theme has a still background."))
+
+        # THEME: Modern or Classic (2004). Applied at the next start.
+        tk.Label(rcol, text=tr("THEME"), font=self._font(10, bold=True),
+                 fg=C_GOLD, bg=P_BG).pack(anchor="w", pady=(self._px(20), 0))
+        for key, label in ((themes.MODERN, N_("Modern")),
+                           (themes.CLASSIC, N_("Classic (2004)"))):
+            tk.Radiobutton(
+                rcol, text=" " + tr(label), value=key,
+                variable=self._theme_var, command=self._change_theme,
+                font=self._font(10), fg=C_TEXT, bg=P_BG,
+                activebackground=P_BG, activeforeground=C_TEXT,
+                selectcolor=P_INP, highlightthickness=0, bd=0,
+                cursor="hand2").pack(anchor="w", pady=(self._px(5), 0))
 
         # FONT: its own section under GENERAL. The panel grows to fit its
         # content (_fit_settings_panel), so a larger face cannot push these
@@ -12207,6 +12396,21 @@ class EqUpdaterApp(tk.Tk):
         self._fonts.apply_tree(ov)
         self._settings_panel = (panel, MW, MH)
         self._fit_settings_panel(panel, MW, MH)
+
+    def _change_theme(self):
+        """Settings -> Theme. The choice is saved at once; the colours of
+        hundreds of live widgets are fixed at start-up, so the new theme
+        shows after a restart, which is offered, never forced."""
+        key = themes.normalize(self._theme_var.get())
+        self._cfg = update_config(lambda c: c.__setitem__("theme", key))
+        if key == self._theme.key:
+            return
+        from tkinter import messagebox
+        body = tr("{app} restarts to show the theme you chose.\n\n"
+                  "Restart now?", app=branding.APP_NAME)
+        if messagebox.askyesno(tr("Restart {app}?", app=branding.APP_NAME),
+                               body, parent=self):
+            self._restart()
 
     def _open_game_launcher(self):
         """Linux: Settings -> Game launcher, in a panel of its own over
@@ -13037,7 +13241,7 @@ class EqUpdaterApp(tk.Tk):
         self._upd_btn.set_enabled(True)
         self._upd_btn.set_split(self._px(16), self._toggle_launch_menu)
         self._refresh_update_all_btn()
-        self._btn_glow.configure(bg="#29472c")
+        self._set_glow("#29472c")
 
     def _set_btn_update(self):
         self._btn_mode = "update"
@@ -13046,7 +13250,7 @@ class EqUpdaterApp(tk.Tk):
         self._upd_btn.set_text(tr("UPDATE"))
         self._upd_btn.set_palette(UPDATE_GRADIENT)
         self._upd_btn.set_enabled(True)
-        self._btn_glow.configure(bg="#5a4828")
+        self._set_glow("#5a4828")
         self._refresh_update_all_btn()
 
     def _set_btn_busy(self, label="…"):
@@ -13056,7 +13260,7 @@ class EqUpdaterApp(tk.Tk):
         self._upd_btn.set_text(label)
         self._upd_btn.set_palette(BUSY_GRADIENT)
         self._upd_btn.set_enabled(False)
-        self._btn_glow.configure(bg="#1b2c43")
+        self._set_glow("#1b2c43")
         self._refresh_update_all_btn()
 
     def _mods_have_errors(self) -> bool:

@@ -793,6 +793,8 @@ class GradientPalette:
     #: far (0..1) towards the canvas background, instead of in the
     #: ``disabled_*`` colours: the same button, dimmed, not a grey one.
     disabled_fade: float | None = None
+    #: Text colour on the Classic theme's stone button (None: its default).
+    skin_fg: str | None = None
 
 
 class GradientButton(tk.Canvas):
@@ -800,7 +802,7 @@ class GradientButton(tk.Canvas):
 
     def __init__(self, parent, *, width: int, height: int, text: str,
                  palette: GradientPalette, command=None, font_factory=None,
-                 **kwargs):
+                 skin=None, **kwargs):
         super().__init__(parent, width=width, height=height,
                          highlightthickness=0, bd=0, takefocus=1, **kwargs)
         self._width_px = int(width)
@@ -809,6 +811,9 @@ class GradientButton(tk.Canvas):
         self._palette = palette
         self._command = command
         self._font_factory = font_factory
+        #: Classic theme: ``skin(big, width, height, state)`` returns the
+        #: stone button's photo; None paints the gradient as always.
+        self._skin = skin
         self._enabled = True
         self._hover = False
         self._pressed = False
@@ -914,8 +919,42 @@ class GradientButton(tk.Canvas):
         elif was_pressed and inside and not self._in_split(event.x):
             self.invoke()
 
+    def _paint_skin(self) -> None:
+        """The stone button: the same states as the gradient one (hover,
+        pressed, disabled, focus, the split arrow), drawn from the sprite."""
+        p = self._palette
+        w, h = self._width_px, self._height_px
+        state = ("off" if not self._enabled else "down" if self._pressed
+                 else "hover" if self._hover else "up")
+        self.create_image(0, 0, anchor="nw", image=self._skin(True, w, h, state))
+        fg = ("#8a8068" if not self._enabled
+              else "#ffe9b0" if self._hover else (p.skin_fg or "#f2cf7a"))
+        yoff = 1 if self._pressed and self._enabled else 0
+        font = self._font_factory() if self._font_factory else None
+        cx = (w - self._split_w) // 2
+        self.create_text(cx + 2, h // 2 + yoff + 2, text=self._text,
+                         fill="#000000", font=font)
+        self.create_text(cx, h // 2 + yoff, text=self._text, fill=fg, font=font)
+        if self._split_w:
+            sx = self._split_x()
+            if self._enabled and (self._split_hover or self._split_pressed):
+                self.create_rectangle(sx, 3, w - 3, h - 3, outline="",
+                                      fill="#ffffff", stipple="gray12")
+            self.create_line(sx, 6, sx, h - 6, fill="#050608")
+            self.create_line(sx + 1, 6, sx + 1, h - 6, fill="#6b5222")
+            half = max(3, self._split_w // 4)
+            ax, ay = sx + self._split_w // 2, h // 2
+            self.create_polygon(ax - half, ay - half // 2, ax + half,
+                                ay - half // 2, ax, ay + half - half // 2,
+                                fill=fg, outline=fg)
+        if self.focus_get() is self and self._enabled:
+            self.create_rectangle(4, 4, w - 5, h - 5, outline="#f2cf7a",
+                                  dash=(2, 2))
+
     def _paint(self) -> None:
         self.delete("all")
+        if self._skin is not None:
+            return self._paint_skin()
         p = self._palette
         if not self._enabled and p.disabled_fade is not None:
             under, f = self.cget("bg"), p.disabled_fade

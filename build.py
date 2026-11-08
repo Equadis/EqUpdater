@@ -76,6 +76,9 @@ BACKGROUNDS = [os.path.join(HERE, branding.BACKGROUND_STATIC),
 DISCORD_ICON = os.path.join(HERE, branding.DISCORD_ICON)
 COFFEE_ICON = os.path.join(HERE, branding.COFFEE_ICON)
 FONTS_DIR = os.path.join(HERE, "fonts")
+#: The Classic (2004) theme's artwork (equpdater/theme.py finds it at
+#: <bundle>/assets/classic).
+CLASSIC_DIR = os.path.join(HERE, "assets", "classic")
 # The frozen build starts at the top-level launcher, not at the package's
 # __main__: PyInstaller runs its entry script as `__main__` with no parent
 # package, and the relative imports in equpdater/__main__.py raise
@@ -256,6 +259,9 @@ def main() -> None:
             cmd += ["--add-data", icon + os.pathsep + "."]
     if os.path.isdir(FONTS_DIR):
         cmd += ["--add-data", FONTS_DIR + os.pathsep + "fonts"]
+    if os.path.isdir(CLASSIC_DIR):
+        cmd += ["--add-data",
+                CLASSIC_DIR + os.pathsep + os.path.join("assets", "classic")]
 
     cmd.append(ENTRY)
     kind = "one file" if onefile else "folder"
