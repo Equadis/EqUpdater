@@ -761,6 +761,10 @@ class TestAppStarts(unittest.TestCase):
                         launcher = shade.winfo_children()[0]
                         self.assertLessEqual(bottom(app._env_vars_box),
                                              bottom(launcher))
+                        # A key goes to the window with the focus: with the
+                        # game (or anything) in front, it would go nowhere.
+                        app.focus_force()
+                        app.update()
                         app.event_generate("<Escape>")    # closes the panel...
                         app.update()
                         self.assertIsNone(app._launcher_overlay)
