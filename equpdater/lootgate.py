@@ -188,7 +188,7 @@ def exe_state(exe_path: str) -> bool | None:
 
 def exe_complete(exe_path: str, enabled: bool) -> bool:
     """Whether the Shift path matches ``enabled`` too. OctoLauncher, and
-    EqUpdater before 2.1.5, set only the two branches."""
+    the first EqUpdater 2.1.4 builds, set only the two branches."""
     try:
         with open(exe_path, "rb") as f:
             return _shift_byte(f) == (JMP if enabled else JZ)
