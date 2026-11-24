@@ -359,6 +359,95 @@ class TestModsPage(Base):
         self.assertFalse(d.open)
 
 
+class TestAddonsPage(Base):
+    N = 80
+
+    def open_page(self):
+        os.environ["EQU3_FAKE_ADDONS"] = str(self.N)
+        self.addCleanup(os.environ.pop, "EQU3_FAKE_ADDONS", None)
+        p = self.start()
+        names = [i.objectName() for i in walk(self.win.property("contentItem"))]
+        self.assertNotIn("addonsPanel", names)        # an unopened page allocates nothing
+        p["app"].tab = "addons"
+        pump(until=lambda: p["addons"].model.rowCount() > 0, limit=6000)
+        pump(300)
+        self.assertEqual(self.qml_errors(), [])
+        return p
+
+    def test_renders_in_every_skin_and_the_list_is_virtualised(self):
+        p = self.open_page()
+        lm = p["addons"].model
+        self.assertEqual(lm.rowCount(), 3 + self.N)
+        lv = self.lst("addonsList")
+        made = len([c for c in lv.property("contentItem").childItems()
+                    if c.property("height")])
+        self.assertLess(made, 30, "only the visible rows (plus a buffer) exist as items")
+        for sid in p["manager"].skins:
+            p["settings_bridge"].setSkin(sid)
+            pump(200)
+        self.assertEqual(self.qml_errors(), [])
+
+    def test_one_addon_changing_repaints_one_row(self):
+        p = self.open_page()
+        lm, svc = p["addons"].model, p["addons_service"]
+        before = dict(lm.stats)
+        folder = next(f for f, r in p["host"]._addons_status["addons"].items()
+                      if r["status"] == "upToDate")
+        p["host"]._addons_status["addons"][folder]["status"] = "updateAvailable"
+        svc.rebuild()
+        pump(until=lambda: lm.stats["changed"] > before["changed"], limit=4000)
+        pump(100)
+        a = lm.stats
+        self.assertEqual(a["changed"] - before["changed"], 1)
+        self.assertEqual((a["inserted"], a["removed"], a["resets"]),
+                         (before["inserted"], before["removed"], before["resets"]))
+
+    def test_installing_one_addon_moves_one_row_between_sections_without_a_reset(self):
+        p = self.open_page()
+        lm, svc = p["addons"].model, p["addons_service"]
+        st = p["host"]._addons_status
+        rec = st["available"].pop(0)
+        st["addons"][rec["folder"]] = dict(rec, status="upToDate", toc=rec["toc"])
+        before = dict(lm.stats)
+        svc.rebuild()
+        pump(until=lambda: lm.stats["moved"] > before["moved"] or lm.stats["resets"] > before["resets"], limit=4000)
+        pump(100)
+        self.assertEqual(lm.stats["resets"], before["resets"])
+        self.assertGreaterEqual(lm.stats["moved"] - before["moved"], 1)
+        self.assertEqual(lm.rowCount(), 3 + self.N)
+
+    def test_search_filters_without_touching_the_network_or_other_state(self):
+        p = self.open_page()
+        lm = p["addons"].model
+        folder = next(iter(p["host"]._addons_status["addons"]))
+        p["addons"].setFilter(folder.lower())
+        pump(until=lambda: lm.rowCount() < 10, limit=4000)
+        rows = [lm.index(i).data(Qt.ItemDataRole.UserRole + 3) for i in range(lm.rowCount())]
+        self.assertIn(folder, rows)
+        p["addons"].setFilter("")
+        pump(until=lambda: lm.rowCount() == 3 + self.N, limit=4000)
+
+    def test_scroll_position_survives_an_update(self):
+        p = self.open_page()
+        lv = self.lst("addonsList")
+        lv.setProperty("contentY", 400)
+        pump(100)
+        folder = next(f for f, r in p["host"]._addons_status["addons"].items()
+                      if r["status"] == "upToDate")
+        p["host"]._addons_status["addons"][folder]["status"] = "modified"
+        p["addons_service"].rebuild()
+        pump(400)
+        self.assertAlmostEqual(lv.property("contentY"), 400, delta=1)
+
+    def test_search_box_exists_and_collapsing_keeps_the_filter(self):
+        p = self.open_page()
+        names = [i.objectName() for i in walk(self.win.property("contentItem"))]
+        self.assertIn("addonSearch", names)
+        p["addons"].toggleSection("AVAILABLE")
+        pump(until=lambda: p["addons"].model.rowCount() < 3 + self.N, limit=4000)
+        self.assertEqual(p["addons"].model.stats["resets"], 0)
+
+
 class TestOffline(Base):
     def test_offline_shows_cache_and_an_error_not_an_empty_page(self):
         p = self.start()

@@ -135,11 +135,20 @@ def icon_check(color):
     return finish(im)
 
 
+def icon_swap(color):
+    im, d = canvas()
+    d.line((10 * K, 22 * K, 50 * K, 22 * K), fill=color, width=6 * K)
+    d.polygon([(44 * K, 10 * K), (58 * K, 22 * K), (44 * K, 34 * K)], fill=color)
+    d.line((14 * K, 44 * K, 54 * K, 44 * K), fill=color, width=6 * K)
+    d.polygon([(20 * K, 32 * K), (6 * K, 44 * K), (20 * K, 56 * K)], fill=color)
+    return finish(im)
+
+
 def write_icons(skin, color, extra=True):
     icons = {"refresh": icon_refresh, "settings": icon_settings,
              "arrow-down": icon_arrow_down, "download": icon_download,
              "remove": icon_remove, "release": icon_release, "link": icon_link,
-             "check": icon_check}
+             "check": icon_check, "swap": icon_swap}
     if extra:
         icons.update({"support": icon_support, "discord": icon_chat})
     for name, fn in icons.items():

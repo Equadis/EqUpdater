@@ -474,6 +474,139 @@ class TestModsService(unittest.TestCase):
         self.assertLessEqual(self.tasks.started_count, 2)
 
 
+class TestAddonsService(unittest.TestCase):
+    def setUp(self):
+        from equpdater.core.addons_service import AddonsService
+        from equpdater.core.ops_host import OpsHost
+        from equpdater.qtui.testing import fake_addon_status
+        self.d = tempfile.mkdtemp()
+        s = {"game_dir": self.d}
+        settings = type("S", (), {"get": lambda _s, k, d=None: s.get(k, d)})()
+        self.pump = Pump()
+        self.tasks = TaskManager(2, self.pump)
+        self.host = OpsHost(settings)
+        self.host._addons_status = fake_addon_status(40)
+        self.svc = AddonsService(self.host, self.tasks)
+
+    def items(self, flt="", secs=None):
+        return self.svc.build_items(self.svc._snapshot(), flt, secs or {})
+
+    def test_three_sections_cover_every_addon_once(self):
+        items = self.items()
+        heads = [i for i in items if i["kind"] == "header"]
+        self.assertEqual([h["title"] for h in heads],
+                         ["MANAGED", "INSTALLED LOCALLY", "AVAILABLE"])
+        self.assertEqual(sum(h["count"] for h in heads), 40)
+        keys = [i["key"] for i in items]
+        self.assertEqual(len(keys), len(set(keys)))
+
+    def test_search_is_space_and_case_insensitive_and_in_python(self):
+        st = self.host._addons_status
+        name = next(iter(st["addons"]))
+        want = "".join(" " + c if c.isupper() and i else c for i, c in enumerate(name))
+        for q in (name.lower(), name.upper(), want):
+            rows = [i for i in self.items(q) if i["kind"] == "addon"]
+            self.assertIn(name, [r["id"] for r in rows])
+        self.assertEqual([i for i in self.items("zzzz-no-such") if i["kind"] == "addon"], [])
+
+    def test_a_closed_section_has_no_rows_but_keeps_its_count(self):
+        items = self.items(secs={"AVAILABLE": False})
+        self.assertFalse([i for i in items if i["kind"] == "addon" and i["section"] == "AVAILABLE"])
+        self.assertTrue(next(i for i in items if i.get("title") == "AVAILABLE")["count"])
+
+    def test_status_words_follow_the_2x_rules(self):
+        from equpdater.core.addons_service import status_for
+        st = type(self.host)._ADDON_STATES
+        up = status_for({"folder": "A", "status": "updateAvailable", "installed_sha": "a" * 40,
+                         "remote_sha": "b" * 40}, True, [], st)
+        self.assertEqual((up["kind"], up["action"]), ("button", "update"))
+        self.assertIn("→", up["tip"])
+        man = status_for({"folder": "A", "status": "unmanaged", "git": "https://x/y.git"},
+                         True, [], st)
+        self.assertEqual(man["action"], "manage")
+        self.assertEqual(status_for({"folder": "A", "status": "unmanaged"}, True, [], st)["kind"], "none")
+        self.assertEqual(status_for({"folder": "A", "status": "modified"}, True, [], st)["kind"], "info")
+        self.assertEqual(status_for({"folder": "A", "status": "x", "check_failed": "r"}, True, [], st)["action"], "retry")
+        self.assertEqual(status_for({"folder": "A", "status": "downloading"}, True, [], st)["kind"], "busy")
+        self.assertEqual(status_for({"folder": "A", "status": "upToDate", "error": "e"}, True, [], st)["tone"], "error")
+        w = status_for({"folder": "A", "status": "upToDate"}, True, ["Made for client 20000"], st)
+        self.assertIn("Made for client", w["text"])
+
+    def test_missing_dependencies_and_client_warnings(self):
+        from equpdater.core.addons_service import warnings_for
+        rec = {"folder": "X", "toc": {"Interface": "20000", "Dependencies": "Foo, Bar"}}
+        out = warnings_for(rec, True, {"X", "Foo"})
+        self.assertEqual(len(out), 2)
+        self.assertEqual(warnings_for({"folder": "pfUI", "toc": {"Dependencies": "Zed"}}, True, {"pfUI"}), [])
+
+    def test_wow_colour_codes_become_safe_rich_text(self):
+        from equpdater.core.addons_service import title_html
+        out = title_html("|cff33ff99My <b>Addon|r", "F")
+        self.assertIn("&lt;b&gt;", out)
+        self.assertNotIn("<b>", out)
+
+    def test_footer_states(self):
+        text, mode = self.svc.footer()
+        self.assertEqual(mode, "update")
+        self.host._addons_status["state"] = "verifying"
+        self.assertEqual(self.svc.footer()[1], "busy")
+        for r in self.host._addons_status["addons"].values():
+            r["status"] = "upToDate"
+        self.host._addons_status["state"] = "done"
+        self.assertEqual(self.svc.footer()[1], "info")
+
+    def test_clicks_route_to_the_lifted_methods(self):
+        from unittest import mock
+        folder = next(iter(self.host._addons_status["addons"]))
+        h = self.host
+        with mock.patch.object(h, "_addon_apply") as m:
+            self.svc.click_status(folder, "update")
+            self.assertEqual(m.call_args[0][0][0]["folder"], folder)
+        with mock.patch.object(h, "_addon_adopt") as m:
+            self.svc.click_status(folder, "manage")
+            self.assertEqual(m.call_args[0][0]["folder"], folder)
+        with mock.patch.object(h, "_addons_verify") as m:
+            self.svc.click_status(folder, "retry")
+            m.assert_called_once_with(force=True)
+        with mock.patch.object(h, "_addon_remove") as m:
+            self.svc.remove(folder)
+            m.assert_called_once_with(folder)
+
+    def test_no_question_is_asked_when_the_addon_folders_are_fine(self):
+        """A host that asked 'Two addon folders?' on every verify hung the Qt
+        page (a dialog nobody could answer); the real check runs first."""
+        from equpdater.core.ops_host import AutoDialogs
+        self.host.dialogs = AutoDialogs()
+        self.assertFalse(self.host._addon_dir_conflict_prompt(self.d))
+        self.assertEqual(self.host.dialogs.asked, [])
+
+    def test_two_addon_folders_ask_once_and_cancel_changes_nothing(self):
+        """(The case-only duplicate cannot exist on Windows, so the scan result
+        is supplied; the asking and the 'decide later' answer are the logic.)"""
+        from types import SimpleNamespace
+        from unittest import mock
+        from equpdater import gamepaths
+        from equpdater.core.ops_host import AutoDialogs
+        state = gamepaths.AddonDirState(
+            path=os.path.join(self.d, "Interface", "AddOns"),
+            conflicts=[("Same", os.path.join(self.d, "Interface", "Addons", "Same"),
+                        os.path.join(self.d, "Interface", "AddOns", "Same"))])
+        self.host.dialogs = AutoDialogs()                # answers None: decide later
+        with mock.patch.object(gamepaths, "prepare_addons_dir", return_value=state),                 mock.patch.object(gamepaths, "resolve_conflicts") as resolve:
+            self.assertFalse(self.host._addon_dir_conflict_prompt(self.d))
+            self.assertFalse(self.host._addon_dir_conflict_prompt(self.d))
+            resolve.assert_not_called()
+        self.assertEqual([a[0] for a in self.host.dialogs.asked], ["yes_no_cancel"])
+
+    def test_badge_counts_only_proven_updates(self):
+        got = []
+        self.host.events = lambda n, **kw: got.append((n, kw))
+        self.host._refresh_addons_badge()
+        want = sum(1 for r in self.host._addons_status["addons"].values()
+                   if r["status"] == "updateAvailable")
+        self.assertEqual([kw["count"] for n, kw in got if n == "addons_badge"], [want])
+
+
 class TestPatchExeSafety(unittest.TestCase):
     """The 0-byte WoW.exe found on a dev machine: a bad cached base must never
     be written over the game."""

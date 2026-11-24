@@ -67,3 +67,26 @@ python tools/bench/bg_bench.py --assets <dir with candidates> --seconds 30 --out
 
 ## Acceptance targets (ARCHITECTURE.md §7) after the proof of concept
 Met: tab switch ≤ 100 ms, no network on scroll, expand "immediate", idle CPU ≈ 0 with animation off (and ≈ 0.3 % with it on), skin switch without restart, scroll p99 within a frame at ~144 swaps/s. **Not met: interactive ≈ 1.0 s (1.25 s), idle memory ≤ 2.x (192 vs 98 MB).** Not yet measured: 8 h soak, repeated skin/tab churn for leaks, large addon lists (page not migrated), HiDPI, Linux.
+
+
+## Addons page: 10, 50, 100 and 250 addons (`tools/bench/addons_bench.py`)
+Real GPU scene, one process per size, synthetic addons (no disk, no network), Bubbles and Minimal Dark, Windows 10, same machine as above. Raw data: `bench-results/addons.json`, `addons-minimal-dark.json`. Small samples (one 4 s scroll per size): read differences under ~30 % as noise; the first run of a session also pays shader/cache warm-up (the 410 ms "open" at N=10).
+
+| Addons | Rows | Delegates alive | Open page | Scroll p50 / p99 frame | Frames > 33 ms | Filter (type) | Filter (clear) | One addon changes | Rows repainted | Memory added by the page |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 10 | 13 | 14 | ~30 ms | 11 / 23 ms (list too short to scroll) | 0 | 9 ms | 8 ms | 8 ms | 1 | 61 MB |
+| 50 | 53 | 17 | 30 ms | 11 / 22 ms | 0 | 7 ms | 11 ms | 9 ms | 1 | 70 MB |
+| 100 | 103 | 18 | 32 ms | 11 / 25 ms | 2 | 7 ms | 16 ms | 10 ms | 1 | 71 MB |
+| 250 | 253 | 18 | 35 ms | 6 / 23 ms | 2 | 11 ms | 23 ms | 11 ms | 1 | 72 MB |
+(Minimal Dark shown; Bubbles is within noise: 250 addons p50 11 ms, p99 24 ms, 0 frames over 33 ms.)
+
+* Cost does **not** grow with the number of addons: delegates alive stay at 14-18, page memory is flat (~60-70 MB incl. the page's textures), building all rows in Python takes 0.6 ms (10) to 7 ms (250) on a worker, a changed addon repaints exactly one row with no insert, remove or reset (asserted in `test_v3_qt.TestAddonsPage`), and the search runs in Python on a snapshot.
+* **Scroll frame times** are gaps between presented frames while the whole list is scrolled down and up in 4 s (about 3,000 px/s, far faster than a mouse wheel). The scene presents at 100+ fps unthrottled here, so "p50 11 ms" means frames are not the limit; a handful of frames over 33 ms per 500 remain at 100 and 250 addons (first appearance of a delegate type, GC); not zero, not yet explained.
+
+### What the first runs found (fixed)
+| Version of the page | 250 addons: scroll p50 | memory added | notes |
+|---|---|---|---|
+| a `Loader` and a fresh delegate per row, a `ToolTip` popup built per icon | 83 ms (12 fps), 41 frames > 33 ms | 190 MB (152 -> 342) | each delegate created ~40 objects incl. 5-6 hidden popups; creation was the cost, and it grew with the distance scrolled |
+| tooltips created only while hovered | 83 ms | 160 MB | removed the popups, not the creation cost |
+| **pooled delegates** (`reuseItems: true`, `DelegateChooser`, one component per row type) | **8.6 ms**, 3 frames > 33 ms | **70 MB** | delegates are recycled; only the model roles change |
+The same applies to any long list in the app: use `reuseItems` with a chooser, build popups lazily. (Mods and News still use the older pattern; both are short and measured fine, to be converted with the 3.0 list audit in Phase 7.)

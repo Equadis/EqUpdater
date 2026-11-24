@@ -15,3 +15,4 @@ VideoLayer 1.0 VideoLayer.qml
 SkinNumberField 1.0 SkinNumberField.qml
 SkinIconButton 1.0 SkinIconButton.qml
 SkinToolTipArea 1.0 SkinToolTipArea.qml
+SkinSearchField 1.0 SkinSearchField.qml

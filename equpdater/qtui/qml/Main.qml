@@ -99,6 +99,7 @@ Window {
                 source: modelData.id === "news" ? "pages/NewsPage.qml"
                       : modelData.id === "tweaks" ? "pages/TweaksPage.qml"
                       : modelData.id === "mods" ? "pages/ModsPage.qml"
+                      : modelData.id === "addons" ? "pages/AddonsPage.qml"
                       : "pages/PlaceholderPage.qml"
                 onLoaded: if (item.pageName !== undefined) item.pageName = app.t(modelData.label)
             }

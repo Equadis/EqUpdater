@@ -1,0 +1,113 @@
+{
+ "skin": "minimal-dark",
+ "results": [
+  {
+   "n": 10,
+   "skin": "minimal-dark",
+   "rss_before_mb": 120,
+   "build_ms": 0.6,
+   "open_ms": 31.4,
+   "rows": 13,
+   "items_alive": 14,
+   "scroll": {
+    "n": 332,
+    "p50_ms": 11.12,
+    "p95_ms": 17.16,
+    "p99_ms": 22.75,
+    "max_ms": 28.34,
+    "over_16ms": 30,
+    "over_33ms": 0,
+    "content_px": 233
+   },
+   "scrollable": true,
+   "filter_ms": 9.1,
+   "filter_rows": 4,
+   "filter_clear_ms": 8.0,
+   "update_ms": 8.2,
+   "rows_changed": 1,
+   "structure_changes": 0,
+   "rss_after_mb": 181
+  },
+  {
+   "n": 50,
+   "skin": "minimal-dark",
+   "rss_before_mb": 121,
+   "build_ms": 1.57,
+   "open_ms": 30.0,
+   "rows": 53,
+   "items_alive": 17,
+   "scroll": {
+    "n": 340,
+    "p50_ms": 11.11,
+    "p95_ms": 17.17,
+    "p99_ms": 22.31,
+    "max_ms": 32.97,
+    "over_16ms": 26,
+    "over_33ms": 0,
+    "content_px": 2265
+   },
+   "scrollable": true,
+   "filter_ms": 6.9,
+   "filter_rows": 5,
+   "filter_clear_ms": 10.6,
+   "update_ms": 8.8,
+   "rows_changed": 1,
+   "structure_changes": 0,
+   "rss_after_mb": 191
+  },
+  {
+   "n": 100,
+   "skin": "minimal-dark",
+   "rss_before_mb": 121,
+   "build_ms": 3.16,
+   "open_ms": 31.8,
+   "rows": 103,
+   "items_alive": 18,
+   "scroll": {
+    "n": 333,
+    "p50_ms": 11.17,
+    "p95_ms": 17.53,
+    "p99_ms": 24.83,
+    "max_ms": 39.97,
+    "over_16ms": 25,
+    "over_33ms": 2,
+    "content_px": 4655
+   },
+   "scrollable": true,
+   "filter_ms": 7.0,
+   "filter_rows": 5,
+   "filter_clear_ms": 16.2,
+   "update_ms": 9.6,
+   "rows_changed": 1,
+   "structure_changes": 0,
+   "rss_after_mb": 192
+  },
+  {
+   "n": 250,
+   "skin": "minimal-dark",
+   "rss_before_mb": 122,
+   "build_ms": 6.19,
+   "open_ms": 34.9,
+   "rows": 253,
+   "items_alive": 18,
+   "scroll": {
+    "n": 565,
+    "p50_ms": 6.09,
+    "p95_ms": 11.51,
+    "p99_ms": 22.93,
+    "max_ms": 34.07,
+    "over_16ms": 12,
+    "over_33ms": 2,
+    "content_px": 12005
+   },
+   "scrollable": true,
+   "filter_ms": 11.0,
+   "filter_rows": 7,
+   "filter_clear_ms": 23.1,
+   "update_ms": 10.9,
+   "rows_changed": 1,
+   "structure_changes": 0,
+   "rss_after_mb": 194
+  }
+ ]
+}

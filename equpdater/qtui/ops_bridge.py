@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import (QEventLoop, QObject, QTimer, Property, Signal, Slot)
 
+from ..core.addons_service import AddonsService
 from ..core.mods_service import ModsService
 from ..core.ops_host import OpsHost
 from ..i18n import tr
@@ -55,6 +56,15 @@ class DialogBridge(QObject):
         self._loop = None
         return self._result
 
+    @Slot()
+    def cancel(self):
+        """The third answer of a yes/no/cancel question: None."""
+        self._result = None
+        self._open = False
+        self.changed.emit()
+        if self._loop is not None:
+            self._loop.quit()
+
     @Slot(bool)
     def answer(self, ok):
         self._result = bool(ok)
@@ -73,6 +83,9 @@ class QtDialogs:
 
     def ask_ok_cancel(self, title, body, **kw):
         return self.b.ask("ok_cancel", title, body)
+
+    def ask_yes_no_cancel(self, title, body, **kw):
+        return self.b.ask("yes_no_cancel", title, body)
 
     def info(self, title, body, **kw):
         self.b.ask("info", title, body)
@@ -159,6 +172,109 @@ class ModsBridge(QObject):
     @Slot()
     def manageAll(self):
         self.service.manage_all()
+
+    @Slot(str)
+    def openUrl(self, url):
+        self.app.openUrl(url)
+
+
+_ADDON_ROLES = ["key", "kind", "id", "section", "titleHtml", "description",
+                "recommended", "installed", "canRelease", "switch", "switchTip",
+                "statusKind", "statusText", "statusAction", "statusTone",
+                "statusTip", "offersReplace", "problem", "problemSeverity",
+                "repoUrl", "title", "count", "open"]
+
+
+class AddonsBridge(QObject):
+    changed = Signal()
+    footerChanged = Signal()
+    badgeChanged = Signal()
+
+    def __init__(self, service: AddonsService, host: OpsHost, app_bridge):
+        super().__init__()
+        self.service, self.host, self.app = service, host, app_bridge
+        self.lm = KeyedListModel(_ADDON_ROLES)
+        self._footer = ("", "info")
+        self._filter_timer = QTimer(self)
+        self._filter_timer.setSingleShot(True)
+        self._filter_timer.setInterval(150)       # debounce typing
+        self._filter_timer.timeout.connect(self._apply_filter)
+        self._pending_filter = ""
+        service.on_rows = self._rows
+        service.on_footer = self._set_footer
+
+    def _rows(self, items):
+        self.lm.set_items([{**{k: None for k in _ADDON_ROLES}, **it} for it in items])
+        self.changed.emit()
+
+    def _set_footer(self, text, mode):
+        if (text, mode) != self._footer:
+            self._footer = (text, mode)
+            self.footerChanged.emit()
+
+    @Property(QObject, constant=True)
+    def model(self):
+        return self.lm
+
+    @Property(str, notify=footerChanged)
+    def footerText(self):
+        return self._footer[0]
+
+    @Property(str, notify=footerChanged)
+    def footerMode(self):
+        return self._footer[1]
+
+    @Property(int, notify=badgeChanged)
+    def updates(self):
+        return self.host._addon_updates_count
+
+    @Slot()
+    def open(self):
+        self.service.open()
+
+    @Slot(str)
+    def setFilter(self, text):
+        self._pending_filter = text
+        self._filter_timer.start()
+
+    def _apply_filter(self):
+        self.service.set_filter(self._pending_filter)
+
+    @Slot()
+    def recheck(self):
+        self.service.verify(True)
+
+    @Slot(str)
+    def toggleSection(self, title):
+        self.service.toggle_section(title)
+
+    @Slot(str, str)
+    def clickStatus(self, folder, action):
+        self.service.click_status(folder, action)
+
+    @Slot(str)
+    def install(self, folder):
+        self.service.install(folder)
+
+    @Slot(str)
+    def remove(self, folder):
+        self.service.remove(folder)
+
+    @Slot(str)
+    def release(self, folder):
+        self.service.release(folder)
+
+    @Slot(str)
+    def switchSource(self, folder):
+        self.service.switch_source(folder)
+
+    @Slot(str)
+    def forceReplace(self, folder):
+        self.service.force_replace(folder)
+
+    @Slot()
+    def updateAll(self):
+        self.service.update_all()
 
     @Slot(str)
     def openUrl(self, url):

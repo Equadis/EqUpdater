@@ -84,6 +84,9 @@
     },
     "icon.check": {
       "icon": "icons/check.png"
+    },
+    "icon.update": {
+      "icon": "icons/swap.png"
     }
   }
 }

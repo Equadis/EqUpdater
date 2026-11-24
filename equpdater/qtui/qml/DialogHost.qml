@@ -30,15 +30,20 @@ Item {
                 spacing: 10
                 anchors.right: parent.right
                 SkinButton {
-                    visible: dialog.kind === "yes_no" || dialog.kind === "ok_cancel"
+                    visible: dialog.kind === "yes_no" || dialog.kind === "ok_cancel" || dialog.kind === "yes_no_cancel"
                     kind: "button.primary"
-                    text: dialog.kind === "yes_no" ? app.t("Yes") : app.t("OK")
+                    text: dialog.kind === "ok_cancel" ? app.t("OK") : app.t("Yes")
                     onClicked: dialog.answer(true)
                 }
                 SkinButton {
-                    visible: dialog.kind === "yes_no" || dialog.kind === "ok_cancel"
-                    text: dialog.kind === "yes_no" ? app.t("No") : app.t("Cancel")
+                    visible: dialog.kind === "yes_no" || dialog.kind === "ok_cancel" || dialog.kind === "yes_no_cancel"
+                    text: dialog.kind === "ok_cancel" ? app.t("Cancel") : app.t("No")
                     onClicked: dialog.answer(false)
+                }
+                SkinButton {
+                    visible: dialog.kind === "yes_no_cancel"
+                    text: app.t("Cancel")
+                    onClicked: dialog.cancel()
                 }
                 SkinButton {
                     visible: dialog.kind === "info" || dialog.kind === "error"

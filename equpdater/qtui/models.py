@@ -19,7 +19,7 @@ class KeyedListModel(QAbstractListModel):
         self._roles = roles
         self._key = key
         self._items: list = []
-        self.stats = {"inserted": 0, "removed": 0, "changed": 0, "resets": 0}
+        self.stats = {"inserted": 0, "removed": 0, "changed": 0, "resets": 0, "moved": 0}
 
     # -- Qt -------------------------------------------------------------
     def roleNames(self):
@@ -72,11 +72,20 @@ class KeyedListModel(QAbstractListModel):
             self.endInsertRows()
             have.add(it[k])
             self.stats["inserted"] += 1
-        # 3. a kept row that is out of order is moved (rare: section changes)
+        # 3. a kept row that is out of order is *moved* (an addon that was
+        # installed goes from AVAILABLE up to MANAGED): the delegate keeps its
+        # identity, nothing is rebuilt, and the view keeps its position.
         cur = [it[k] for it in self._items]
-        if cur != new_keys:
-            self.reset_items(items)
-            return
+        for pos, key in enumerate(new_keys):
+            if cur[pos] == key:
+                continue
+            src = cur.index(key, pos)
+            # moveRows semantics: destination is the row *before which* it lands
+            self.beginMoveRows(QModelIndex(), src, src, QModelIndex(), pos)
+            self._items.insert(pos, self._items.pop(src))
+            cur.insert(pos, cur.pop(src))
+            self.endMoveRows()
+            self.stats["moved"] += 1
         # 4. same keys, same order: repaint only the rows that differ
         for i, it in enumerate(items):
             if self._items[i] != it:

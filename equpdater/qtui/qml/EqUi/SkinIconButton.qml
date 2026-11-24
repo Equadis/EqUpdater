@@ -30,23 +30,31 @@ Item {
     }
     HoverHandler { id: hover; cursorShape: Qt.PointingHandCursor; enabled: root.enabled }
     TapHandler { enabled: root.enabled; onTapped: root.clicked() }
-    C.ToolTip {
-        id: tt
-        visible: hover.hovered && root.tip !== ""
-        delay: 450
-        text: root.tip
-        readonly property var spec: Style.theme.components["tooltip"]
-        contentItem: Text {
-            text: tt.text
-            wrapMode: Text.Wrap
-            color: Style.pick(tt.spec.textColors, "normal", "#fff")
-            font.family: Style.theme.fonts.dim.family
-            font.pixelSize: Style.theme.fonts.dim.size
-        }
-        background: Rectangle {
-            color: Style.pick(tt.spec.colors, "normal", "#222")
-            border.color: Style.pick(tt.spec.borderColors, "normal", "#444")
-            radius: 3
+    // The tooltip popup is created only while the pointer is over the control:
+    // a Popup per control, built for every delegate that scrolls into view,
+    // was the main cost of scrolling long lists (measured).
+    Loader {
+        active: hover.hovered && root.tip !== ""
+        sourceComponent: Component {
+            C.ToolTip {
+                id: tt
+                visible: true
+                delay: 450
+                text: root.tip
+                readonly property var spec: Style.theme.components["tooltip"]
+                contentItem: Text {
+                    text: tt.text
+                    wrapMode: Text.Wrap
+                    color: Style.pick(tt.spec.textColors, "normal", "#fff")
+                    font.family: Style.theme.fonts.dim.family
+                    font.pixelSize: Style.theme.fonts.dim.size
+                }
+                background: Rectangle {
+                    color: Style.pick(tt.spec.colors, "normal", "#222")
+                    border.color: Style.pick(tt.spec.borderColors, "normal", "#444")
+                    radius: 3
+                }
+            }
         }
     }
 }

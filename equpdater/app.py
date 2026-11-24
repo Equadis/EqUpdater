@@ -5159,6 +5159,10 @@ class EqUpdaterApp(ModsRows, AddonsOps, ModsOps, tk.Tk):
         from tkinter import messagebox
         return messagebox.askyesno(title, body, parent=self, **kw)
 
+    def _ask_yes_no_cancel(self, title, body, **kw):
+        from tkinter import messagebox
+        return messagebox.askyesnocancel(title, body, parent=self, **kw)
+
     def _ask_ok_cancel(self, title, body, **kw):
         from tkinter import messagebox
         return messagebox.askokcancel(title, body, parent=self, **kw)
@@ -5878,52 +5882,6 @@ class EqUpdaterApp(ModsRows, AddonsOps, ModsOps, tk.Tk):
 
     # ── addons engine (app side) ─────────────────────────────────────────────
 
-    def _addon_dir_conflict_prompt(self, client: str) -> bool:
-        """When Interface/AddOns and another case of it (Interface/Addons)
-        both hold different copies of the same addon: ask, once per
-        session, which copies to keep. The others are moved aside, never
-        deleted. Returns True when the scan should wait (the player chose
-        to decide later), False to go on."""
-        try:
-            state = gamepaths.prepare_addons_dir(client)
-        except OSError as e:
-            self._log_line(f"Could not check the addons folder: {e}\n", "err")
-            return False
-        _log_addon_dir_state(state)
-        if not state.conflicts or getattr(self, "_addon_conflict_asked", False):
-            return False
-        self._addon_conflict_asked = True
-        from tkinter import messagebox
-        other = os.path.dirname(state.conflicts[0][1])
-        names = "\n".join("    " + c[0] for c in state.conflicts)
-        choice = messagebox.askyesnocancel(
-            tr("Two addon folders"),
-            tr("This game folder has two addon folders whose names differ only "
-               "in letter case:\n    {other}\n    {addons}\n\nEverything that "
-               "was in only one of them is now in {addons}. These addons are "
-               "in both, with different files:\n{names}\n\nYes: keep the "
-               "copies from {other}.\nNo: keep the copies in {addons}.\n"
-               "Cancel: decide later. Until then {app} installs, updates and "
-               "removes no addons.\n\nThe copies you do not keep are moved "
-               "into an AddOns-conflicts folder next to them, not deleted.",
-               other=other, addons=state.path, names=names,
-               app=branding.APP_NAME),
-            icon="warning", parent=self)
-        if choice is None:
-            self._log_line("Addon changes are paused until the two addon "
-                           "folders are resolved (ADDONS tab, Check for "
-                           "updates, asks again after a restart).\n", "err")
-            return False
-        try:
-            aside, moved = gamepaths.resolve_conflicts(
-                client, "other" if choice else "addons")
-        except OSError as e:
-            self._log_line(f"Could not resolve the addon folders: {e}\n", "err")
-            return False
-        _ADDON_CONFLICT_LOGGED[:] = []
-        for entry in moved:
-            self._log_line(f"Moved {entry} aside to {aside}\n", "ok")
-        return False
 
 
 
@@ -6688,30 +6646,6 @@ class EqUpdaterApp(ModsRows, AddonsOps, ModsOps, tk.Tk):
         tk.Frame(f, bg=C_DIVIDER, height=self._px(1)).pack(
             fill="x", pady=(self._px(3), 0))
 
-    #: Addon status -> (label, colour, tooltip). Anything that is not an
-    #: offer to act reads as plain text in a muted colour: a state the user
-    #: cannot act on is not drawn to look like a button.
-    _ADDON_STATES = {
-        "localNewer":      (N_("Local version newer"), "#d4b43c",
-                            N_("The installed commit is ahead of the source's. "
-                            "EqUpdater will not roll it back.")),
-        "modified":        (N_("Modified locally"), "#d4b43c",
-                            N_("These files differ from the ones EqUpdater "
-                            "installed. Automatic updates are held back so "
-                            "your changes survive.")),
-        "differentSource": (N_("Different source"), "#d4b43c",
-                            N_("Installed from a different repository than the "
-                            "one now recommended. Switching forks is a "
-                            "choice, not an update.")),
-        "diverged":        (N_("Different revision"), "#d4b43c",
-                            N_("The installed commit and the remote one do not contain each other – another branch, a fork, or rebased history.")),
-        "unverifiable":    (N_("Unable to verify"), C_TEXT_DIM,
-                            N_("Which side is newer could not be established, "
-                            "so nothing is replaced.")),
-        "ignored":         (N_("Ignored"), C_TEXT_DIM,
-                            N_("Excluded from updates at your request.")),
-        "unknown":         (N_("Not versioned"), C_TEXT_DIM, ""),
-    }
 
     def _addon_row_status(self, row, rec, installed, warnings):
         """The right-hand end of an addon row: what it is, and what may be

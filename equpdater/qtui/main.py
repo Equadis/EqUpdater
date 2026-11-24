@@ -13,6 +13,7 @@ Test/benchmark hooks (environment, all optional):
     EQU3_NEWS_FIXTURE    serve news from a JSON fixture (no network)
     EQU3_FAKE_SITE       same fixture, served as forum HTML to the real parsers
     EQU3_OFFLINE=1       every request fails (offline behaviour)
+    EQU3_FAKE_ADDONS=N   N synthetic addons in the Addons page (no disk/network)
     EQU3_SKIN=<id>       override the saved skin for this run
 """
 
@@ -38,6 +39,7 @@ from ..core.tasks import TaskManager                         # noqa: E402
 from ..core.tweaks_service import TweaksService              # noqa: E402
 from . import bridge, ops_bridge                             # noqa: E402
 from ..core.mods_service import ModsService                  # noqa: E402
+from ..core.addons_service import AddonsService              # noqa: E402
 
 QML_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "qml")
 
@@ -103,6 +105,8 @@ def build(argv=None):
     host, holder = ops_bridge.make_host(settings, dialog_bridge, app_bridge, dispatcher)
     mods_service = ModsService(host, tasks)
     mods_bridge = ops_bridge.ModsBridge(mods_service, host, app_bridge)
+    addons_service = AddonsService(host, tasks)
+    addons_bridge = ops_bridge.AddonsBridge(addons_service, host, app_bridge)
 
     def on_event(name, kw):
         if name in ("mods_rows", "mods_finished"):
@@ -110,11 +114,21 @@ def build(argv=None):
         elif name == "mods_badge":
             app_bridge.setModUpdates(kw["count"])
             mods_bridge.badgeChanged.emit()
+        elif name in ("addons_rows", "addons_footer"):
+            addons_service.rebuild()
+        elif name == "addons_badge":
+            app_bridge.setAddonUpdates(kw["count"])
+            addons_bridge.badgeChanged.emit()
         elif name == "busy":
             app_bridge.setBusy(kw["on"])
         elif name == "status_error":
             app_bridge.setStatus(kw["text"], True)
     holder["handler"] = on_event
+    if os.environ.get("EQU3_FAKE_ADDONS"):
+        from .testing import fake_addon_status
+        import time as _t
+        host._addons_status = fake_addon_status(int(os.environ["EQU3_FAKE_ADDONS"]))
+        host._addons_verified_ts = _t.time() + 3600      # the TTL keeps verify from rescanning
     launch_service = LaunchService(settings)
     launch_bridge = bridge.LaunchBridge(launch_service, tasks, app_bridge)
 
@@ -130,11 +144,13 @@ def build(argv=None):
     for name, obj in (("app", app_bridge), ("skin", skin_bridge),
                       ("settings", settings_bridge), ("news", news_bridge),
                       ("tweaks", tweaks_bridge), ("launch", launch_bridge),
-                      ("mods", mods_bridge), ("dialog", dialog_bridge)):
+                      ("mods", mods_bridge), ("addons", addons_bridge),
+                      ("dialog", dialog_bridge)):
         ctx.setContextProperty(name, obj)
     marks["objects_ready_ms"] = round((time.perf_counter() - _T0) * 1000)
 
-    parts = dict(mods=mods_bridge, mods_service=mods_service, host=host,
+    parts = dict(addons=addons_bridge, addons_service=addons_service,
+                 mods=mods_bridge, mods_service=mods_service, host=host,
                  dialog=dialog_bridge, tweaks=tweaks_bridge, settings=settings, tasks=tasks, news=news_bridge,
                  launch=launch_bridge, app=app_bridge, skin=skin_bridge,
                  settings_bridge=settings_bridge, marks=marks, fetcher=fetcher,

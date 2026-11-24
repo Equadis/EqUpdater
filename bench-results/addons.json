@@ -1,0 +1,113 @@
+{
+ "skin": "bubbles",
+ "results": [
+  {
+   "n": 10,
+   "skin": "bubbles",
+   "rss_before_mb": 153,
+   "build_ms": 0.54,
+   "open_ms": 409.6,
+   "rows": 13,
+   "items_alive": 14,
+   "scroll": {
+    "n": 277,
+    "p50_ms": 11.58,
+    "p95_ms": 28.6,
+    "p99_ms": 45.61,
+    "max_ms": 77.8,
+    "over_16ms": 73,
+    "over_33ms": 7,
+    "content_px": 233
+   },
+   "scrollable": true,
+   "filter_ms": 10.6,
+   "filter_rows": 4,
+   "filter_clear_ms": 14.5,
+   "update_ms": 5.9,
+   "rows_changed": 1,
+   "structure_changes": 0,
+   "rss_after_mb": 212
+  },
+  {
+   "n": 50,
+   "skin": "bubbles",
+   "rss_before_mb": 152,
+   "build_ms": 1.77,
+   "open_ms": 38.7,
+   "rows": 53,
+   "items_alive": 17,
+   "scroll": {
+    "n": 386,
+    "p50_ms": 9.18,
+    "p95_ms": 20.96,
+    "p99_ms": 34.19,
+    "max_ms": 73.37,
+    "over_16ms": 53,
+    "over_33ms": 4,
+    "content_px": 2265
+   },
+   "scrollable": true,
+   "filter_ms": 11.5,
+   "filter_rows": 5,
+   "filter_clear_ms": 14.6,
+   "update_ms": 11.6,
+   "rows_changed": 1,
+   "structure_changes": 0,
+   "rss_after_mb": 219
+  },
+  {
+   "n": 100,
+   "skin": "bubbles",
+   "rss_before_mb": 153,
+   "build_ms": 2.82,
+   "open_ms": 38.7,
+   "rows": 103,
+   "items_alive": 18,
+   "scroll": {
+    "n": 445,
+    "p50_ms": 6.98,
+    "p95_ms": 18.05,
+    "p99_ms": 24.08,
+    "max_ms": 29.98,
+    "over_16ms": 41,
+    "over_33ms": 0,
+    "content_px": 4655
+   },
+   "scrollable": true,
+   "filter_ms": 7.1,
+   "filter_rows": 5,
+   "filter_clear_ms": 15.4,
+   "update_ms": 9.3,
+   "rows_changed": 1,
+   "structure_changes": 0,
+   "rss_after_mb": 221
+  },
+  {
+   "n": 250,
+   "skin": "bubbles",
+   "rss_before_mb": 153,
+   "build_ms": 5.25,
+   "open_ms": 37.6,
+   "rows": 253,
+   "items_alive": 18,
+   "scroll": {
+    "n": 332,
+    "p50_ms": 11.15,
+    "p95_ms": 18.2,
+    "p99_ms": 23.99,
+    "max_ms": 30.42,
+    "over_16ms": 36,
+    "over_33ms": 0,
+    "content_px": 12005
+   },
+   "scrollable": true,
+   "filter_ms": 10.0,
+   "filter_rows": 7,
+   "filter_clear_ms": 20.5,
+   "update_ms": 14.3,
+   "rows_changed": 1,
+   "structure_changes": 0,
+   "rss_after_mb": 223
+  }
+ ]
+}

@@ -591,9 +591,16 @@ class AppBridge(QObject):
             self._mod_updates = n
             self.countsChanged.emit()
 
+    _addon_updates = 0
+
     @Property(int, notify=countsChanged)
     def addonUpdates(self):
-        return 0
+        return self._addon_updates
+
+    def setAddonUpdates(self, n: int):
+        if n != self._addon_updates:
+            self._addon_updates = n
+            self.countsChanged.emit()
 
     @Property(str, constant=True)
     def discordUrl(self):

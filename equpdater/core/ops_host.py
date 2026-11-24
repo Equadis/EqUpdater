@@ -58,6 +58,10 @@ class AutoDialogs:
         self.asked.append(("ok_cancel", title))
         return self.yes
 
+    def ask_yes_no_cancel(self, title, body, **kw):
+        self.asked.append(("yes_no_cancel", title))
+        return None            # "decide later": the safe answer
+
     def info(self, title, body, **kw):
         self.asked.append(("info", title))
 
@@ -165,7 +169,14 @@ class OpsHost(ModsRows, AddonsOps, ModsOps):
         self.events("addons_rows", keep_scroll=keep_scroll)
 
     def _refresh_addons_badge(self):
-        self.events("addons_badge")
+        """Addons that can be safely updated (the nav badge): the Tk window's
+        rule - unmanaged, modified or diverged ones are not pending tasks."""
+        count = sum(1 for r in self._addons_status["addons"].values()
+                    if r["status"] == "updateAvailable")
+        if count != self._addon_updates_count:
+            self._addon_updates_count = count
+        self.events("addons_badge", count=count)
+        self._refresh_update_all_btn()
 
     def _refresh_addons_footer(self):
         self.events("addons_footer")
@@ -198,8 +209,8 @@ class OpsHost(ModsRows, AddonsOps, ModsOps):
     def _ask_essential_mods(self, mods) -> bool:
         return bool(self.dialogs.ask_yes_no("essential", str([m["name"] for m in mods])))
 
-    def _addon_dir_conflict_prompt(self, client: str) -> bool:
-        return bool(self.dialogs.ask_yes_no("addon_dir_conflict", client))
+    def _ask_yes_no_cancel(self, title, body, **kw):
+        return self.dialogs.ask_yes_no_cancel(title, body, **kw)
 
     def _update_all_preview(self, plans) -> bool:
         return bool(self.dialogs.ask_yes_no("update_all", str(len(plans))))
