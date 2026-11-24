@@ -89,6 +89,71 @@ Item {
                 Rectangle { width: parent.width; height: 1
                             color: Style.pick(Style.theme.components["divider"].colors, "normal", "#444") }
 
+                // ── ANTIVIRUS (Windows) ─────────────────────────────────
+                Column {
+                    visible: general.isWindows
+                    width: parent.width
+                    spacing: 6
+                    SkinText { kind: "text.heading"; text: app.t("ANTIVIRUS") }
+                    SkinButton {
+                        objectName: "defenderButton"
+                        kind: "button.small"
+                        text: app.t("Exclude from Defender")
+                        onClicked: root.folderError = general.excludeFromDefender()
+                        SkinToolTipArea { tip: app.t("Asks Windows to stop scanning the game folder. Antivirus can wrongly block mods. Windows asks you to confirm.") }
+                    }
+                    Rectangle { width: parent.width; height: 1
+                                color: Style.pick(Style.theme.components["divider"].colors, "normal", "#444") }
+                }
+
+                // ── GAME LAUNCHER (Linux) ───────────────────────────────
+                Column {
+                    visible: general.hasLauncher
+                    objectName: "launcherSection"
+                    width: parent.width
+                    spacing: 6
+                    SkinText { kind: "text.heading"; text: app.t("GAME LAUNCHER") }
+                    SkinText { kind: "text.body"; text: app.t("Launch command") }
+                    SkinSearchField {
+                        objectName: "launchCommandField"
+                        width: parent.width
+                        text: general.launcher.launch_command
+                        placeholder: "umu-run {exe}"
+                        onEdited: function (t) { general.setLauncher("launch_command", t) }
+                    }
+                    SkinText { width: parent.width; kind: "text.dim"; wrapMode: Text.Wrap
+                               text: app.t("Leave empty to use Wine, or UMU if Wine is not installed. {exe} stands for the game's path; without it, the path is added at the end.") }
+                    SkinText { kind: "text.body"; text: app.t("Wine prefix") }
+                    SkinSearchField {
+                        objectName: "winePrefixField"
+                        width: parent.width
+                        text: general.launcher.wine_prefix
+                        onEdited: function (t) { general.setLauncher("wine_prefix", t) }
+                    }
+                    SkinText { width: parent.width; kind: "text.dim"; text: general.runnerText; wrapMode: Text.Wrap }
+                    SkinText { kind: "text.body"; text: app.t("Environment variables") }
+                    Rectangle {
+                        width: parent.width; height: 70
+                        color: Style.pick(Style.theme.components["input"].colors, "normal", "#222")
+                        border.color: Style.pick(Style.theme.components["input"].borderColors, "normal", "#555")
+                        TextEdit {
+                            objectName: "envVarsField"
+                            anchors { fill: parent; margins: 6 }
+                            text: general.launcher.env_vars
+                            font.family: "Consolas"; font.pixelSize: 12
+                            color: Style.pick(Style.theme.components["input"].textColors, "normal", "#fff")
+                            selectByMouse: true
+                            onTextChanged: if (text !== general.launcher.env_vars) general.setLauncher("env_vars", text)
+                        }
+                    }
+                    SkinText { width: parent.width; kind: "text.dim"; wrapMode: Text.Wrap
+                               text: app.t("Optional. One NAME=value per line, given only to the game when PLAY starts it – for example DXVK_HUD=fps.") }
+                    SkinText { visible: general.envProblems !== ""; width: parent.width; kind: "text.error"
+                               wrapMode: Text.Wrap; text: general.envProblems }
+                    Rectangle { width: parent.width; height: 1
+                                color: Style.pick(Style.theme.components["divider"].colors, "normal", "#444") }
+                }
+
                 // ── GENERAL ────────────────────────────────────────────
                 SkinText { kind: "text.heading"; text: app.t("GENERAL") }
                 SkinCheckBox { text: app.t("Clear WDB on game launch")

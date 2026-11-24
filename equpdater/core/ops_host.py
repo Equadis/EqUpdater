@@ -34,6 +34,7 @@ from .mods_rows import ModsRows
 from .mpq_ops import MPQ_PATCHES
 from .mpq_page_ops import MpqPageOps
 from .settings_ops import SettingsOps
+from .av_ops import AntivirusOps
 from .launch_ops import LaunchOps
 
 
@@ -81,7 +82,7 @@ class AutoDialogs:
         self.asked.append(("error", title))
 
 
-class OpsHost(LaunchOps, SettingsOps, MpqPageOps, ModsRows, AddonsOps, ModsOps):
+class OpsHost(AntivirusOps, LaunchOps, SettingsOps, MpqPageOps, ModsRows, AddonsOps, ModsOps):
     def __init__(self, settings, schedule=None, events=None, dialogs=None):
         self.settings = settings
         self._schedule = schedule or (lambda ms, fn, *a: fn(*a))
@@ -246,6 +247,12 @@ class OpsHost(LaunchOps, SettingsOps, MpqPageOps, ModsRows, AddonsOps, ModsOps):
         self.events("mpq_badge", count=self._mpq_updates_count)
 
     def _refresh_update_all_btn(self):
+        """As the Tk button did: the run is over once nothing is busy and no
+        chained addon step is waiting; the view follows through an event."""
+        busy = (self._btn_mode == "busy" or self._addons_busy
+                or getattr(self, "_running", False))
+        if self._update_all_running and not busy and not self._update_all_chain:
+            self._update_all_running = False
         self.events("update_all")
 
     def _update_all_count(self) -> int:

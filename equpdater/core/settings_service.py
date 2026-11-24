@@ -16,7 +16,9 @@ import os
 
 from .. import branding, i18n, platforms
 from ..config import load_config, update_config
+from ..i18n import tr
 from . import logsink
+from .av_ops import LauncherSettings
 from .ops_host import OpsHost
 
 #: font override -> (family, size scale). "" means: the skin's own fonts.
@@ -104,6 +106,18 @@ class GeneralService:
         self.host._game_folder_changed(path)          # lifted: wipes folder-scoped state
         self.settings.set("game_dir", path)
         self.host.events("game_dir_changed")
+        self.host._offer_av_exclusion()               # once per folder, Windows only
+        return ""
+
+    launcher = LauncherSettings
+
+    def exclude_from_defender(self) -> str:
+        """Settings button: ask Windows to exclude the game folder. "" or why not."""
+        if not platforms.WINDOWS:
+            return tr("Windows Defender is not used on this system.")
+        if not os.path.isdir(self.game_dir()):
+            return tr("Choose the game folder first.")
+        self.host._allow_through_antivirus()
         return ""
 
     def open_game_dir(self) -> bool:
@@ -129,6 +143,38 @@ class GeneralService:
         locked = i18n.language() in SYSTEM_FONT_LANGUAGES
         return [{"id": k, "family": v[0], "locked": locked and bool(k)}
                 for k, v in FONT_OVERRIDES.items()]
+
+    def language_choices(self) -> list:
+        from .tweaks import DEFAULT_LOCALE, LOCALES, load_tweaks_config
+        current = load_tweaks_config().get("locale", DEFAULT_LOCALE)
+        return [{"code": c, "label": label, "current": c == current}
+                for c, (_i, label) in LOCALES.items()]
+
+    def needs_language_prompt(self) -> bool:
+        """A first run (nothing imported from 2.x, never asked) or 2.x's
+        support flag ``ask_language``; asked once."""
+        if os.environ.get("EQUPDATER_NO_LANGUAGE_PROMPT"):
+            return False
+        if load_config().get("ask_language"):
+            return True
+        return not (self.settings.get("language_asked") or self.settings.get("imported_from_2x"))
+
+    def choose_language(self, code: str) -> bool:
+        """The first-run choice is the Language tweak (EqUpdater's text now, the
+        game's at the next patch). Returns True when EqUpdater restarts to show it."""
+        from .tweaks import DEFAULT_LOCALE, LOCALES, load_tweaks_config, save_tweaks_config
+        self.settings.set("language_asked", True)
+        update_config(lambda c: c.pop("ask_language", None))
+        if code not in LOCALES:
+            return False
+        tweaks = load_tweaks_config()
+        if tweaks.get("locale", DEFAULT_LOCALE) != code:
+            tweaks["locale"] = code
+            save_tweaks_config(tweaks)
+        if i18n.ui_language(code) != i18n.language():
+            self.host._restart()
+            return True
+        return False
 
     def language_label(self) -> str:
         from .tweaks import LOCALES

@@ -165,6 +165,8 @@ def build(argv=None):
             launch_bridge.setMode(kw["mode"], kw.get("label", ""))
         elif name == "busy":
             app_bridge.setBusy(kw["on"] and kw.get("label") != "PLAY")
+        elif name == "update_all":
+            app_bridge.busyChanged.emit()           # the footer arrow becomes a spinner
         elif name == "diag_changed":
             diag_bridge.refresh_from_disk()
         elif name == "launch_menu":
@@ -225,7 +227,10 @@ def build(argv=None):
 
 
 def first_run_setup(p):
-    """No game yet and never asked: open "find your game" (it never downloads)."""
+    """First run: the language, then "find your game" (which never downloads)."""
+    if p["general"].promptLanguageIfNeeded():
+        p["general"].afterLanguage = lambda: first_run_setup(p)
+        return
     gd = p["settings"].get("game_dir") or ""
     if (not os.path.isfile(os.path.join(gd, "WoW.exe")) and not p["settings"].get("setup_seen")
             and not os.environ.get("EQU3_NO_SETUP")):

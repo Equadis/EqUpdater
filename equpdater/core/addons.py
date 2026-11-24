@@ -34,6 +34,7 @@ from ..gitcompare import (GIT_HOSTS, Ancestry, ancestry, canonical_repo_url,
 from ..hashing import files_hash, folder_hash
 from ..planner import CAUSE_LOOKUP, Component, plan, skipped_notably, updatable
 from ..states import Action, Plan, Status
+from . import atomic as _atomic
 from .logsink import log
 from .net import ALLOWED_DOWNLOAD_HOSTS, secure_urlopen
 from .errors import (DDOS_CHECK, DdosCheckError, _api_json,
@@ -936,8 +937,7 @@ def patch_pfui_default_profile(client_dir: str):
             txt = f.read()
         txt = re.sub(re.escape(_PFUI_MARK_BEGIN) + r".*?"
                      + re.escape(_PFUI_MARK_END) + r"\n?", "", txt, flags=re.S)
-        with open(profiles_lua, "w", encoding="utf-8") as f:
-            f.write(txt.rstrip() + "\n\n" + block)
+        _atomic.write_text(profiles_lua, txt.rstrip() + "\n\n" + block, encoding="utf-8")
         log("  pfUI: 'Default' profile installed.")
     except OSError as e:
         log(f"  pfUI: could not patch profiles.lua ({e})")
@@ -954,8 +954,7 @@ def patch_pfui_default_profile(client_dir: str):
             if old in pf:
                 pf = pf.replace(
                     old, 'CopyTable(pfUI_profiles["Default"]) or {}', 1)
-                with open(pfui_lua, "w", encoding="utf-8") as f:
-                    f.write(pf)
+                _atomic.write_text(pfui_lua, pf, encoding="utf-8")
                 log("  pfUI: 'Default' set as the fresh-install profile.")
         except OSError as e:
             log(f"  pfUI: could not patch pfUI.lua ({e})")
@@ -1013,8 +1012,7 @@ def patch_pfui_default_profile(client_dir: str):
         fr = fr.replace('pfUI_init.selected_profile or "Modern"',
                         'pfUI_init.selected_profile or "Default"')
 
-        with open(firstrun_lua, "w", encoding="utf-8") as f:
-            f.write(fr)
+        _atomic.write_text(firstrun_lua, fr, encoding="utf-8")
         log("  pfUI: 'Default' added to the firstrun profile picker.")
     except OSError as e:
         log(f"  pfUI: could not patch firstrun.lua ({e})")

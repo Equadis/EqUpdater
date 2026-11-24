@@ -917,4 +917,8 @@ STRINGS = {
         '{count} archivos de descarga sin terminar',
     '{files} files, {mb} MB. Choose an empty folder to put them in.':
         '{files} archivos, {mb} MB. Elige una carpeta vacía donde ponerlos.',
+    'Choose the game folder first.':
+        'Elige primero la carpeta del juego.',
+    'Windows Defender is not used on this system.':
+        'Windows Defender no se usa en este sistema.',
 }

@@ -146,9 +146,17 @@ Window {
             anchors { right: parent.right; rightMargin: win.layout.contentMargin
                       bottom: parent.bottom; bottomMargin: 14 }
             spacing: 14
+            SkinIcon {
+                objectName: "updateAllSpinner"
+                visible: app.updateAllRunning
+                kind: "icon.update"; size: 24
+                anchors.verticalCenter: parent.verticalCenter
+                RotationAnimator on rotation { running: app.updateAllRunning; from: 0; to: 360
+                                               duration: 1200; loops: Animation.Infinite }
+            }
             SkinIconButton {
                 objectName: "updateAllButton"
-                visible: app.updateAllCount > 0 && !app.busy
+                visible: app.updateAllCount > 0 && !app.busy && !app.updateAllRunning
                 kind: "icon.update"
                 tip: app.updateAllCount === 1 ? app.t("Update all addons and mods (1 update available)")
                      : app.t("Update all addons and mods ({count} updates available)").replace("{count}", app.updateAllCount)
@@ -197,5 +205,6 @@ Window {
     DiagnosticsOverlay { anchors.fill: parent; z: 90 }
     CustomOverlay { anchors.fill: parent; z: 90 }
     SetupOverlay { anchors.fill: parent; z: 90 }
+    LanguageOverlay { anchors.fill: parent; z: 95 }
     DialogHost { anchors.fill: parent; z: 100 }
 }

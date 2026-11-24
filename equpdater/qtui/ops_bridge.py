@@ -17,6 +17,7 @@ from ..core.addons_service import AddonsService
 from ..core.mods_service import ModsService
 from ..core.diagnostics_service import DiagnosticsService, scan_lines
 from ..core.custom_service import CustomSourceService
+from .. import platforms
 from ..core import install as I
 from ..core.setup_service import SetupService
 from ..core.mpq_service import MpqService
@@ -433,6 +434,64 @@ class GeneralBridge(QObject):
     autoMods = _toggle("autoMods")
     autoAddons = _toggle("autoAddons")
     del _toggle
+
+    languageChanged = Signal()
+    _lang_open = False
+
+    @Property(bool, notify=languageChanged)
+    def languagePromptOpen(self):
+        return self._lang_open
+
+    @Property("QVariantList", constant=True)
+    def languageChoices(self):
+        return self.service.language_choices()
+
+    @Slot(result=bool)
+    def promptLanguageIfNeeded(self):
+        if self.service.needs_language_prompt():
+            self._lang_open = True
+            self.languageChanged.emit()
+        return self._lang_open
+
+    @Slot(str)
+    def chooseLanguage(self, code):
+        self._lang_open = False
+        self.languageChanged.emit()
+        self.service.choose_language(code)
+        self.changed.emit()
+        if self.afterLanguage:
+            self.afterLanguage()
+
+    afterLanguage = None
+
+    @Property(bool, constant=True)
+    def isWindows(self):
+        return platforms.WINDOWS
+
+    @Property(bool, constant=True)
+    def hasLauncher(self):
+        return self.service.launcher.available()
+
+    @Property("QVariantMap", notify=changed)
+    def launcher(self):
+        return self.service.launcher.values()
+
+    @Property(str, notify=changed)
+    def runnerText(self):
+        return self.service.launcher.runner_text()
+
+    @Property(str, notify=changed)
+    def envProblems(self):
+        return self.service.launcher.env_problems(self.service.launcher.values()["env_vars"])
+
+    @Slot(str, str)
+    def setLauncher(self, key, value):
+        self.service.launcher.set(key, value)
+        self.changed.emit()
+
+    @Slot(result=str)
+    def excludeFromDefender(self):
+        return self.service.exclude_from_defender()
 
     @Property(str, notify=changed)
     def gameDir(self):

@@ -917,4 +917,8 @@ STRINGS = {
         'Незавершённых файлов загрузки: {count}',
     '{files} files, {mb} MB. Choose an empty folder to put them in.':
         'Файлов: {files}, {mb} МБ. Выберите пустую папку для них.',
+    'Choose the game folder first.':
+        'Сначала выберите папку игры.',
+    'Windows Defender is not used on this system.':
+        'Windows Defender в этой системе не используется.',
 }

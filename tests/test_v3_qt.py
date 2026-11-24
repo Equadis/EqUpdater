@@ -783,6 +783,19 @@ class TestUpdateAllButton(Base):
         self.assertTrue(btn.property("visible"))
         p["app"].updateAll()
         self.assertEqual(calls, [1])
+        spin = self.win.findChild(QObject, "updateAllSpinner")
+        self.assertFalse(spin.property("visible"))
+        p["host"]._update_all_running = True           # a run started: arrow becomes a spinner
+        p["host"]._update_all_chain = True
+        p["host"]._refresh_update_all_btn()
+        pump(80)
+        self.assertTrue(spin.property("visible"))
+        self.assertFalse(btn.property("visible"))
+        p["host"]._update_all_chain = False            # nothing busy, no chain: the run is over
+        p["host"]._refresh_update_all_btn()
+        pump(80)
+        self.assertFalse(spin.property("visible"))
+        self.assertTrue(btn.property("visible"))
         p["app"].setBusy(True)
         pump(50)
         self.assertFalse(btn.property("visible"))
@@ -836,6 +849,46 @@ class TestSetupOverlay(Base):
         __import__("equpdater.qtui.main", fromlist=["x"]).first_run_setup(p)                     # asked once: closing it is the answer
         self.assertFalse(p["setup"].isOpen)
         self.assertTrue(p["settings"].get("setup_seen"))
+
+
+class TestGapOverlays(Base):
+    def test_first_run_asks_language_then_finds_the_game(self):
+        from unittest import mock
+        main = __import__("equpdater.qtui.main", fromlist=["x"])
+        os.environ.pop("EQU3_NO_SETUP", None)
+        os.environ.pop("EQUPDATER_NO_LANGUAGE_PROMPT", None)
+        self.addCleanup(os.environ.__setitem__, "EQU3_NO_SETUP", "1")
+        self.addCleanup(os.environ.__setitem__, "EQUPDATER_NO_LANGUAGE_PROMPT", "1")
+        p = self.start()
+        lang = self.win.findChild(QObject, "languageOverlay")
+        p["settings"].set("imported_from_2x", False)        # a true first run, whatever HOME holds
+        p["settings"].set("language_asked", False)
+        main.first_run_setup(p)
+        pump(80)
+        self.assertTrue(p["general"].languagePromptOpen)
+        self.assertTrue(lang.property("visible"))
+        self.assertFalse(p["setup"].isOpen)
+        with mock.patch.object(p["general_service"].host, "_restart"):
+            p["general"].chooseLanguage("enUS")        # same language: no restart
+        pump(80)
+        self.assertFalse(lang.property("visible"))
+        self.assertTrue(p["setup"].isOpen)
+        self.assertEqual(self.qml_errors(), [])
+
+    def test_settings_shows_the_platform_section_in_every_skin(self):
+        from unittest import mock
+        p = self.start()
+        for sid in p["manager"].skins:
+            p["settings_bridge"].setSkin(sid)
+            self.win.findChild(QObject, "settingsOverlay").metaObject().invokeMethod(
+                self.win.findChild(QObject, "settingsOverlay"), "open")
+            pump(150)
+        launcher = self.win.findChild(QObject, "launcherSection")
+        defender = self.win.findChild(QObject, "defenderButton")
+        self.assertEqual(bool(launcher.property("visible")), p["general"].hasLauncher)
+        self.assertEqual(bool(defender.property("visible")) or not p["general"].isWindows, True)
+        self.assertNotEqual(p["general"].hasLauncher, p["general"].isWindows)
+        self.assertEqual(self.qml_errors(), [])
 
 
 class TestOffline(Base):

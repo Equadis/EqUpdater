@@ -163,12 +163,19 @@ def patches_for(data, enabled: bool) -> list:
 def set_exe_state(exe_path: str, enabled: bool) -> None:
     """Write the setting, in place. Raises OSError when it cannot be written
     (the game is running), and ValueError on a build it does not recognise."""
-    if _layout(exe_path) is None:
+    # Built in memory and swapped in whole (as tweaks.patch_exe does): a crash
+    # or a full disk half way through used to leave a half-patched game program.
+    from .core import atomic
+    with open(exe_path, "rb") as f:
+        data = bytearray(f.read())
+    size = len(data)
+    if _layout_of(bytes(data[:SHIFT_LOOT_OFFSET + 1])) is None:
         raise ValueError("unrecognised WoW.exe")
-    with open(exe_path, "r+b") as f:
-        for off, data in patches(enabled):
-            f.seek(off)
-            f.write(data)
+    for off, patch in patches(enabled):
+        data[off:off + len(patch)] = patch
+    if len(data) != size:
+        raise ValueError("the patch changed the size of WoW.exe")
+    atomic.write_bytes(exe_path, bytes(data))
 
 
 def remove_gate(addons_dir: str) -> bool:

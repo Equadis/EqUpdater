@@ -128,5 +128,72 @@ class TestLock(unittest.TestCase):
             self.assertTrue(hasattr(fn, "__wrapped__"), fn.__name__)
 
 
+class TestInPlaceWritesAreAtomic(unittest.TestCase):
+    """The last two in-place writers: the Auto Loot byte patch and the pfUI lua files."""
+
+    def setUp(self):
+        self.d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.d, True)
+
+    def test_a_failed_autoloot_write_leaves_wow_exe_exactly_as_it_was(self):
+        from unittest import mock
+        from tests.test_lootgate import fake_exe
+        from equpdater import lootgate
+        exe = os.path.join(self.d, "WoW.exe")
+        fake_exe(exe, lootgate.JZ)
+        with open(exe, "rb") as f:
+            before = f.read()
+
+        def die(f):
+            raise OSError("disk full")
+        with mock.patch("os.fsync", die):
+            with self.assertRaises(OSError):
+                lootgate.set_exe_state(exe, True)
+        with open(exe, "rb") as f:
+            self.assertEqual(f.read(), before)
+        self.assertEqual(os.listdir(self.d), ["WoW.exe"])
+
+    def test_an_unrecognised_exe_is_refused_untouched(self):
+        from equpdater import lootgate
+        exe = os.path.join(self.d, "WoW.exe")
+        with open(exe, "wb") as f:
+            f.write(b"MZ" + b"x" * 5000)
+        with self.assertRaises(ValueError):
+            lootgate.set_exe_state(exe, True)
+        self.assertEqual(os.path.getsize(exe), 5002)
+
+    def test_a_failed_pfui_write_keeps_the_original_lua(self):
+        from unittest import mock
+        from equpdater.core import addons
+        base = os.path.join(self.d, "Interface", "AddOns", "pfUI")
+        os.makedirs(os.path.join(base, "env"))
+        prof = os.path.join(base, "env", "profiles.lua")
+        with open(prof, "w", encoding="utf-8") as f:
+            f.write("pfUI_profiles = {}\n")
+
+        def die(f):
+            raise OSError("disk full")
+        with mock.patch("os.fsync", die):
+            addons.patch_pfui_default_profile(self.d)
+        with open(prof, encoding="utf-8") as f:
+            self.assertEqual(f.read(), "pfUI_profiles = {}\n")
+        self.assertEqual(os.listdir(os.path.join(base, "env")), ["profiles.lua"])
+
+    def test_the_pfui_patch_still_works_and_is_idempotent(self):
+        from equpdater.core import addons
+        base = os.path.join(self.d, "Interface", "AddOns", "pfUI")
+        os.makedirs(os.path.join(base, "env"))
+        prof = os.path.join(base, "env", "profiles.lua")
+        with open(prof, "w", encoding="utf-8") as f:
+            f.write("pfUI_profiles = {}\n")
+        addons.patch_pfui_default_profile(self.d)
+        with open(prof, encoding="utf-8") as f:
+            once = f.read()
+        addons.patch_pfui_default_profile(self.d)
+        with open(prof, encoding="utf-8") as f:
+            self.assertEqual(f.read(), once)
+        self.assertIn('pfUI_profiles["Default"]', once)
+
+
 if __name__ == "__main__":
     unittest.main()

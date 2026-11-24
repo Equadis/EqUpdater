@@ -918,4 +918,8 @@ STRINGS = {
         '{count} 个未完成的下载文件',
     '{files} files, {mb} MB. Choose an empty folder to put them in.':
         '{files} 个文件，{mb} MB。请选择一个空文件夹来存放。',
+    'Choose the game folder first.':
+        '请先选择游戏文件夹。',
+    'Windows Defender is not used on this system.':
+        '此系统不使用 Windows Defender。',
 }
