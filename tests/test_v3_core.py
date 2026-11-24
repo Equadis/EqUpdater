@@ -852,6 +852,135 @@ class TestVersionMigration(unittest.TestCase):
         self.assertEqual(config.load_config()["tweaks"]["frillDistance"], 70)
 
 
+class TestDiagnosticsService(unittest.TestCase):
+    def setUp(self):
+        from equpdater import config, diagnostics
+        from equpdater.core.diagnostics_service import DiagnosticsService
+        from equpdater.core.ops_host import AutoDialogs, OpsHost
+        self.d = tempfile.mkdtemp()
+        self.game = os.path.join(self.d, "game")
+        os.makedirs(self.game)
+        self._cfg = config.CONFIG_FILE
+        config.CONFIG_FILE = os.path.join(self.d, "config.json")
+        self.addCleanup(setattr, config, "CONFIG_FILE", self._cfg)
+        s = {"game_dir": self.game}
+        settings = type("S", (), {"get": lambda _s, k, d=None: s.get(k, d)})()
+        self.dialogs = AutoDialogs()
+        self.host = OpsHost(settings, dialogs=self.dialogs)
+        self.host._diag_store_obj = diagnostics.Store(os.path.join(self.d, "diagnostics"))
+        self.pump = Pump()
+        self.tasks = TaskManager(2, self.pump)
+        self.calls = []
+        self.svc = DiagnosticsService(
+            self.host, self.tasks, manifest=lambda: None,
+            fetch=lambda url, timeout: self.calls.append(url) or 200,
+            resolve=lambda host: ["203.0.113.5"],
+            connect=lambda host, port, timeout: None)
+        self.diagnostics = diagnostics
+
+    def record(self, name="WoW.exe", code=0):
+        a = self.diagnostics.Attempt(self.host._diag_store(), self.game, "3.0", "win32", False)
+        a.stage("process_created")
+        a.event("spawned", role="game", pid=4242, name=name)
+        a.process_exit("game", code, 12.0)
+        a.finish()
+        return a
+
+    def test_a_recorded_launch_is_listed_and_explained(self):
+        self.record()
+        rows = self.svc.attempts()
+        self.assertEqual(len(rows), 1)
+        self.assertTrue(rows[0]["outcomeText"])
+        lines = self.svc.attempt_detail(rows[0]["id"])
+        self.assertEqual(lines[0], ("Last launch", "head"))
+        self.assertTrue(any("Timeline" in t for t, _x in lines))
+
+    def test_no_record_says_so(self):
+        self.assertEqual(self.svc.attempts(), [])
+        self.assertIn("No launch has been recorded", self.svc.attempt_detail(None)[0][0])
+
+    def test_scan_is_read_only_and_reports_coverage(self):
+        with open(os.path.join(self.game, "WoW.exe"), "wb") as f:
+            f.write(b"MZ" + b"x" * 5000)
+        before = sorted(os.listdir(self.game))
+        got = []
+        self.assertTrue(self.svc.start_scan(False, False, got.append))
+        self.pump.drain(self.tasks)
+        self.assertEqual(sorted(os.listdir(self.game)), before)        # nothing written there
+        self.assertEqual(len(got), 1)
+        lines = scan_text = [t for t, _x in __import__("equpdater.core.diagnostics_service", fromlist=["x"]).scan_lines(got[0])]
+        self.assertIn("Folder scan", lines)
+        self.assertTrue(self.svc.latest_scan())
+        self.assertFalse(self.svc.scanning)
+
+    def test_a_scan_can_be_cancelled_and_only_one_runs_at_a_time(self):
+        for i in range(30):
+            with open(os.path.join(self.game, f"f{i}.bin"), "wb") as f:
+                f.write(b"x" * 1000)
+        got = []
+        self.assertTrue(self.svc.start_scan(True, False, got.append))
+        self.assertFalse(self.svc.start_scan(True, False, got.append))
+        self.svc.cancel_scan()
+        self.pump.drain(self.tasks)
+        self.assertEqual(len(got), 1)
+
+    def test_scan_without_a_game_folder_says_so(self):
+        self.svc.client = lambda: ""
+        self.assertFalse(self.svc.start_scan(False, False, lambda s: None))
+        self.assertIn("No game folder", self.svc.status)
+
+    def test_export_previews_what_goes_in_and_writes_a_zip_without_the_user_name(self):
+        import zipfile
+        a = self.record()
+        text, plan = self.svc.export_preview(a.id)
+        self.assertIn("This report will contain", text)
+        self.assertIn("Nothing is sent anywhere", text)
+        dest = os.path.join(self.d, "r.zip")
+        done = []
+        self.svc.export(plan, dest, lambda: done.append(1))
+        self.pump.drain(self.tasks)
+        self.assertTrue(done and zipfile.is_zipfile(dest))
+        user = os.environ.get("USERNAME") or os.environ.get("USER") or "zzzz-none"
+        with zipfile.ZipFile(dest) as z:
+            blob = b"".join(z.read(n) for n in z.namelist())
+        self.assertNotIn(user.encode(), blob.replace(b"zzzz-none", b""))
+
+    def test_doctor_runs_local_then_network_and_never_logs_in(self):
+        changed = []
+        self.svc.doctor_run(lambda: changed.append(1))
+        self.pump.drain(self.tasks)
+        lines = self.svc.doctor_lines()
+        titles = [t for t, tone in lines if tone == "head"]
+        self.assertIn("Game client", titles)
+        self.assertIn("Connection", titles)
+        self.assertTrue(any("WoW.exe not found" in t for t, _x in lines))
+        self.assertTrue(all("octowow.st" in u for u in self.calls))   # reads the site only
+
+    def test_doctor_repair_changes_only_login_lines_and_keeps_a_backup(self):
+        with open(os.path.join(self.game, "realmlist.wtf"), "w") as f:
+            f.write("set realmlist octowow.st" + chr(10) + "set patchlist x" + chr(10))
+        self.svc.doctor_run(lambda: None)
+        self.pump.drain(self.tasks)
+        self.assertTrue(self.svc.can_repair())
+        self.assertIn("realmlist.wtf", self.svc.repair_text())
+        self.assertEqual(self.svc.repair(), "")
+        text = open(os.path.join(self.game, "realmlist.wtf")).read()
+        self.assertIn("play.octowow.st", text)
+        self.assertIn("set patchlist x", text)
+        self.assertTrue(os.path.exists(os.path.join(self.game, "realmlist.wtf.octobak")))
+
+    def test_repair_is_refused_while_the_game_runs(self):
+        from unittest import mock
+        with open(os.path.join(self.game, "realmlist.wtf"), "w") as f:
+            f.write("set realmlist octowow.st" + chr(10))
+        with mock.patch("equpdater.platforms.client_in_use", lambda d: True):
+            self.svc.doctor_run(lambda: None)
+            self.pump.drain(self.tasks)
+            self.assertFalse(self.svc.can_repair())
+            self.assertIn("The game is running", self.svc.repair())
+        self.assertIn("octowow.st", open(os.path.join(self.game, "realmlist.wtf")).read())
+
+
 class TestPatchExeSafety(unittest.TestCase):
     """The 0-byte WoW.exe found on a dev machine: a bad cached base must never
     be written over the game."""

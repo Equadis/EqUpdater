@@ -15,6 +15,7 @@ from PySide6.QtCore import (QCoreApplication, QEventLoop, QObject, QThread, QTim
 
 from ..core.addons_service import AddonsService
 from ..core.mods_service import ModsService
+from ..core.diagnostics_service import DiagnosticsService, scan_lines
 from ..core.mpq_service import MpqService
 from ..core.settings_service import GeneralService
 from ..core.ops_host import OpsHost
@@ -473,6 +474,203 @@ class GeneralBridge(QObject):
     @Slot()
     def closed(self):
         self.service.close()
+
+
+_DIAG_ROLES = ["key", "id", "outcome", "outcomeText", "tone", "when"]
+
+
+class DiagnosticsBridge(QObject):
+    """Game Diagnostics, the folder scan ("Verify game files": read-only) and
+    Login Doctor, in one overlay. Opening it never starts the game."""
+    changed = Signal()
+    openChanged = Signal()
+
+    def __init__(self, service: DiagnosticsService, host: OpsHost, app_bridge):
+        super().__init__()
+        self.service, self.host, self.app = service, host, app_bridge
+        self.lm = KeyedListModel(_DIAG_ROLES)
+        self._open, self._view, self._selected = False, "attempt", None
+        self._lines: list = []
+        self._plan = None
+        service.on_change = self._changed
+
+    # -- state ---------------------------------------------------------------
+    @Property(bool, notify=openChanged)
+    def isOpen(self):
+        return self._open
+
+    @Property(str, notify=changed)
+    def view(self):
+        return self._view
+
+    @Property(QObject, constant=True)
+    def model(self):
+        return self.lm
+
+    @Property("QVariantList", notify=changed)
+    def lines(self):
+        return [{"text": t, "tone": tone} for t, tone in self._lines]
+
+    @Property(str, notify=changed)
+    def statusText(self):
+        return self.service.status
+
+    @Property(bool, notify=changed)
+    def scanning(self):
+        return self.service.scanning
+
+    @Property(bool, notify=changed)
+    def exporting(self):
+        return self.service.exporting
+
+    @Property(bool, notify=changed)
+    def canLaunch(self):
+        return self.host._btn_mode == "play"
+
+    @Property(bool, notify=changed)
+    def hasAttempts(self):
+        return self.lm.rowCount() > 0
+
+    @Property(bool, notify=changed)
+    def hasScan(self):
+        return self.service.latest_scan() is not None
+
+    @Property(bool, notify=changed)
+    def canRepair(self):
+        return self.service.can_repair()
+
+    @Property(str, constant=True)
+    def priorityNote(self):
+        return self.service.priority_note()
+
+    @Property(str, notify=changed)
+    def selectedId(self):
+        return self._selected or ""
+
+    def _changed(self):
+        self.changed.emit()
+
+    def _refresh_attempts(self):
+        self.lm.set_items(self.service.attempts())
+        if self._view == "attempt":
+            ids = [self.lm.item_at(i)["id"] for i in range(self.lm.rowCount())]
+            if self._selected not in ids:
+                self._selected = ids[0] if ids else None
+            self._lines = (self.service.attempt_detail(self._selected) if ids
+                           else [(tr("No launch has been recorded yet."), "dim")])
+        self.changed.emit()
+
+    # -- opening ---------------------------------------------------------------
+    @Slot(str)
+    def openView(self, view):
+        self._open, self._view = True, view
+        self.openChanged.emit()
+        if view == "doctor":
+            self._lines = []
+            self.service.doctor_run(self._doctor_changed)
+        elif view == "scan":
+            scan = self.service.latest_scan()
+            self._lines = scan_lines(scan) if scan else [
+                (tr("Verify game files"), "head"),
+                (tr("Scanning reads every file in the game folder and compares it with the "
+                    "client's manifest. Nothing is changed or downloaded."), "dim")]
+            self.changed.emit()
+        else:
+            self._refresh_attempts()
+
+    @Slot()
+    def close(self):
+        self._open = False
+        self.openChanged.emit()
+
+    def refresh_from_disk(self):
+        """A watcher noticed a change in a recorded launch."""
+        if self._open and self._view == "attempt":
+            self._refresh_attempts()
+
+    # -- launches --------------------------------------------------------------------
+    @Slot(str)
+    def select(self, attempt_id):
+        self._selected = attempt_id
+        self._view = "attempt"
+        self._refresh_attempts()
+
+    @Slot()
+    def recheck(self):
+        if self._selected:
+            self.service.recheck(self._selected, self._refresh_attempts)
+
+    @Slot()
+    def launchWithDiagnostics(self):
+        if not self.host.dialogs.ask_ok_cancel(tr("Launch with diagnostics"),
+                                               self.service.diagnostic_note()):
+            return
+        self._selected = None
+        self.service.launch_diagnostic()
+
+    # -- scan --------------------------------------------------------------------------
+    @Slot(bool, bool)
+    def startScan(self, deep, include_mpq):
+        self._view = "scan"
+        if self.service.start_scan(deep, include_mpq, self._scan_done):
+            self.changed.emit()
+
+    def _scan_done(self, scan):
+        self._view = "scan"
+        self._lines = scan_lines(scan)
+        self.changed.emit()
+
+    @Slot()
+    def cancelScan(self):
+        self.service.cancel_scan()
+
+    @Slot()
+    def showScan(self):
+        scan = self.service.latest_scan()
+        if scan:
+            self._view = "scan"
+            self._lines = scan_lines(scan)
+            self.changed.emit()
+
+    # -- export ----------------------------------------------------------------------------
+    @Slot(result=str)
+    def exportDefaultName(self):
+        return f"EqUpdater-support-{self._selected or 'report'}.zip"
+
+    @Slot(result=bool)
+    def confirmExport(self):
+        if not self._selected:
+            return False
+        text, self._plan = self.service.export_preview(self._selected)
+        return bool(self.host.dialogs.ask_ok_cancel(tr("Export support ZIP…"), text))
+
+    @Slot(str)
+    def exportTo(self, dest):
+        if self._plan and dest:
+            self.service.export(self._plan, dest, self._changed)
+
+    # -- Login Doctor ---------------------------------------------------------------------------
+    def _doctor_changed(self):
+        self._lines = self.service.doctor_lines()
+        self.changed.emit()
+
+    @Slot()
+    def doctorAgain(self):
+        self._view = "doctor"
+        self.service.doctor_run(self._doctor_changed)
+
+    @Slot()
+    def repairLogin(self):
+        if self.service.doctor["running"] or not self.service.repair_plan():
+            self.service.doctor_run(self._doctor_changed)
+            return
+        if not self.host.dialogs.ask_yes_no(tr("Repair login configuration"),
+                                            self.service.repair_text()):
+            return
+        err = self.service.repair()
+        if err:
+            self.host.dialogs.error(tr("Repair login configuration"), err)
+        self.service.doctor_run(self._doctor_changed)
 
 
 def make_host(settings, dialogs_bridge: DialogBridge, app_bridge, dispatcher):

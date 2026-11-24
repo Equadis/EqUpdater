@@ -82,7 +82,7 @@ Known flaky test (pre-existing, order/timing dependent): `test_custom_mods…tes
 ### Tweaks gaps still open (tracked; do not drop)
 1. EqUpdater language restart offer after changing the Language tweak -> Settings slice (language). **Open.**
 2. One-time 1.3 re-patch (`_migrate_1_3`; runs only in the Tk app; matters for upgraded 2.x installs) -> game-launch lifecycle / first-run slice. **Open.**
-3. Auto Loot enforcement at Play (`enforce_autoloot` is still in `app.py`; needs the Play pre-launch pipeline: dlls.txt reconcile, Auto Loot gate, diagnostics attempt, WDB clear) -> launch lifecycle slice. **Open.**
+3. Auto Loot enforcement at Play: **resolved** in the launch lifecycle slice.
 
 ## Shared records and concurrent use (Phase 3)
 * Mods, addons and tweaks records stay in 2.x's `config.json` (schema v2), read and written through `config.update_config` (process-local lock, read-modify-write, temp + fsync + `os.replace`). 3.0-only data (skin, animation, cache, launch default) is in `v3/` and never read by 2.x, so version-specific settings stay isolated.
@@ -113,8 +113,16 @@ Known flaky test (pre-existing, order/timing dependent): `test_custom_mods…tes
 **Tracked Tweaks gaps:**
 1. **Language restart offer: DONE.** After a Tweaks Apply/Reset has finished writing, `_offer_language_restart` asks (in the new language, never forced); yes starts a new process and closes this one. EqUpdater's own text now follows the saved Language at start (the PoC had been English-only: found while wiring this).
 2. **One-time 1.3 re-patch: DONE.** `_new_version_installed` / `_migrate_1_3` lifted verbatim into the shared mixin and run after the first frame on a worker (re-patch frillDistance, raise frillDensity, clean stale dlls.txt entries, refresh dxvk.conf, drop obsolete keys); only for non-first-run installs older than 1.3, stamped once. Config.wtf write made atomic. Tested.
-3. **Auto Loot enforcement at Play: OPEN** (needs the Play pre-launch pipeline, next).
+3. **Auto Loot enforcement at Play: DONE** (lifted `enforce_autoloot` runs in the Play pipeline, after the dlls.txt check; tested for order).
 **Deliberately not migrated:** *Download mirror* status and *Verify game files* via the torrent (the base-client downloader is gone; `ARIA2_AUDIT.md`), the firewall notice for aria2c, "pending reconcile" (belongs to the client sync). *Verify game files* returns with Diagnostics as a read-only manifest check.
 **Remaining in Settings:** Login Doctor, Game Diagnostics, Exclude from Defender, Game launcher... (Linux) - all in the Diagnostics slice; first-run language prompt (2.x asked once on a first launch; the Qt shell does not yet).
 **Tests:** `TestGeneralService` (8), `TestVersionMigration` (2), `TestSettingsPage` (5). **Suite: 1,004, all pass.**
 **Regressions found/fixed:** a closure over a Qt signal inside the class body (import error), a Qt `FolderDialog` result needing `file:///` stripping, UI always English in the PoC (language never set).
+
+## Phase 3 slice report: Diagnostics and launch lifecycle (2026-11-24)
+**Migrated:** Play runs the lifted launch pipeline on a worker (dlls.txt check, Auto Loot enforcement, launch record, preflight, damaged-loader refusal, WDB clear, minimize, watch) with GUI-thread dialogs. Diagnostics overlay with three views: **Game Diagnostics** (recorded launches, plain-language outcome and timeline, Check again, Launch with diagnostics, Export support ZIP with a preview of its contents and nothing sent anywhere), **Verify game files** (read-only folder scan against the client manifest metadata; optional content check and MPQ coverage; cancellable; one at a time; never writes to the game folder), **Login Doctor** (local checks, then read-only network checks; never logs in; Repair login configuration asks first, changes only the login lines, keeps a `.octobak` backup, refused while the game runs). Opened from Settings → Troubleshooting. Opening any view never starts the game.
+**Modules:** `core/manifest.py` (metadata only), `core/diagnostics_service.py`, `DiagnosticsBridge`, `DiagnosticsOverlay.qml`.
+**Not carried over:** torrent-based verify/repair (downloader removed).
+**Still missing:** Exclude from Defender, Linux "Game launcher...", first-run language prompt.
+**Tests:** `TestDiagnosticsService` (9, no sockets: DNS/TCP/fetch injected), `TestDiagnosticsOverlay` (3: all views x all skins without QML errors, scan on a worker, repair asks first), 1 translation. **Suite: 1,025, all pass.**
+**Fixed:** a QML binding loop on the Login Doctor note.

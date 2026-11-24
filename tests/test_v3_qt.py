@@ -678,6 +678,65 @@ class TestPlayPipeline(Base):
         self.assertTrue(p["app"].statusIsError)
 
 
+class TestDiagnosticsOverlay(Base):
+    def test_opens_every_view_in_every_skin_without_errors_and_never_starts_the_game(self):
+        from unittest import mock
+        from equpdater import platforms
+        p = self.start()
+        p["diag_service"]._fetch = lambda url, timeout: 200
+        with mock.patch.object(platforms, "spawn_detached", side_effect=AssertionError("started")):
+            for sid in p["manager"].skins:
+                p["settings_bridge"].setSkin(sid)
+                for view in ("attempt", "scan", "doctor"):
+                    p["diag"].openView(view)
+                    pump(200)
+        self.assertTrue(p["diag"].isOpen)
+        p["diag"].close()
+        pump(100)
+        self.assertFalse(p["diag"].isOpen)
+        self.assertEqual(self.qml_errors(), [])
+
+    def test_scan_runs_on_a_worker_and_reports_into_the_view(self):
+        game = tempfile.mkdtemp(prefix="equ-game-")
+        self.addCleanup(shutil.rmtree, game, True)
+        with open(os.path.join(game, "WoW.exe"), "wb") as f:
+            f.write(fake_pe())
+        d = tempfile.mkdtemp(prefix="equ-q-")
+        with open(os.path.join(d, "settings.json"), "w") as f:
+            json.dump({"_schema": 1, "game_dir": game, "imported_from_2x": True}, f)
+        p = self.start(data_dir=d)
+        p["diag_service"]._manifest = lambda: None
+        p["diag"].openView("scan")
+        p["diag"].startScan(False, False)
+        pump(until=lambda: any("Folder scan" in l["text"] for l in p["diag"].lines), limit=8000)
+        self.assertFalse(p["diag"].scanning)
+        self.assertTrue(p["diag"].hasScan)
+
+    def test_login_doctor_repair_asks_before_it_changes_anything(self):
+        game = tempfile.mkdtemp(prefix="equ-game-")
+        self.addCleanup(shutil.rmtree, game, True)
+        with open(os.path.join(game, "realmlist.wtf"), "w") as f:
+            f.write("set realmlist octowow.st" + chr(10))
+        d = tempfile.mkdtemp(prefix="equ-q-")
+        with open(os.path.join(d, "settings.json"), "w") as f:
+            json.dump({"_schema": 1, "game_dir": game, "imported_from_2x": True}, f)
+        p = self.start(data_dir=d)
+        svc = p["diag_service"]
+        svc._fetch = lambda url, timeout: 200
+        svc._net = {"resolve": lambda h: ["203.0.113.5"], "connect": lambda h, pt, t: None}
+        p["diag"].openView("doctor")
+        pump(until=lambda: svc.doctor.get("network") is not None, limit=6000)
+        asked = []
+        p["dialog"].auto = lambda kind, t, b: asked.append(kind) or False
+        p["diag"].repairLogin()
+        self.assertEqual(asked, ["yes_no"])
+        self.assertIn("octowow.st", open(os.path.join(game, "realmlist.wtf")).read())
+        p["dialog"].auto = lambda kind, t, b: asked.append(kind) or True
+        p["diag"].repairLogin()
+        pump(300)
+        self.assertIn("play.octowow.st", open(os.path.join(game, "realmlist.wtf")).read())
+
+
 class TestOffline(Base):
     def test_offline_shows_cache_and_an_error_not_an_empty_page(self):
         p = self.start()

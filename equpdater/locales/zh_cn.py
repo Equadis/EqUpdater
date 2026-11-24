@@ -846,4 +846,6 @@ STRINGS = {
     "Deletes the game's WDB cache before each launch: the item and creature data the server sent. Clearing it fixes stale names and tooltips; the game builds it again as you play.": "每次启动前删除游戏的 WDB 缓存，即服务器发送的物品和生物数据。这可以修复过期的名称和提示；游戏会在你游玩时重新生成。",
     "Minimizes {app} to the taskbar a moment after the game starts.": "游戏启动片刻后将 {app} 最小化到任务栏。",
     "When on, the recommended addons (marked ★ on the Addons tab) are installed wherever they are missing. Addons already in the client are never replaced.": "开启后，推荐插件（在插件标签页标有 ★）会在缺失时自动安装。客户端中已有的插件绝不会被替换。",
+    "Scanning reads every file in the game folder and compares it with the client's manifest. Nothing is changed or downloaded.":
+        "扫描会读取游戏文件夹中的每个文件，并与客户端清单进行比较。不会更改或下载任何内容。",
 }

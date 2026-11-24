@@ -42,6 +42,7 @@ from ..core.mods_service import ModsService                  # noqa: E402
 from ..core.addons_service import AddonsService              # noqa: E402
 from ..core.mpq_service import MpqService                    # noqa: E402
 from ..core.settings_service import GeneralService          # noqa: E402
+from ..core.diagnostics_service import DiagnosticsService  # noqa: E402
 from .. import i18n                                          # noqa: E402
 
 QML_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "qml")
@@ -162,6 +163,8 @@ def build(argv=None):
             launch_bridge.setMode(kw["mode"], kw.get("label", ""))
         elif name == "busy":
             app_bridge.setBusy(kw["on"] and kw.get("label") != "PLAY")
+        elif name == "diag_changed":
+            diag_bridge.refresh_from_disk()
         elif name == "launch_menu":
             launch_bridge.reload_options()
         elif name == "show_page":
@@ -182,6 +185,8 @@ def build(argv=None):
     general_service = GeneralService(host, settings, tasks)
     general_bridge = ops_bridge.GeneralBridge(general_service, app_bridge, skin_bridge)
     tweaks_bridge.on_applied = lambda: host._offer_language_restart()
+    diag_service = DiagnosticsService(host, tasks)
+    diag_bridge = ops_bridge.DiagnosticsBridge(diag_service, host, app_bridge)
     launch_service = LaunchService(settings)
     launch_bridge = bridge.LaunchBridge(launch_service, tasks, app_bridge, host)
 
@@ -197,12 +202,12 @@ def build(argv=None):
     for name, obj in (("app", app_bridge), ("skin", skin_bridge),
                       ("settings", settings_bridge), ("news", news_bridge),
                       ("tweaks", tweaks_bridge), ("launch", launch_bridge),
-                      ("mods", mods_bridge), ("addons", addons_bridge), ("mpq", mpq_bridge), ("general", general_bridge),
+                      ("mods", mods_bridge), ("addons", addons_bridge), ("mpq", mpq_bridge), ("general", general_bridge), ("diag", diag_bridge),
                       ("dialog", dialog_bridge)):
         ctx.setContextProperty(name, obj)
     marks["objects_ready_ms"] = round((time.perf_counter() - _T0) * 1000)
 
-    parts = dict(general=general_bridge, general_service=general_service, mpq=mpq_bridge, mpq_service=mpq_service, addons=addons_bridge, addons_service=addons_service,
+    parts = dict(diag=diag_bridge, diag_service=diag_service, general=general_bridge, general_service=general_service, mpq=mpq_bridge, mpq_service=mpq_service, addons=addons_bridge, addons_service=addons_service,
                  mods=mods_bridge, mods_service=mods_service, host=host,
                  dialog=dialog_bridge, tweaks=tweaks_bridge, settings=settings, tasks=tasks, news=news_bridge,
                  launch=launch_bridge, app=app_bridge, skin=skin_bridge,

@@ -32,6 +32,7 @@ Window {
         function onDebugAction(name) {
             if (name === "settings") settingsView.open()
             else if (name === "menu") menu.open()
+            else if (name.indexOf("diag:") === 0) diag.openView(name.substring(5))
             else app.tab = name
         }
         function onScreenshotRequested(path) {
@@ -184,5 +185,6 @@ Window {
     }
 
     SettingsOverlay { id: settingsView; anchors.fill: parent }
+    DiagnosticsOverlay { anchors.fill: parent; z: 90 }
     DialogHost { anchors.fill: parent; z: 100 }
 }

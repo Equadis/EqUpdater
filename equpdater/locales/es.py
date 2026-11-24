@@ -845,4 +845,6 @@ STRINGS = {
     "Deletes the game's WDB cache before each launch: the item and creature data the server sent. Clearing it fixes stale names and tooltips; the game builds it again as you play.": "Borra la caché WDB del juego antes de cada inicio: los datos de objetos y criaturas que envió el servidor. Así se corrigen nombres y descripciones desactualizados; el juego la vuelve a crear mientras juegas.",
     "Minimizes {app} to the taskbar a moment after the game starts.": "Minimiza {app} a la barra de tareas poco después de que se inicie el juego.",
     "When on, the recommended addons (marked ★ on the Addons tab) are installed wherever they are missing. Addons already in the client are never replaced.": "Si está activado, los addons recomendados (marcados con ★ en la pestaña Addons) se instalan donde falten. Los addons que ya están en el cliente nunca se reemplazan.",
+    "Scanning reads every file in the game folder and compares it with the client's manifest. Nothing is changed or downloaded.":
+        "El análisis lee cada archivo de la carpeta del juego y lo compara con el manifiesto del cliente. No se cambia ni se descarga nada.",
 }

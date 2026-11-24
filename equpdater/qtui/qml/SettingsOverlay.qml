@@ -165,14 +165,22 @@ Item {
 
                 // ── TROUBLESHOOTING ─────────────────────────────────────
                 SkinText { kind: "text.heading"; text: app.t("TROUBLESHOOTING") }
-                Row {
-                    spacing: 10
+                Flow {
+                    width: parent.width
+                    spacing: 8
+                    SkinButton { kind: "button.small"; text: app.t("Verify game files")
+                                 onClicked: { root.close(); diag.openView("scan") }
+                                 SkinToolTipArea { tip: app.t("Reads every file in the game folder and compares it with the client's manifest. Nothing is changed or downloaded.") } }
+                    SkinButton { kind: "button.small"; text: app.t("Login Doctor")
+                                 onClicked: { root.close(); diag.openView("doctor") }
+                                 SkinToolTipArea { tip: app.t("Checks this computer for common login problems: the game client, its login settings, OctoLogin and the connection to OctoWoW.") } }
+                    SkinButton { kind: "button.small"; text: app.t("Game Diagnostics")
+                                 onClicked: { root.close(); diag.openView("attempt") }
+                                 SkinToolTipArea { tip: app.t("What happened after you pressed PLAY, a check of the game folder, and a report you can send for help.") } }
                     SkinButton { kind: "button.small"; text: app.t("Show Session Log")
                                  onClicked: { general.refreshLog(); root.showLog = true }
                                  SkinToolTipArea { tip: app.t("Everything EqUpdater has done since it started: what it checked, what it changed and why anything failed.") } }
                 }
-                SkinText { kind: "text.dim"; width: parent.width; wrapMode: Text.Wrap
-                           text: app.t("Verify game files, Login Doctor, Game Diagnostics and the Defender exclusion arrive with the Diagnostics page.") }
             }
         }
 
