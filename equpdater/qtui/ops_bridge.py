@@ -16,6 +16,7 @@ from PySide6.QtCore import (QCoreApplication, QEventLoop, QObject, QThread, QTim
 from ..core.addons_service import AddonsService
 from ..core.mods_service import ModsService
 from ..core.diagnostics_service import DiagnosticsService, scan_lines
+from ..core.custom_service import CustomSourceService
 from ..core.mpq_service import MpqService
 from ..core.settings_service import GeneralService
 from ..core.ops_host import OpsHost
@@ -671,6 +672,110 @@ class DiagnosticsBridge(QObject):
         if err:
             self.host.dialogs.error(tr("Repair login configuration"), err)
         self.service.doctor_run(self._doctor_changed)
+
+
+class CustomBridge(QObject):
+    """The "add custom git mod / addon" dialog. Nothing is installed until the
+    player has confirmed the warning (a blocking question on the GUI thread)."""
+    changed = Signal()
+    openChanged = Signal()
+
+    def __init__(self, service: CustomSourceService, host: OpsHost):
+        super().__init__()
+        self.service, self.host = service, host
+        self._open, self._kind, self._choice, self._addon_msg = False, "mod", "", ("", "dim")
+        service.on_change = self.changed.emit
+
+    @Property(bool, notify=openChanged)
+    def isOpen(self):
+        return self._open
+
+    @Property(str, notify=openChanged)
+    def kind(self):
+        return self._kind
+
+    @Property(str, notify=changed)
+    def statusText(self):
+        return self.service.status[0] if self._kind == "mod" else self._addon_msg[0]
+
+    @Property(str, notify=changed)
+    def statusTone(self):
+        return self.service.status[1] if self._kind == "mod" else self._addon_msg[1]
+
+    @Property("QStringList", notify=changed)
+    def choices(self):
+        return list(self.service.choices)
+
+    @Property(str, notify=changed)
+    def choice(self):
+        return self._choice
+
+    @Property(bool, notify=changed)
+    def found(self):
+        return bool(self.service.src)
+
+    @Property(bool, notify=changed)
+    def busy(self):
+        return self.service.busy
+
+    @Property(str, constant=True)
+    def hosts(self):
+        return self.service.addon_hosts()
+
+    @Slot(str)
+    def open(self, kind):
+        self.service.reset()
+        self._kind, self._choice, self._addon_msg, self._open = kind, "", ("", "dim"), True
+        self.openChanged.emit()
+        self.changed.emit()
+
+    @Slot()
+    def close(self):
+        self._open = False
+        self.openChanged.emit()
+
+    @Slot(str)
+    def linkChanged(self, text):
+        if self._kind == "addon":
+            self._addon_msg = self.service.check_addon(text)
+        else:
+            self._choice = ""
+            self.service.link_changed()
+        self.changed.emit()
+
+    @Slot(str)
+    def choose(self, name):
+        self._choice = name
+        self.changed.emit()
+
+    @Slot(str)
+    def submit(self, link):
+        """The one button: find the files, then install the chosen one."""
+        if self._kind == "addon":
+            err = self.service.install_addon(link)
+            if err:
+                self._addon_msg = (err, "err")
+                self.changed.emit()
+            else:
+                self.close()
+            return
+        if not self.service.src:
+            self.service.find(link)
+            return
+        name = self._choice or (self.service.choices[0] if self.service.choices else "")
+        self.service.prepare(name, self._confirm)
+
+    def _confirm(self, warning, plan):
+        if not self.host.dialogs.ask_yes_no(tr("Install {name}?", name=plan["name"]), warning):
+            return
+        if self.service.add(plan):
+            self.close()
+
+    @Slot(str)
+    def remove(self, mod_id):
+        q = self.service.remove_text(mod_id)
+        if q and self.host.dialogs.ask_yes_no(*q):
+            self.service.remove(mod_id)
 
 
 def make_host(settings, dialogs_bridge: DialogBridge, app_bridge, dispatcher):

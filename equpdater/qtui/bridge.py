@@ -632,6 +632,22 @@ class AppBridge(QObject):
 
     _addon_updates = 0
     _mpq_updates = 0
+    update_all_hook = None                  # set by the shell: runs the lifted _update_all
+    update_all_state = lambda self: (False, False)   # (running, can start)
+
+    @Property(int, notify=countsChanged)
+    def updateAllCount(self):
+        return self._mod_updates + self._addon_updates
+
+    @Property(bool, notify=busyChanged)
+    def updateAllRunning(self):
+        return bool(self.update_all_state()[0])
+
+    @Slot()
+    def updateAll(self):
+        if self.update_all_hook:
+            self.update_all_hook()
+            self.busyChanged.emit()
 
     @Property(int, notify=countsChanged)
     def mpqUpdates(self):

@@ -126,3 +126,9 @@ Known flaky test (pre-existing, order/timing dependent): `test_custom_mods…tes
 **Still missing:** Exclude from Defender, Linux "Game launcher...", first-run language prompt.
 **Tests:** `TestDiagnosticsService` (9, no sockets: DNS/TCP/fetch injected), `TestDiagnosticsOverlay` (3: all views x all skins without QML errors, scan on a worker, repair asks first), 1 translation. **Suite: 1,025, all pass.**
 **Fixed:** a QML binding loop on the Login Doctor note.
+
+## Phase 3 slice report: Custom sources, Update All, first-run question (2026-11-24)
+**Migrated:** *Add custom git mod* (Mods header): link check, latest release read on a worker, file choice (.dll first, then .zip/.mpq), a ZIP is downloaded and read before anything is asked, the 2.x warning (what goes where, what loads), twin-build replacement question, nothing recorded until confirmed; *remove custom mod* (row icon, asks first, deletes its files and dlls.txt line). *Add custom git addon* (Addons header): live "Valid URL" check, install through the lifted `_addon_apply`. **Update All** arrow in the footer (count of mod + addon updates, hidden while busy) runs the lifted `_update_all` (mods then addons chain) with the real preview, shown only when something is held back. First-run **Install essential mods?** question with the 2.x wording, answer recorded once.
+**Modules:** `core/custom_service.py` (`CustomSourceService`), `CustomBridge`, `CustomOverlay.qml`; real `_update_all_preview` / `_ask_essential_mods` in `OpsHost` (they were placeholders).
+**Tests:** `TestCustomSourceService` (13 with the overlay test), `TestUpdateAllAndFirstRun` (4), `TestUpdateAllButton` (1). **Suite: 1,043, all pass.**
+**Still missing:** Exclude from Defender, Linux "Game launcher...", first-run language prompt, per-item progress, pfUI lua atomic writes, Auto Loot in-place patch hardening, spinner while Update All runs.

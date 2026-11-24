@@ -737,6 +737,58 @@ class TestDiagnosticsOverlay(Base):
         self.assertIn("play.octowow.st", open(os.path.join(game, "realmlist.wtf")).read())
 
 
+class TestCustomOverlay(Base):
+    def test_both_dialogs_open_in_every_skin_and_a_mod_waits_for_confirmation(self):
+        from equpdater.core import mods as M
+        p = self.start()
+        svc, br = p["custom_service"], p["custom"]
+        svc._release = lambda src: {"tag_name": "v9", "assets": [
+            {"name": "Cool.dll", "browser_download_url": "https://github.com/o/r/x"}]}
+        for sid in p["manager"].skins:
+            p["settings_bridge"].setSkin(sid)
+            for kind in ("mod", "addon"):
+                br.open(kind)
+                pump(120)
+        br.open("mod")
+        br.submit("https://example.com/x")
+        pump(50)
+        self.assertEqual(br.statusTone, "err")
+        br.linkChanged("https://github.com/o/r")
+        br.submit("https://github.com/o/r")
+        pump(until=lambda: br.found, limit=4000)
+        self.assertEqual(list(br.choices), ["Cool.dll"])
+        asked = []
+        p["dialog"].auto = lambda kind, t, b: asked.append(kind) or False
+        br.submit("https://github.com/o/r")
+        pump(until=lambda: asked, limit=4000)
+        self.assertEqual(asked, ["yes_no"])
+        self.assertTrue(br.isOpen)                  # declined: nothing added, dialog stays
+        self.assertFalse(any(m.get("custom") for m in M.MODS_REGISTRY))
+        br.close()
+        self.assertEqual(self.qml_errors(), [])
+
+
+class TestUpdateAllButton(Base):
+    def test_the_footer_arrow_follows_the_counts_and_runs_the_lifted_update_all(self):
+        p = self.start()
+        calls = []
+        p["app"].update_all_hook = lambda: calls.append(1)
+        btn = self.win.findChild(QObject, "updateAllButton")
+        self.assertIsNotNone(btn)
+        self.assertFalse(btn.property("visible"))
+        p["app"].setModUpdates(1)
+        p["app"].setAddonUpdates(2)
+        pump(100)
+        self.assertEqual(p["app"].updateAllCount, 3)
+        self.assertTrue(btn.property("visible"))
+        p["app"].updateAll()
+        self.assertEqual(calls, [1])
+        p["app"].setBusy(True)
+        pump(50)
+        self.assertFalse(btn.property("visible"))
+        self.assertEqual(self.qml_errors(), [])
+
+
 class TestOffline(Base):
     def test_offline_shows_cache_and_an_error_not_an_empty_page(self):
         p = self.start()

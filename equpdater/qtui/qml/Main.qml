@@ -146,6 +146,15 @@ Window {
             anchors { right: parent.right; rightMargin: win.layout.contentMargin
                       bottom: parent.bottom; bottomMargin: 14 }
             spacing: 14
+            SkinIconButton {
+                objectName: "updateAllButton"
+                visible: app.updateAllCount > 0 && !app.busy
+                kind: "icon.update"
+                tip: app.updateAllCount === 1 ? app.t("Update all addons and mods (1 update available)")
+                     : app.t("Update all addons and mods ({count} updates available)").replace("{count}", app.updateAllCount)
+                anchors.verticalCenter: parent.verticalCenter
+                onClicked: app.updateAll()
+            }
             SkinText { kind: "text.dim"; text: "v" + app.version
                        anchors.verticalCenter: parent.verticalCenter }
             Repeater {
@@ -186,5 +195,6 @@ Window {
 
     SettingsOverlay { id: settingsView; anchors.fill: parent }
     DiagnosticsOverlay { anchors.fill: parent; z: 90 }
+    CustomOverlay { anchors.fill: parent; z: 90 }
     DialogHost { anchors.fill: parent; z: 100 }
 }

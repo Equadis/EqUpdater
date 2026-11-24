@@ -981,6 +981,195 @@ class TestDiagnosticsService(unittest.TestCase):
         self.assertIn("octowow.st", open(os.path.join(self.game, "realmlist.wtf")).read())
 
 
+class TestCustomSourceService(unittest.TestCase):
+    def setUp(self):
+        from equpdater import config
+        from equpdater.core import mods as M
+        from equpdater.core.custom_service import CustomSourceService
+        from equpdater.core.ops_host import AutoDialogs, OpsHost
+        self.M = M
+        self.d = tempfile.mkdtemp()
+        self.game = os.path.join(self.d, "game")
+        os.makedirs(self.game)
+        self._cfg = config.CONFIG_FILE
+        config.CONFIG_FILE = os.path.join(self.d, "config.json")
+        self.addCleanup(setattr, config, "CONFIG_FILE", self._cfg)
+        self._reg = list(M.MODS_REGISTRY)
+        self.addCleanup(lambda: M.MODS_REGISTRY.__setitem__(slice(None), self._reg))
+        s = {"game_dir": self.game}
+        settings = type("S", (), {"get": lambda _s, k, d=None: s.get(k, d)})()
+        self.host = OpsHost(settings, dialogs=AutoDialogs())
+        self.updated = []
+        self.host._update_mod = lambda mid: self.updated.append(mid)
+        self.pump = Pump()
+        self.tasks = TaskManager(2, self.pump)
+        self.release = {"tag_name": "v1", "assets": [
+            {"name": "Cool.dll", "browser_download_url": "https://github.com/o/r/x"},
+            {"name": "Pack-1.zip", "browser_download_url": "https://github.com/o/r/y"},
+            {"name": "notes.txt"}]}
+        self.zips = {"https://github.com/o/r/y": ["Interface/AddOns/Cool/Cool.toc"]}
+        self.svc = CustomSourceService(
+            self.host, self.tasks, release=lambda src: self.release,
+            download=lambda url: self.zips[url])
+
+    def found(self, link="https://github.com/o/r"):
+        self.assertTrue(self.svc.find(link))
+        self.pump.drain(self.tasks)
+
+    def prepare(self, name):
+        got = []
+        self.svc.prepare(name, lambda w, p: got.append((w, p)))
+        self.pump.drain(self.tasks)
+        return got
+
+    def test_a_bad_link_says_why_and_looks_nothing_up(self):
+        self.assertFalse(self.svc.find("http://github.com/o/r"))
+        self.assertEqual(self.svc.status[1], "err")
+        self.assertFalse(self.svc.find("https://example.com/o/r"))
+        self.assertEqual(self.svc.choices, [])
+
+    def test_the_release_files_are_offered_dll_first_and_only_installable_ones(self):
+        self.found()
+        self.assertEqual(self.svc.choices, ["Cool.dll", "Pack-1.zip"])
+        self.assertEqual(self.svc.status[1], "ok")
+
+    def test_a_release_with_nothing_installable_says_so(self):
+        self.release = {"tag_name": "v1", "assets": [{"name": "notes.txt"}]}
+        self.found()
+        self.assertEqual(self.svc.choices, [])
+        self.assertEqual(self.svc.status[1], "err")
+
+    def test_a_failed_lookup_reports_the_error(self):
+        def boom(src):
+            raise RuntimeError("rate limited")
+        self.svc._release = boom
+        self.found()
+        self.assertIn("rate limited", self.svc.status[0])
+
+    def test_nothing_is_recorded_until_the_player_confirms(self):
+        self.found()
+        got = self.prepare("Cool.dll")
+        self.assertEqual(len(got), 1)
+        self.assertIn("Only install mods you trust", got[0][0])
+        self.assertFalse(any(m.get("custom") for m in self.M.MODS_REGISTRY))
+        self.assertTrue(self.svc.add(got[0][1]))
+        self.assertTrue(any(m["id"] == "custom:cool.dll" for m in self.M.MODS_REGISTRY))
+        self.assertEqual(self.updated, ["custom:cool.dll"])
+
+    def test_a_zip_is_read_first_and_the_warning_lists_where_files_go(self):
+        self.found()
+        got = self.prepare("Pack-1.zip")
+        self.assertIn("Interface/AddOns/Cool/", got[0][0])
+        self.assertEqual(got[0][1]["files"], ["Interface/AddOns/Cool/Cool.toc"])
+        self.assertIn("loads no .dll", got[0][0])
+
+    def test_a_zip_that_cannot_be_read_is_not_added(self):
+        self.found()
+
+        def bad(url):
+            raise ValueError("That archive is unsafe.")
+        self.svc._download = bad
+        self.assertEqual(self.prepare("Pack-1.zip"), [])
+        self.assertEqual(self.svc.status[1], "err")
+
+    def test_an_mpq_that_is_already_in_data_is_refused(self):
+        self.release["assets"].append({"name": "patch-Z.mpq"})
+        self.found()
+        os.makedirs(os.path.join(self.game, "Data"))
+        open(os.path.join(self.game, "Data", "patch-Z.mpq"), "wb").close()
+        self.assertEqual(self.prepare("patch-Z.mpq"), [])
+        self.assertIn("already has a file", self.svc.status[0])
+
+    def test_removing_a_custom_mod_deletes_its_file_and_forgets_it(self):
+        self.found()
+        self.svc.add(self.prepare("Cool.dll")[0][1])
+        os.makedirs(os.path.join(self.game, "mods"), exist_ok=True)
+        with open(os.path.join(self.game, "mods", "Cool.dll"), "wb") as f:
+            f.write(b"MZ")
+        title, body = self.svc.remove_text("custom:cool.dll")
+        self.assertIn("Cool", title)
+        self.assertTrue(self.svc.remove("custom:cool.dll"))
+        self.assertFalse(os.path.exists(os.path.join(self.game, "mods", "Cool.dll")))
+        self.assertFalse(any(m["id"] == "custom:cool.dll" for m in self.M.MODS_REGISTRY))
+
+    def test_a_listed_mod_cannot_be_removed_as_custom(self):
+        mid = next(m["id"] for m in self.M.MODS_REGISTRY if not m.get("custom"))
+        self.assertIsNone(self.svc.remove_text(mid))
+        self.assertFalse(self.svc.remove(mid))
+
+    def test_addon_link_checking(self):
+        self.assertEqual(self.svc.check_addon("https://github.com/o/pfUI")[1], "ok")
+        self.assertEqual(self.svc.check_addon("https://gith")[0], "")
+        self.assertTrue(self.svc.install_addon("nonsense"))
+
+    def test_addon_install_goes_through_the_lifted_apply(self):
+        seen = []
+        self.host._addon_apply = lambda recs, force=False: seen.append(recs)
+        self.assertEqual(self.svc.install_addon("https://github.com/o/pfUI"), "")
+        self.assertEqual(seen[0][0]["git"], "https://github.com/o/pfUI")
+        self.assertTrue(seen[0][0]["custom"])
+
+
+class TestUpdateAllAndFirstRun(unittest.TestCase):
+    def setUp(self):
+        from equpdater import config
+        from equpdater.core.ops_host import AutoDialogs, OpsHost
+        self.d = tempfile.mkdtemp()
+        self._cfg = config.CONFIG_FILE
+        config.CONFIG_FILE = os.path.join(self.d, "config.json")
+        self.addCleanup(setattr, config, "CONFIG_FILE", self._cfg)
+        self.dialogs = AutoDialogs()
+        self.asked = []
+        self.dialogs.ask_yes_no = lambda t, b, **k: self.asked.append(("yes_no", t, b)) or self.answer
+        self.dialogs.ask_ok_cancel = lambda t, b, **k: self.asked.append(("ok_cancel", t, b)) or self.answer
+        self.dialogs.info = lambda t, b, **k: self.asked.append(("info", t, b))
+        self.answer = True
+        settings = type("S", (), {"get": lambda _s, k, d=None: None})()
+        self.host = OpsHost(settings, dialogs=self.dialogs)
+
+    def plan(self, cid, action, reason="", local="1", remote="2"):
+        from equpdater.states import Plan, Status
+        return Plan(cid, "mod", action, Status.UPDATE_AVAILABLE if hasattr(Status, "UPDATE_AVAILABLE") else list(Status)[0],
+                    reason, local, remote)
+
+    def test_an_ordinary_update_all_asks_nothing(self):
+        from equpdater.states import Action
+        self.assertTrue(self.host._update_all_preview([self.plan("a", Action.UPDATE)]))
+        self.assertEqual(self.asked, [])
+
+    def test_a_held_back_component_is_listed_with_its_reason_and_can_be_declined(self):
+        from equpdater.states import Action
+        plans = [self.plan("a", Action.UPDATE), self.plan("b", Action.LOCAL_MODIFIED if hasattr(Action, "LOCAL_MODIFIED") else Action.REQUIRES_CONFIRMATION, "you changed it")]
+        self.answer = False
+        self.assertFalse(self.host._update_all_preview(plans))
+        kind, title, body = self.asked[0]
+        self.assertEqual(kind, "ok_cancel")
+        self.assertIn("a   1", body)
+        self.assertIn("Not being changed", body)
+        self.assertIn("you changed it", body)
+
+    def test_when_nothing_can_be_updated_it_only_informs(self):
+        from equpdater.states import Action
+        plans = [self.plan("b", Action.REQUIRES_CONFIRMATION, "needs you")]
+        self.assertFalse(self.host._update_all_preview(plans))
+        self.assertEqual(self.asked[0][0], "info")
+        self.assertIn("Nothing can be safely updated", self.asked[0][2])
+
+    def test_the_first_run_question_lists_the_mods_and_is_asked_once(self):
+        from equpdater.config import load_config
+        self.answer = False
+        self.assertFalse(self.host._ask_essential_mods([{"name": "Alpha"}, {"name": "Beta"}]))
+        body = self.asked[0][2]
+        self.assertIn("• Alpha", body)
+        self.assertIn("Nothing is installed unless you say yes", body)
+        cfg = load_config()
+        self.assertTrue(cfg["essential_mods_asked"])
+        self.assertFalse(cfg["auto_install_mods"])
+        self.answer = True
+        self.assertTrue(self.host._ask_essential_mods([{"name": "Alpha"}]))
+        self.assertTrue(load_config()["auto_install_mods"])
+
+
 class TestPatchExeSafety(unittest.TestCase):
     """The 0-byte WoW.exe found on a dev machine: a bad cached base must never
     be written over the game."""

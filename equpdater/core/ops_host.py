@@ -23,8 +23,9 @@ from __future__ import annotations
 import os
 import threading
 
-from .. import config as _config
-from ..config import load_config
+from .. import branding, config as _config
+from ..config import load_config, update_config
+from ..planner import skipped_notably, updatable
 from .addons_ops import AddonsOps
 from ..i18n import tr
 from .logsink import log
@@ -292,10 +293,50 @@ class OpsHost(LaunchOps, SettingsOps, MpqPageOps, ModsRows, AddonsOps, ModsOps):
         return self.dialogs.error(title, body, **kw)
 
     def _ask_essential_mods(self, mods) -> bool:
-        return bool(self.dialogs.ask_yes_no("essential", str([m["name"] for m in mods])))
+        """The one-time first-run question (2.x wording). Records that it was
+        asked and the answer, so it is never asked again."""
+        names = "\n".join("    • %s" % m["name"] for m in mods)
+        yes = bool(self.dialogs.ask_yes_no(
+            tr("Install essential mods?"),
+            tr("{app} can install these client mods:\n\n{mods}\n\n"
+               "They are DLLs the game loads at start-up, downloaded from each "
+               "mod's own release page. Nothing is installed unless you say "
+               "yes.\n\nYou can change this later in Settings → Install "
+               "essential mods, or pick mods one at a time on the MODS "
+               "tab.\n\nInstall them now?", app=branding.APP_NAME, mods=names)))
+
+        def _merge(c):
+            c["essential_mods_asked"] = True
+            c["auto_install_mods"] = yes
+        self._cfg = update_config(_merge)
+        return yes
 
     def _ask_yes_no_cancel(self, title, body, **kw):
         return self.dialogs.ask_yes_no_cancel(title, body, **kw)
 
     def _update_all_preview(self, plans) -> bool:
-        return bool(self.dialogs.ask_yes_no("update_all", str(len(plans))))
+        """What the update will and will not do; True to go ahead. Shown only
+        when something is being held back (2.x: a confirmation nobody needs is
+        one everybody learns to dismiss)."""
+        doing, held = updatable(plans), skipped_notably(plans)
+        if not held:
+            return True
+        lines = []
+        if doing:
+            lines.append(tr("Updates to install: {count}", count=len(doing)))
+            for p in doing:
+                lines.append("    %s   %s → %s" % (p.component_id, p.local, p.remote)
+                             if p.local and p.remote else "    %s" % p.component_id)
+            lines.append("")
+        else:
+            lines += [tr("Nothing can be safely updated right now."), ""]
+        lines.append(tr("Not being changed:"))
+        for p in held:
+            lines += ["    %s" % p.component_id, "        %s" % tr(str(p.reason))]
+        lines += ["", tr("Anything listed under “not being changed” stays exactly "
+                         "as it is. Each one can still be dealt with individually from its "
+                         "own tab.")]
+        if not doing:
+            self.dialogs.info(tr("Update all"), "\n".join(lines))
+            return False
+        return bool(self.dialogs.ask_ok_cancel(tr("Update all"), "\n".join(lines)))

@@ -19,10 +19,18 @@ SkinPanel {
         SkinText { kind: "panel.header"; text: app.t("ADDONS"); anchors.verticalCenter: parent.verticalCenter }
         SkinSearchField {
             objectName: "addonSearch"
-            anchors { right: refresh.left; rightMargin: 10; verticalCenter: parent.verticalCenter }
-            width: 260
+            anchors { right: addCustom.left; rightMargin: 10; verticalCenter: parent.verticalCenter }
+            width: 200
             placeholder: app.t("Search addons")
             onEdited: function (t) { addons.setFilter(t) }
+        }
+        SkinButton {
+            id: addCustom
+            objectName: "addCustomAddon"
+            kind: "button.small"
+            anchors { right: refresh.left; rightMargin: 8; verticalCenter: parent.verticalCenter }
+            text: app.t("Add custom git addon")
+            onClicked: customSrc.open("addon")
         }
         SkinIconButton {
             id: refresh

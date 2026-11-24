@@ -15,7 +15,15 @@ SkinPanel {
         anchors { left: parent.left; right: parent.right; top: parent.top }
         height: 34
         SkinText { kind: "panel.header"; text: app.t("MODS"); anchors.verticalCenter: parent.verticalCenter }
+        SkinButton {
+            objectName: "addCustomMod"
+            kind: "button.small"
+            anchors { right: refreshBox.left; rightMargin: 8; verticalCenter: parent.verticalCenter }
+            text: app.t("Add custom git mod")
+            onClicked: customSrc.open("mod")
+        }
         Item {
+            id: refreshBox
             width: 28; height: 28
             anchors { right: parent.right; verticalCenter: parent.verticalCenter }
             SkinIconButton { anchors.centerIn: parent; kind: "icon.refresh"
@@ -129,6 +137,9 @@ SkinPanel {
                                              kind: "icon.release"
                                              tip: app.t("Stop managing. Your files are kept.")
                                              onClicked: mods.release(model.id) }
+                            SkinIconButton { visible: model.custom; kind: "icon.remove"
+                                             tip: app.t("Remove from the list")
+                                             onClicked: customSrc.remove(model.id) }
                             SkinIconButton { kind: "icon.link"; tip: app.t("Open repository in browser")
                                              onClicked: mods.openUrl(model.repoUrl) }
                         }
