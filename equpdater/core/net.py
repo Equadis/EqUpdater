@@ -78,7 +78,6 @@ def make_ssl_context():
     return ctx, loaded
 
 
-SSL_CTX, CA_SOURCES = make_ssl_context()
 
 # Binaries may only be fetched from these hosts. TLS already stops a MITM from
 # impersonating them; this additionally stops a tampered API response from
@@ -117,11 +116,30 @@ class _HttpsOnlyRedirectHandler(urllib.request.HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
-# Shared opener with the hardened TLS context and the HTTPS-only redirect
-# guard, built once.
-_SECURE_OPENER = urllib.request.build_opener(
-    urllib.request.HTTPSHandler(context=SSL_CTX),
-    _HttpsOnlyRedirectHandler())
+# The hardened TLS context costs ~350 ms to build (parsing the CA bundle), so
+# it is built on first use - on a worker thread, when the first request is
+# made - not at import. ``SSL_CTX``, ``CA_SOURCES`` and ``_SECURE_OPENER`` stay
+# importable names (module ``__getattr__``), so 2.x call sites are unchanged.
+_LAZY = {}
+_LOCK = __import__("threading").Lock()
+
+
+def _build():
+    with _LOCK:
+        if not _LAZY:
+            ctx, loaded = make_ssl_context()
+            _LAZY["SSL_CTX"], _LAZY["CA_SOURCES"] = ctx, loaded
+            # Shared opener: hardened TLS + HTTPS-only redirect guard.
+            _LAZY["_SECURE_OPENER"] = urllib.request.build_opener(
+                urllib.request.HTTPSHandler(context=ctx),
+                _HttpsOnlyRedirectHandler())
+    return _LAZY
+
+
+def __getattr__(name):
+    if name in ("SSL_CTX", "CA_SOURCES", "_SECURE_OPENER"):
+        return _build()[name]
+    raise AttributeError(name)
 
 
 def secure_urlopen(req, timeout, allowed_hosts=None):
@@ -130,4 +148,4 @@ def secure_urlopen(req, timeout, allowed_hosts=None):
     `req` may be a URL string or a urllib Request."""
     url = req.full_url if isinstance(req, urllib.request.Request) else req
     _check_url(url, allowed_hosts)
-    return _SECURE_OPENER.open(req, timeout=timeout)
+    return _build()["_SECURE_OPENER"].open(req, timeout=timeout)

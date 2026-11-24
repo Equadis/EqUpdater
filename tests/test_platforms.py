@@ -808,20 +808,22 @@ class TestTls(unittest.TestCase):
             with mock.patch.object(sys, "_MEIPASS", bundle, create=True), \
                     mock.patch.dict(sys.modules, {"certifi": None}):
                 self.assertIn(pem, app.ca_bundles())
-                with mock.patch.object(app, "ca_bundles", lambda: [pem]):
+                net = app.ca_bundles.__globals__                   # core/net.py's namespace
+                with mock.patch.dict(net, {"ca_bundles": lambda: [pem]}):
                     _ctx, loaded = app.make_ssl_context()
             self.assertEqual(loaded, [pem])
 
     def test_linux_adds_the_distributions_bundle(self):
         app, _platforms = modules()
+        net = app.ca_bundles.__globals__           # core/net.py's namespace
         with tempfile.NamedTemporaryFile(suffix=".crt", delete=False) as f:
             system = f.name
         try:
             with On("linux"), \
-                    mock.patch.object(app, "SYSTEM_CA_BUNDLES", (system,)):
+                    mock.patch.dict(net, {"SYSTEM_CA_BUNDLES": (system,)}):
                 self.assertIn(system, app.ca_bundles())
             with On("windows"), \
-                    mock.patch.object(app, "SYSTEM_CA_BUNDLES", (system,)):
+                    mock.patch.dict(net, {"SYSTEM_CA_BUNDLES": (system,)}):
                 self.assertNotIn(system, app.ca_bundles())
         finally:
             os.remove(system)
