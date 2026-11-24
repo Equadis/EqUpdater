@@ -22,6 +22,7 @@ DEFAULTS = {
     "font_override": "",           # "", "arial", "friz", "opendyslexic"
     "game_launcher": None,           # Linux launch command / env, as in 2.x
     "news_seen": {},
+    "renderer": "auto",             # "auto" (GPU) or "software": ~30 MB less memory, a little more CPU
     "show_server_status": True,     # the footer chip (reads OctoBot's static status files)
     "imported_from_2x": False,
 }

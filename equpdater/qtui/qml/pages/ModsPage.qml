@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls.Basic as C
+import Qt.labs.qmlmodels
 import EqUi
 
 // Mods: one virtualised list (the only scroller), sections and rows from the
@@ -48,13 +49,13 @@ SkinPanel {
         cacheBuffer: 400
         C.ScrollBar.vertical: SkinScrollBar {}
 
-        delegate: Loader {
-            width: ListView.view.width - 16
-            sourceComponent: model.kind === "header" ? headerC : rowC
-            // `model` is visible inside the component through the context
-            Component {
-                id: headerC
-                Item {
+        reuseItems: true                       // pooled delegates, as on the Addons page
+        delegate: DelegateChooser {
+            role: "kind"
+            DelegateChoice {
+                roleValue: "header"
+                delegate: Item {
+                    width: ListView.view.width - 16
                     height: 40
                     Row {
                         anchors { left: parent.left; verticalCenter: parent.verticalCenter }
@@ -76,10 +77,10 @@ SkinPanel {
                     Accessible.name: model.title
                 }
             }
-            Component {
-                id: rowC
-                Item {
+            DelegateChoice {
+                delegate: Item {
                     id: row
+                    width: ListView.view.width - 16
                     height: Math.max(54, layout.implicitHeight + 14) + (model.problem !== "" ? 22 : 0)
                     RowLayout {
                         id: layout

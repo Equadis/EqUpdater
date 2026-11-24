@@ -88,6 +88,12 @@ def build(argv=None):
     news_cache = core_settings.open_news_cache(data)
     server_cache = core_settings.open_server_cache(data)
 
+    if (os.environ.get("EQU3_RENDERER") or settings.get("renderer")) == "software":
+        # No GPU device or swap chain: about 30 MB less memory, and a safe
+        # choice on a machine (or Wine/VM) without a usable graphics driver.
+        from PySide6.QtQuick import QQuickWindow, QSGRendererInterface
+        QQuickWindow.setGraphicsApi(QSGRendererInterface.GraphicsApi.Software)
+
     app = QGuiApplication.instance() or QGuiApplication(argv or sys.argv)
     app.setApplicationName("EqUpdater")
     icon = os.path.join(branding.resource_dir(), "icon.png")
@@ -139,6 +145,7 @@ def build(argv=None):
         offline=(os.environ.get("EQU3_OFFLINE") == "1" or bool(os.environ.get("EQUPDATER_OFFLINE")))
         and not server_fixture)
     app_bridge.window_hooks.append(server_bridge.window_state)
+    app_bridge.restart_hook = lambda: holder.get("handler") and holder["handler"]("restart", {})
 
     tweaks_bridge = bridge.TweaksBridge(TweaksService(settings, tasks), app_bridge)
     dialog_bridge = ops_bridge.DialogBridge(dispatcher)

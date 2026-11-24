@@ -1,0 +1,578 @@
+{
+ "minutes": 5.0,
+ "actions": 1053,
+ "baseline": {
+  "t_s": 120,
+  "rss_mb": 275.8,
+  "py_objects": 40174,
+  "threads": 61,
+  "handles": 1395,
+  "qml_objects": 945,
+  "actions": 422
+ },
+ "final": {
+  "t_s": 300,
+  "rss_mb": 245.5,
+  "py_objects": 40140,
+  "threads": 59,
+  "handles": 1388,
+  "qml_objects": 945,
+  "actions": 1053
+ },
+ "rss_growth_mb": -30.3,
+ "py_object_growth": -34,
+ "thread_growth": -2,
+ "handle_growth": -7,
+ "samples": [
+  {
+   "t_s": 0,
+   "rss_mb": 152.0,
+   "py_objects": 34237,
+   "threads": 59,
+   "handles": 702,
+   "qml_objects": 160,
+   "actions": 1
+  },
+  {
+   "t_s": 5,
+   "rss_mb": 238.3,
+   "py_objects": 38720,
+   "threads": 62,
+   "handles": 1374,
+   "qml_objects": 945,
+   "actions": 17
+  },
+  {
+   "t_s": 10,
+   "rss_mb": 241.0,
+   "py_objects": 40093,
+   "threads": 63,
+   "handles": 1383,
+   "qml_objects": 945,
+   "actions": 36
+  },
+  {
+   "t_s": 15,
+   "rss_mb": 236.4,
+   "py_objects": 40064,
+   "threads": 62,
+   "handles": 1377,
+   "qml_objects": 945,
+   "actions": 53
+  },
+  {
+   "t_s": 20,
+   "rss_mb": 269.9,
+   "py_objects": 40140,
+   "threads": 64,
+   "handles": 1393,
+   "qml_objects": 945,
+   "actions": 71
+  },
+  {
+   "t_s": 25,
+   "rss_mb": 262.8,
+   "py_objects": 40140,
+   "threads": 64,
+   "handles": 1393,
+   "qml_objects": 945,
+   "actions": 88
+  },
+  {
+   "t_s": 30,
+   "rss_mb": 254.9,
+   "py_objects": 40140,
+   "threads": 63,
+   "handles": 1390,
+   "qml_objects": 945,
+   "actions": 106
+  },
+  {
+   "t_s": 35,
+   "rss_mb": 273.2,
+   "py_objects": 40140,
+   "threads": 63,
+   "handles": 1390,
+   "qml_objects": 945,
+   "actions": 123
+  },
+  {
+   "t_s": 40,
+   "rss_mb": 272.6,
+   "py_objects": 40140,
+   "threads": 63,
+   "handles": 1390,
+   "qml_objects": 945,
+   "actions": 141
+  },
+  {
+   "t_s": 45,
+   "rss_mb": 258.4,
+   "py_objects": 40140,
+   "threads": 63,
+   "handles": 1390,
+   "qml_objects": 945,
+   "actions": 159
+  },
+  {
+   "t_s": 50,
+   "rss_mb": 247.7,
+   "py_objects": 40140,
+   "threads": 63,
+   "handles": 1390,
+   "qml_objects": 945,
+   "actions": 176
+  },
+  {
+   "t_s": 55,
+   "rss_mb": 270.0,
+   "py_objects": 40140,
+   "threads": 63,
+   "handles": 1390,
+   "qml_objects": 945,
+   "actions": 194
+  },
+  {
+   "t_s": 60,
+   "rss_mb": 254.5,
+   "py_objects": 40140,
+   "threads": 60,
+   "handles": 1388,
+   "qml_objects": 945,
+   "actions": 211
+  },
+  {
+   "t_s": 65,
+   "rss_mb": 248.7,
+   "py_objects": 40140,
+   "threads": 60,
+   "handles": 1388,
+   "qml_objects": 945,
+   "actions": 229
+  },
+  {
+   "t_s": 70,
+   "rss_mb": 276.4,
+   "py_objects": 40112,
+   "threads": 59,
+   "handles": 1382,
+   "qml_objects": 945,
+   "actions": 247
+  },
+  {
+   "t_s": 75,
+   "rss_mb": 277.4,
+   "py_objects": 40140,
+   "threads": 60,
+   "handles": 1388,
+   "qml_objects": 945,
+   "actions": 264
+  },
+  {
+   "t_s": 80,
+   "rss_mb": 254.3,
+   "py_objects": 40140,
+   "threads": 60,
+   "handles": 1388,
+   "qml_objects": 945,
+   "actions": 282
+  },
+  {
+   "t_s": 85,
+   "rss_mb": 254.2,
+   "py_objects": 40140,
+   "threads": 60,
+   "handles": 1388,
+   "qml_objects": 945,
+   "actions": 299
+  },
+  {
+   "t_s": 90,
+   "rss_mb": 271.7,
+   "py_objects": 40140,
+   "threads": 60,
+   "handles": 1388,
+   "qml_objects": 945,
+   "actions": 317
+  },
+  {
+   "t_s": 95,
+   "rss_mb": 259.3,
+   "py_objects": 40112,
+   "threads": 59,
+   "handles": 1382,
+   "qml_objects": 945,
+   "actions": 334
+  },
+  {
+   "t_s": 100,
+   "rss_mb": 260.9,
+   "py_objects": 40140,
+   "threads": 60,
+   "handles": 1388,
+   "qml_objects": 945,
+   "actions": 352
+  },
+  {
+   "t_s": 105,
+   "rss_mb": 278.6,
+   "py_objects": 40112,
+   "threads": 59,
+   "handles": 1382,
+   "qml_objects": 945,
+   "actions": 369
+  },
+  {
+   "t_s": 110,
+   "rss_mb": 259.9,
+   "py_objects": 40140,
+   "threads": 60,
+   "handles": 1388,
+   "qml_objects": 945,
+   "actions": 387
+  },
+  {
+   "t_s": 115,
+   "rss_mb": 260.5,
+   "py_objects": 40112,
+   "threads": 59,
+   "handles": 1382,
+   "qml_objects": 945,
+   "actions": 404
+  },
+  {
+   "t_s": 120,
+   "rss_mb": 275.8,
+   "py_objects": 40174,
+   "threads": 61,
+   "handles": 1395,
+   "qml_objects": 945,
+   "actions": 422
+  },
+  {
+   "t_s": 125,
+   "rss_mb": 278.1,
+   "py_objects": 40112,
+   "threads": 58,
+   "handles": 1380,
+   "qml_objects": 945,
+   "actions": 439
+  },
+  {
+   "t_s": 130,
+   "rss_mb": 264.9,
+   "py_objects": 40168,
+   "threads": 60,
+   "handles": 1392,
+   "qml_objects": 945,
+   "actions": 457
+  },
+  {
+   "t_s": 135,
+   "rss_mb": 250.2,
+   "py_objects": 40112,
+   "threads": 57,
+   "handles": 1380,
+   "qml_objects": 945,
+   "actions": 475
+  },
+  {
+   "t_s": 140,
+   "rss_mb": 273.5,
+   "py_objects": 40140,
+   "threads": 58,
+   "handles": 1386,
+   "qml_objects": 945,
+   "actions": 492
+  },
+  {
+   "t_s": 145,
+   "rss_mb": 258.0,
+   "py_objects": 40140,
+   "threads": 58,
+   "handles": 1386,
+   "qml_objects": 945,
+   "actions": 509
+  },
+  {
+   "t_s": 150,
+   "rss_mb": 248.3,
+   "py_objects": 40140,
+   "threads": 58,
+   "handles": 1386,
+   "qml_objects": 945,
+   "actions": 528
+  },
+  {
+   "t_s": 155,
+   "rss_mb": 272.2,
+   "py_objects": 40140,
+   "threads": 58,
+   "handles": 1386,
+   "qml_objects": 945,
+   "actions": 544
+  },
+  {
+   "t_s": 160,
+   "rss_mb": 266.4,
+   "py_objects": 40140,
+   "threads": 58,
+   "handles": 1386,
+   "qml_objects": 945,
+   "actions": 562
+  },
+  {
+   "t_s": 165,
+   "rss_mb": 253.9,
+   "py_objects": 40140,
+   "threads": 58,
+   "handles": 1386,
+   "qml_objects": 945,
+   "actions": 580
+  },
+  {
+   "t_s": 170,
+   "rss_mb": 253.8,
+   "py_objects": 40140,
+   "threads": 58,
+   "handles": 1386,
+   "qml_objects": 945,
+   "actions": 598
+  },
+  {
+   "t_s": 175,
+   "rss_mb": 269.6,
+   "py_objects": 40140,
+   "threads": 58,
+   "handles": 1386,
+   "qml_objects": 945,
+   "actions": 615
+  },
+  {
+   "t_s": 180,
+   "rss_mb": 259.0,
+   "py_objects": 40140,
+   "threads": 58,
+   "handles": 1386,
+   "qml_objects": 945,
+   "actions": 633
+  },
+  {
+   "t_s": 185,
+   "rss_mb": 249.3,
+   "py_objects": 40112,
+   "threads": 57,
+   "handles": 1380,
+   "qml_objects": 945,
+   "actions": 651
+  },
+  {
+   "t_s": 190,
+   "rss_mb": 261.8,
+   "py_objects": 40112,
+   "threads": 57,
+   "handles": 1380,
+   "qml_objects": 945,
+   "actions": 668
+  },
+  {
+   "t_s": 195,
+   "rss_mb": 253.1,
+   "py_objects": 40140,
+   "threads": 58,
+   "handles": 1386,
+   "qml_objects": 945,
+   "actions": 685
+  },
+  {
+   "t_s": 200,
+   "rss_mb": 246.4,
+   "py_objects": 40112,
+   "threads": 57,
+   "handles": 1380,
+   "qml_objects": 945,
+   "actions": 703
+  },
+  {
+   "t_s": 205,
+   "rss_mb": 246.6,
+   "py_objects": 40112,
+   "threads": 57,
+   "handles": 1380,
+   "qml_objects": 945,
+   "actions": 721
+  },
+  {
+   "t_s": 210,
+   "rss_mb": 252.9,
+   "py_objects": 40112,
+   "threads": 57,
+   "handles": 1380,
+   "qml_objects": 945,
+   "actions": 738
+  },
+  {
+   "t_s": 215,
+   "rss_mb": 243.0,
+   "py_objects": 40140,
+   "threads": 58,
+   "handles": 1386,
+   "qml_objects": 945,
+   "actions": 756
+  },
+  {
+   "t_s": 220,
+   "rss_mb": 247.7,
+   "py_objects": 40112,
+   "threads": 57,
+   "handles": 1380,
+   "qml_objects": 945,
+   "actions": 773
+  },
+  {
+   "t_s": 225,
+   "rss_mb": 261.9,
+   "py_objects": 40140,
+   "threads": 58,
+   "handles": 1386,
+   "qml_objects": 945,
+   "actions": 791
+  },
+  {
+   "t_s": 230,
+   "rss_mb": 244.9,
+   "py_objects": 40112,
+   "threads": 57,
+   "handles": 1380,
+   "qml_objects": 945,
+   "actions": 808
+  },
+  {
+   "t_s": 235,
+   "rss_mb": 243.7,
+   "py_objects": 40140,
+   "threads": 58,
+   "handles": 1386,
+   "qml_objects": 945,
+   "actions": 826
+  },
+  {
+   "t_s": 240,
+   "rss_mb": 259.8,
+   "py_objects": 40140,
+   "threads": 58,
+   "handles": 1386,
+   "qml_objects": 945,
+   "actions": 843
+  },
+  {
+   "t_s": 245,
+   "rss_mb": 254.8,
+   "py_objects": 40140,
+   "threads": 58,
+   "handles": 1386,
+   "qml_objects": 945,
+   "actions": 861
+  },
+  {
+   "t_s": 250,
+   "rss_mb": 242.8,
+   "py_objects": 40140,
+   "threads": 58,
+   "handles": 1386,
+   "qml_objects": 945,
+   "actions": 878
+  },
+  {
+   "t_s": 255,
+   "rss_mb": 244.5,
+   "py_objects": 40140,
+   "threads": 58,
+   "handles": 1386,
+   "qml_objects": 945,
+   "actions": 896
+  },
+  {
+   "t_s": 260,
+   "rss_mb": 259.4,
+   "py_objects": 40140,
+   "threads": 58,
+   "handles": 1386,
+   "qml_objects": 945,
+   "actions": 913
+  },
+  {
+   "t_s": 265,
+   "rss_mb": 241.8,
+   "py_objects": 40140,
+   "threads": 58,
+   "handles": 1386,
+   "qml_objects": 945,
+   "actions": 931
+  },
+  {
+   "t_s": 270,
+   "rss_mb": 244.8,
+   "py_objects": 40140,
+   "threads": 58,
+   "handles": 1386,
+   "qml_objects": 945,
+   "actions": 948
+  },
+  {
+   "t_s": 275,
+   "rss_mb": 260.5,
+   "py_objects": 40140,
+   "threads": 58,
+   "handles": 1386,
+   "qml_objects": 945,
+   "actions": 966
+  },
+  {
+   "t_s": 280,
+   "rss_mb": 253.4,
+   "py_objects": 40140,
+   "threads": 58,
+   "handles": 1386,
+   "qml_objects": 945,
+   "actions": 983
+  },
+  {
+   "t_s": 285,
+   "rss_mb": 238.8,
+   "py_objects": 40112,
+   "threads": 57,
+   "handles": 1380,
+   "qml_objects": 945,
+   "actions": 1001
+  },
+  {
+   "t_s": 290,
+   "rss_mb": 239.9,
+   "py_objects": 40140,
+   "threads": 58,
+   "handles": 1386,
+   "qml_objects": 945,
+   "actions": 1019
+  },
+  {
+   "t_s": 295,
+   "rss_mb": 257.3,
+   "py_objects": 40112,
+   "threads": 57,
+   "handles": 1380,
+   "qml_objects": 945,
+   "actions": 1037
+  },
+  {
+   "t_s": 300,
+   "rss_mb": 245.5,
+   "py_objects": 40140,
+   "threads": 59,
+   "handles": 1388,
+   "qml_objects": 945,
+   "actions": 1053
+  }
+ ],
+ "problems": []
+}

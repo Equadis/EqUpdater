@@ -1,0 +1,61 @@
+{
+ "machine": {
+  "cpus": 12,
+  "ram_gb": 31.9
+ },
+ "target": "source",
+ "skins": {
+  "bubbles": {
+   "first_frame_ms": 1317,
+   "interactive_ms": 1317,
+   "rss_mb": 225.5,
+   "cpu_pct": 4.1
+  },
+  "classic-2004": {
+   "first_frame_ms": 1306,
+   "interactive_ms": 1307,
+   "rss_mb": 218.0,
+   "cpu_pct": 3.1
+  },
+  "minimal": {
+   "first_frame_ms": 1266,
+   "interactive_ms": 1266,
+   "rss_mb": 194.6,
+   "cpu_pct": 0.5
+  },
+  "minimal-dark": {
+   "first_frame_ms": 1240,
+   "interactive_ms": 1241,
+   "rss_mb": 194.2,
+   "cpu_pct": 0.5
+  },
+  "minimal-light": {
+   "first_frame_ms": 1269,
+   "interactive_ms": 1269,
+   "rss_mb": 194.9,
+   "cpu_pct": 0.0
+  }
+ },
+ "pages": {
+  "news": {
+   "rss_mb": 222.6,
+   "cpu_pct": 0.0
+  },
+  "tweaks": {
+   "rss_mb": 229.4,
+   "cpu_pct": 3.6
+  },
+  "addons": {
+   "rss_mb": 227.6,
+   "cpu_pct": 4.5
+  },
+  "mods": {
+   "rss_mb": 228.1,
+   "cpu_pct": 7.0
+  },
+  "mpq": {
+   "rss_mb": 225.8,
+   "cpu_pct": 2.6
+  }
+ }
+}

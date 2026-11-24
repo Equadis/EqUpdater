@@ -17,7 +17,7 @@ os.environ.setdefault("QT_QUICK_BACKEND", "software")
 os.environ["QT_QUICK_CONTROLS_STYLE"] = "Basic"
 
 try:
-    from PySide6.QtCore import Qt, QCoreApplication, QEvent, QObject, QTimer, QUrl, qInstallMessageHandler
+    from PySide6.QtCore import Qt, QCoreApplication, QEvent, QMetaObject, QObject, QTimer, QUrl, qInstallMessageHandler
     from PySide6.QtQuick import QQuickItem
     HAVE_QT = True
 except Exception:                                    # pragma: no cover
@@ -860,12 +860,13 @@ class TestGapOverlays(Base):
         self.addCleanup(os.environ.__setitem__, "EQU3_NO_SETUP", "1")
         self.addCleanup(os.environ.__setitem__, "EQUPDATER_NO_LANGUAGE_PROMPT", "1")
         p = self.start()
-        lang = self.win.findChild(QObject, "languageOverlay")
         p["settings"].set("imported_from_2x", False)        # a true first run, whatever HOME holds
         p["settings"].set("language_asked", False)
         main.first_run_setup(p)
         pump(80)
         self.assertTrue(p["general"].languagePromptOpen)
+        lang = self.win.findChild(QObject, "languageOverlay")      # built when first wanted
+        self.assertIsNotNone(lang)
         self.assertTrue(lang.property("visible"))
         self.assertFalse(p["setup"].isOpen)
         with mock.patch.object(p["general_service"].host, "_restart"):
@@ -880,8 +881,7 @@ class TestGapOverlays(Base):
         p = self.start()
         for sid in p["manager"].skins:
             p["settings_bridge"].setSkin(sid)
-            self.win.findChild(QObject, "settingsOverlay").metaObject().invokeMethod(
-                self.win.findChild(QObject, "settingsOverlay"), "open")
+            QMetaObject.invokeMethod(self.win, "openSettings")
             pump(150)
         launcher = self.win.findChild(QObject, "launcherSection")
         defender = self.win.findChild(QObject, "defenderButton")
@@ -1031,10 +1031,111 @@ class TestServerChip(Base):
     def test_the_settings_switch_is_there(self):
         self.fixture()
         p = self.start()
-        self.win.findChild(QObject, "settingsOverlay").metaObject().invokeMethod(
-            self.win.findChild(QObject, "settingsOverlay"), "open")
+        QMetaObject.invokeMethod(self.win, "openSettings")
         pump(120)
         self.assertIsNotNone(self.win.findChild(QObject, "serverStatusToggle"))
+
+
+class TestLazyOverlays(Base):
+    def test_nothing_is_built_until_it_is_wanted_and_a_real_question_still_shows(self):
+        p = self.start()
+        built = lambda n: self.win.findChild(QObject, n) is not None
+        for name in ("settingsOverlay", "diagnosticsOverlay", "customOverlay", "setupOverlay",
+                     "languageOverlay", "dialogHost"):
+            self.assertFalse(built(name), name)
+        # a real question (not the test shortcut) must build the dialog host and be answerable
+        QTimer.singleShot(250, lambda: (self.assertTrue(built("dialogHost")),
+                                        self.assertTrue(self.win.findChild(QObject, "dialogHost").property("visible")),
+                                        p["dialog"].answer(True)))
+        self.assertTrue(p["dialog"].ask("yes_no", "Title", "Body"))
+        p["diag"].openView("doctor")
+        pump(120)
+        self.assertTrue(built("diagnosticsOverlay"))
+        p["diag"].close()
+        pump(60)
+        self.assertTrue(built("diagnosticsOverlay"))          # stays built once built
+        QMetaObject.invokeMethod(self.win, "openSettings")
+        pump(150)
+        self.assertTrue(self.win.findChild(QObject, "settingsOverlay").property("visible"))
+        self.assertEqual(self.qml_errors(), [])
+
+
+class TestBackgroundAnimations(Base):
+    def anims(self):
+        return [i for i in walk(self.win.property("contentItem")) if i.objectName() == "backgroundAnimation"]
+
+    def test_a_skin_switch_shows_or_hides_an_animation_and_never_rebuilds_one(self):
+        p = self.start()
+        for _ in range(4):
+            for sid in ("classic-2004", "minimal", "bubbles", "minimal-dark"):
+                p["settings_bridge"].setSkin(sid)
+                pump(60)
+        # two animated skins were visited: two animations exist, however often we switched
+        self.assertEqual(len(self.anims()), 2)
+        by_visible = {a.property("source").toString().rsplit("/", 1)[-1]: a.property("visible") for a in self.anims()}
+        self.assertFalse(any(by_visible.values()))                       # Minimal Dark: none showing
+        p["settings_bridge"].setSkin("classic-2004")
+        pump(80)
+        shown = [a for a in self.anims() if a.property("visible")]
+        self.assertEqual(len(shown), 1)
+        self.assertTrue(shown[0].property("source").toString().endswith("login-2004.webp"))
+        self.assertTrue(shown[0].property("playing"))
+        self.assertEqual(self.qml_errors(), [])
+
+    def test_the_setting_pauses_and_hides_without_destroying(self):
+        p = self.start()
+        p["settings_bridge"].setSkin("bubbles")
+        pump(80)
+        (anim,) = self.anims()
+        self.assertTrue(anim.property("visible"))
+        p["settings_bridge"].animatedBackground = False
+        pump(80)
+        self.assertFalse(anim.property("visible"))
+        self.assertFalse(anim.property("playing"))
+        self.assertEqual(len(self.anims()), 1)
+        p["settings_bridge"].animatedBackground = True
+        pump(80)
+        self.assertTrue(anim.property("visible"))
+
+
+class TestLowMemoryRendering(Base):
+    def test_the_setting_is_saved_and_asks_for_a_restart_only_when_it_differs(self):
+        p = self.start()
+        sb = p["settings_bridge"]
+        self.assertFalse(sb.softwareRendering)
+        self.assertFalse(sb.rendererNeedsRestart)
+        sb.softwareRendering = True
+        self.assertTrue(sb.rendererNeedsRestart)
+        self.assertEqual(p["settings"].get("renderer"), "software")
+        sb.softwareRendering = False
+        self.assertFalse(sb.rendererNeedsRestart)
+        self.assertEqual(p["settings"].get("renderer"), "auto")
+
+    def test_the_settings_page_has_the_switch_and_the_restart_button_works(self):
+        p = self.start()
+        QMetaObject.invokeMethod(self.win, "openSettings")
+        pump(150)
+        self.assertIsNotNone(self.win.findChild(QObject, "softwareRenderingToggle"))
+        calls = []
+        p["app"].restart_hook = lambda: calls.append(1)
+        p["app"].restartNow()
+        self.assertEqual(calls, [1])
+
+    def test_a_process_started_with_software_rendering_runs_and_reports_frames(self):
+        import subprocess
+        d = tempfile.mkdtemp(prefix="equ-sw-")
+        self.addCleanup(shutil.rmtree, d, True)
+        marks = os.path.join(d, "marks.json")
+        env = {k: v for k, v in os.environ.items()
+               if k not in ("EQU3_NEWS_FIXTURE", "EQU3_SERVER_FIXTURE", "EQU3_FAKE_SITE")}
+        env.update(EQU3_DATA_DIR=d, EQU3_MARKS=marks, EQU3_RENDERER="software", EQU3_OFFLINE="1",
+                   EQU3_EXIT_AFTER_MS="2500", QT_QPA_PLATFORM="offscreen")
+        r = subprocess.run([sys.executable, "-m", "equpdater.qtui"], env=env, timeout=60,
+                           cwd=os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                           capture_output=True)
+        self.assertEqual(r.returncode, 0, r.stderr[-500:])
+        with open(marks) as f:
+            self.assertGreater(json.load(f)["first_frame_ms"], 0)
 
 
 class TestOffline(Base):

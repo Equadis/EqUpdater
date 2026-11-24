@@ -90,3 +90,31 @@ Real GPU scene, one process per size, synthetic addons (no disk, no network), Bu
 | tooltips created only while hovered | 83 ms | 160 MB | removed the popups, not the creation cost |
 | **pooled delegates** (`reuseItems: true`, `DelegateChooser`, one component per row type) | **8.6 ms**, 3 frames > 33 ms | **70 MB** | delegates are recycled; only the model roles change |
 The same applies to any long list in the app: use `reuseItems` with a chooser, build popups lazily. (Mods and News still use the older pattern; both are short and measured fine, to be converted with the 3.0 list audit in Phase 7.)
+
+## Phase 7: optimisation pass (2026-11-24)
+Same machine as above. Tools: `tools/bench/phase7_bench.py` (start-up, memory, idle CPU for every skin and page, one real process per sample, medians of 3), `tools/bench/soak.py` (scripted cycling of pages, skins, overlays and the footer chip for minutes, sampling memory, Python and QML object counts, threads and handles). Raw data: `bench-results/phase7-before.json`, `phase7-after.json`, `phase7-packaged.json`, `soak.json`.
+
+| | before | after |
+|---|---|---|
+| Time to first frame, source run, 5 skins | 1,240-1,317 ms | **1,081-1,114 ms** (0.96 s running alone) |
+| Time to first frame, **packaged exe** | not measured | **770-834 ms** |
+| QML load (alone) | 1,105-1,337 ms from process start | **800-850 ms** |
+| Idle memory, Bubbles / Classic / Minimal skins | 225 / 218 / 195 MB | **217 / 209 / 186 MB** |
+| Memory per page (news, tweaks, addons, mods, mpq) | 223-229 MB | 216-223 MB |
+| Soak, 6 min of cycling (before the fix) | **250 -> 475 MB, never levelling** | 5 min: **245-276 MB, flat** (handles 1,388 +/- 8, threads 59 +/- 3, QML objects constant at 945, Python objects flat at ~40 k) |
+| Soak, one skin switch to an animated skin | **~8 MB leaked each** | none |
+
+### What was done
+1. **Overlays are built when first wanted** (`LazyOverlay.qml`): Settings, Diagnostics, Setup, the custom mod/addon dialog, the language picker and the question dialog were all built at start-up and are rarely opened. 300 ms off QML load, 10 MB off memory. A test asserts nothing is built until it is needed, that a real question still shows and is answerable, and that an overlay stays built once built.
+2. **A real leak, found by the soak test and reproduced in isolation:** Qt's animated-WebP reader leaks the file's data (about 1.5x its size: 8 MB for Classic's scene, 3.4 MB for Bubbles' ocean, ~0.4 MB for a GIF) each time a movie is released. The background destroyed and rebuilt its AnimatedImage on every skin switch or animation toggle. Now each animation is loaded once, kept, and shown or hidden (paused when hidden): a one-time cost of about 5 MB per animated skin the player visits, and no growth however often they switch. Tests: no more than one animation object per animated skin however many switches; the setting hides and pauses without destroying. (A Qt bug, not ours; if a later Qt fixes it the pool is harmless.)
+3. **Mods list uses pooled delegates** like Addons (`DelegateChooser` + `reuseItems`). **News does not**: measured pooled vs not (2 runs each): scroll p50 5.5 vs 5.5-6.0 ms, max 13 vs 18-22 ms, expand p95 41-44 vs 38-39 ms: no benefit, a worse worst case, so it stays unpooled (variable-height posts with lazily built bodies).
+4. **Low-memory rendering** (Settings, restart to apply; `QT_QUICK_BACKEND=software` equivalent via `EQU3_RENDERER=software`): no GPU device or swap chain: Bubbles 226 -> 179 MB, Minimal Dark 197 -> 161 MB (about 30-45 MB), first frame about 130 ms sooner, a little more CPU while an animation plays. Compared with the other Qt graphics backends it is the only one that helps: OpenGL 289-307 MB and Direct3D 12 252-292 MB are both worse than the default Direct3D 11. It is also the safe choice on a machine, VM or Wine without a working graphics driver.
+
+### Where the memory is
+Python 14 MB -> + PySide 31 -> + app imports 42 -> + objects 54 -> + QML 104 -> rendering 185-220. The jump to rendering is the Direct3D device, swap chain and the driver's own allocations, which the app does not control (software rendering removes it). Remaining app-owned memory is small. 2.x's 98 MB does not include a GPU device; the target of "no more than today" is **not met with the GPU renderer** and is met only approximately with software rendering (161-180 MB).
+
+### Not done / limits
+* Start-up is under 1.0 s packaged (0.77-0.83 s) but 1.08-1.1 s from source; Python imports (about 0.4 s: PySide6 QtCore 0.13 s, the lifted `core` modules 0.1 s, `urllib`/`http.client` 0.05 s) were not made lazy because they sit in 2.x code the lift keeps verbatim.
+* The soak ran on this machine for 5-6 minutes, not hours; the flat counters make an hours-long run likely clean, but it has not been done.
+* Linux and HiDPI scaling were not measured (no Linux machine here; HiDPI is Qt's automatic scaling, checked only by the existing layout tests).
+

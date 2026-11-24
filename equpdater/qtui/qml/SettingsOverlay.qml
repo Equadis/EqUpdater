@@ -172,6 +172,18 @@ Item {
                 SkinCheckBox { text: app.t("Animated background")
                                checked: settings.animatedBackground
                                onToggled: settings.animatedBackground = !settings.animatedBackground }
+                SkinCheckBox { text: app.t("Low-memory rendering")
+                               objectName: "softwareRenderingToggle"
+                               checked: settings.softwareRendering
+                               onToggled: settings.softwareRendering = !settings.softwareRendering
+                               SkinToolTipArea { tip: app.t("Draws with the processor instead of the graphics card: about 30 MB less memory and a safe choice without a working graphics driver, at the cost of a little more processor use. Takes effect after a restart.") } }
+                Row {
+                    visible: settings.rendererNeedsRestart
+                    spacing: 10
+                    SkinText { kind: "text.dim"; anchors.verticalCenter: parent.verticalCenter
+                               text: app.t("Restart EqUpdater to change the rendering.") }
+                    SkinButton { kind: "button.small"; text: app.t("Restart now"); onClicked: app.restartNow() }
+                }
                 SkinCheckBox { text: app.t("Pause animation when the window is not focused")
                                checked: settings.pauseWhenUnfocused
                                onToggled: settings.pauseWhenUnfocused = !settings.pauseWhenUnfocused }

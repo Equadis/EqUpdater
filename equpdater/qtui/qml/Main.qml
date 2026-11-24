@@ -30,7 +30,7 @@ Window {
         target: app
         function onMinimizeRequested() { win.showMinimized() }
         function onDebugAction(name) {
-            if (name === "settings") settingsView.open()
+            if (name === "settings") win.openSettings()
             else if (name === "menu") menu.open()
             else if (name === "server") footerChip.toggle()
             else if (name.indexOf("diag:") === 0) diag.openView(name.substring(5))
@@ -80,11 +80,11 @@ Window {
             activeFocusOnTab: true
             Accessible.role: Accessible.Button
             Accessible.name: app.t("Settings")
-            Keys.onSpacePressed: settingsView.open()
+            Keys.onSpacePressed: win.openSettings()
             SkinIcon { kind: "icon.settings"; size: 18; anchors.centerIn: parent
                        opacity: gh.hovered ? 1 : 0.7 }
             HoverHandler { id: gh; cursorShape: Qt.PointingHandCursor }
-            TapHandler { onTapped: settingsView.open() }
+            TapHandler { onTapped: win.openSettings() }
         }
     }
 
@@ -212,10 +212,16 @@ Window {
         onHeightChanged: if (visible) place()
     }
 
-    SettingsOverlay { id: settingsView; anchors.fill: parent }
-    DiagnosticsOverlay { anchors.fill: parent; z: 90 }
-    CustomOverlay { anchors.fill: parent; z: 90 }
-    SetupOverlay { anchors.fill: parent; z: 90 }
-    LanguageOverlay { anchors.fill: parent; z: 95 }
-    DialogHost { anchors.fill: parent; z: 100 }
+    // Overlays are built the first time they are wanted, not at start-up.
+    LazyOverlay { id: settingsL; source: "SettingsOverlay.qml" }
+    LazyOverlay { z: 90; source: "DiagnosticsOverlay.qml"; wanted: diag.isOpen }
+    LazyOverlay { z: 90; source: "CustomOverlay.qml"; wanted: customSrc.isOpen }
+    LazyOverlay { z: 90; source: "SetupOverlay.qml"; wanted: setup.isOpen }
+    LazyOverlay { z: 95; source: "LanguageOverlay.qml"; wanted: general.languagePromptOpen }
+    LazyOverlay { z: 100; source: "DialogHost.qml"; wanted: dialog.open }
+
+    function openSettings() {
+        settingsL.seen = true
+        if (settingsL.item) settingsL.item.open()
+    }
 }

@@ -17,7 +17,7 @@ Item {
     readonly property bool animate: settings.animatedBackground
                                     && app.animationsActive
                                     && bg.animation !== ""
-    readonly property bool animating: anim.status === Loader.Ready && animate
+    readonly property bool animating: animate
 
     Rectangle { anchors.fill: parent; color: root.bg.color }
 
@@ -31,30 +31,47 @@ Item {
         mipmap: false
     }
 
-    Loader {
-        id: anim
-        anchors.fill: parent
-        active: root.bg.animation !== "" && settings.animatedBackground
-        sourceComponent: root.bg.animationKind === "video" ? videoC : imageC
+    // Animations are loaded once and kept: a skin switch shows or hides them,
+    // it never destroys one. Qt's animated-WebP reader leaks the whole file
+    // (about 1.5x its size) every time a movie is released, and GIF a little;
+    // reloading on each switch grew the process by ~8 MB per switch to Classic
+    // (found by tools/bench/soak.py, reproduced in isolation). Kept, the cost
+    // is a one-time ~5 MB per animated skin the player actually visits.
+    readonly property bool wantsImage: root.bg.animation !== "" && settings.animatedBackground
+                                       && root.bg.animationKind !== "video"
+    ListModel { id: pool }
+    function remember() {
+        if (!wantsImage || root.bg.animation === "") return
+        for (var i = 0; i < pool.count; ++i)
+            if (pool.get(i).url === root.bg.animation) return
+        pool.append({ url: root.bg.animation })
     }
-    Component {
-        id: imageC
+    onWantsImageChanged: remember()
+    onBgChanged: remember()
+    Component.onCompleted: remember()
+    Repeater {
+        model: pool
         AnimatedImage {
-            source: root.bg.animation
+            required property string url
+            objectName: "backgroundAnimation"
+            width: root.width; height: root.height
+            source: url
+            visible: url === root.bg.animation && root.wantsImage
             fillMode: Image.PreserveAspectCrop
             cache: false                  // stream; do not keep every frame decoded
-            playing: root.animate
+            playing: visible && root.animate
             smooth: true
             // shown only once its first frame is ready, so the still never blinks
             opacity: status === Image.Ready ? 1 : 0
         }
     }
-    Component {
-        id: videoC
-        Loader {
-            source: "VideoLayer.qml"
-            onLoaded: item.play = Qt.binding(function () { return root.animate })
-        }
+    Loader {
+        id: anim
+        anchors.fill: parent
+        active: root.bg.animation !== "" && settings.animatedBackground
+                && root.bg.animationKind === "video"
+        source: "VideoLayer.qml"
+        onLoaded: item.play = Qt.binding(function () { return root.animate })
     }
 
     // darken: one translucent rectangle instead of re-processing every frame

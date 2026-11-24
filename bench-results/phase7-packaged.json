@@ -1,0 +1,27 @@
+{
+ "machine": {
+  "cpus": 12,
+  "ram_gb": 31.9
+ },
+ "target": "D:/EqUpdater/dist/EqUpdater3/EqUpdater3.exe",
+ "skins": {
+  "bubbles": {
+   "first_frame_ms": 834,
+   "interactive_ms": 834,
+   "rss_mb": 215.3,
+   "cpu_pct": 1.0
+  },
+  "minimal-dark": {
+   "first_frame_ms": 770,
+   "interactive_ms": 771,
+   "rss_mb": 180.9,
+   "cpu_pct": 0.5
+  }
+ },
+ "pages": {
+  "news": {
+   "rss_mb": 210.2,
+   "cpu_pct": 10.7
+  }
+ }
+}

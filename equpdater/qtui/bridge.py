@@ -492,6 +492,7 @@ class SettingsBridge(QObject):
                  app_bridge):
         super().__init__()
         self.s, self.manager, self.skin_bridge, self.app = settings, manager, skin_bridge, app_bridge
+        self._started_software = (os.environ.get("EQU3_RENDERER") or settings.get("renderer")) == "software"
 
     @Property("QVariantList", notify=skinsChanged)
     def skins(self):
@@ -517,6 +518,19 @@ class SettingsBridge(QObject):
         self.s.set("animated_background", bool(v))
         self.optionsChanged.emit()
         self.app.animationChanged.emit()
+
+    @Property(bool, notify=optionsChanged)
+    def softwareRendering(self):
+        return self.s.get("renderer") == "software"
+
+    @softwareRendering.setter
+    def softwareRendering(self, v):
+        self.s.set("renderer", "software" if v else "auto")
+        self.optionsChanged.emit()
+
+    @Property(bool, notify=optionsChanged)
+    def rendererNeedsRestart(self):
+        return (self.s.get("renderer") == "software") != self._started_software
 
     @Property(bool, notify=optionsChanged)
     def pauseWhenUnfocused(self):
@@ -875,6 +889,13 @@ class AppBridge(QObject):
             self.animationChanged.emit()
             for hook in self.window_hooks:
                 hook(minimized, active)
+
+    restart_hook = None
+
+    @Slot()
+    def restartNow(self):
+        if self.restart_hook:
+            self.restart_hook()
 
     @Slot()
     def windowShown(self):

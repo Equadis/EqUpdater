@@ -5,6 +5,7 @@ import EqUi
 // its caller in a nested event loop until answer() is called).
 Item {
     id: root
+    objectName: "dialogHost"
     visible: dialog.open
     focus: dialog.open
     Keys.onEscapePressed: dialog.answer(false)
