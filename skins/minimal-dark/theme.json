@@ -1,0 +1,38 @@
+{
+  "palette": {
+    "bg": "#121316",
+    "panel": "#1a1c20",
+    "panelBorder": "#2c2f36",
+    "text": "#e6e8eb",
+    "textDim": "#8f96a1",
+    "accent": "#7aa2f7",
+    "accentLight": "#a9c1fb",
+    "link": "#7aa2f7",
+    "danger": "#f07178",
+    "ok": "#7bd88f",
+    "new": "#f07178",
+    "buttonFace": "#24272d",
+    "buttonHover": "#2e323a",
+    "buttonPressed": "#1d1f24",
+    "primary": "#3b6fd4",
+    "primaryHover": "#4a80e8",
+    "primaryPressed": "#325fba"
+  },
+  "fonts": {
+    "body": { "family": "Segoe UI", "size": 13 },
+    "dim": { "family": "Segoe UI", "size": 11 },
+    "heading": { "family": "Segoe UI", "size": 15, "bold": true },
+    "title": { "family": "Segoe UI", "size": 24, "bold": true },
+    "button": { "family": "Segoe UI", "size": 13, "bold": true },
+    "nav": { "family": "Segoe UI", "size": 13, "bold": true }
+  },
+  "background": { "color": "$bg" },
+  "components": {
+    "icon.logo": { "icon": "icons/logo.png" },
+    "icon.refresh": { "icon": "icons/refresh.png" },
+    "icon.settings": { "icon": "icons/settings.png" },
+    "icon.arrow-down": { "icon": "icons/arrow-down.png" },
+    "icon.discord": { "icon": "icons/discord.png" },
+    "icon.support": { "icon": "icons/support.png" }
+  }
+}

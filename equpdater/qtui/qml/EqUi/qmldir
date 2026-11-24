@@ -1,0 +1,14 @@
+module EqUi
+singleton Style 1.0 Style.qml
+SkinText 1.0 SkinText.qml
+SkinIcon 1.0 SkinIcon.qml
+SkinPanel 1.0 SkinPanel.qml
+SkinButton 1.0 SkinButton.qml
+SkinSplitButton 1.0 SkinSplitButton.qml
+SkinNavTab 1.0 SkinNavTab.qml
+SkinScrollBar 1.0 SkinScrollBar.qml
+SkinCheckBox 1.0 SkinCheckBox.qml
+SkinProgressBar 1.0 SkinProgressBar.qml
+SkinMenu 1.0 SkinMenu.qml
+Background 1.0 Background.qml
+VideoLayer 1.0 VideoLayer.qml

@@ -1,0 +1,109 @@
+{
+  "python": "3.12.10",
+  "results": [
+    {
+      "candidate": "gif_cache",
+      "file": "bubbles.gif",
+      "kind": "image",
+      "file_mb": 22.56,
+      "first_frame_ms": 226,
+      "cpu_pct": 0.16,
+      "rss_mb": 298,
+      "peak_mb": 298,
+      "gpu_pct": 1.75,
+      "swaps_per_s": 29.5,
+      "window_s": 30.0
+    },
+    {
+      "candidate": "gif_nocache",
+      "file": "bubbles.gif",
+      "kind": "image",
+      "file_mb": 22.56,
+      "first_frame_ms": 232,
+      "cpu_pct": 0.1,
+      "rss_mb": 81,
+      "peak_mb": 81,
+      "gpu_pct": 1.38,
+      "swaps_per_s": 29.5,
+      "window_s": 30.0
+    },
+    {
+      "candidate": "webp_cache",
+      "file": "b400.webp",
+      "kind": "image",
+      "file_mb": 2.7,
+      "first_frame_ms": 222,
+      "cpu_pct": 0.36,
+      "rss_mb": 301,
+      "peak_mb": 301,
+      "gpu_pct": 1.16,
+      "swaps_per_s": 29.5,
+      "window_s": 30.0
+    },
+    {
+      "candidate": "webp_nocache",
+      "file": "b400.webp",
+      "kind": "image",
+      "file_mb": 2.7,
+      "first_frame_ms": 220,
+      "cpu_pct": 0.42,
+      "rss_mb": 86,
+      "peak_mb": 86,
+      "gpu_pct": 1.52,
+      "swaps_per_s": 29.5,
+      "window_s": 30.0
+    },
+    {
+      "candidate": "mp4_400",
+      "file": "b400.mp4",
+      "kind": "video",
+      "file_mb": 1.62,
+      "first_frame_ms": 1032,
+      "cpu_pct": 2.24,
+      "rss_mb": 136,
+      "peak_mb": 136,
+      "gpu_pct": 3.1,
+      "swaps_per_s": 31.6,
+      "window_s": 30.0
+    },
+    {
+      "candidate": "mp4_960",
+      "file": "b960.mp4",
+      "kind": "video",
+      "file_mb": 6.61,
+      "first_frame_ms": 1009,
+      "cpu_pct": 2.29,
+      "rss_mb": 152,
+      "peak_mb": 152,
+      "gpu_pct": 5.34,
+      "swaps_per_s": 31.6,
+      "window_s": 30.0
+    },
+    {
+      "candidate": "webm_400",
+      "file": "b400.webm",
+      "kind": "video",
+      "file_mb": 0.62,
+      "first_frame_ms": 998,
+      "cpu_pct": 2.92,
+      "rss_mb": 124,
+      "peak_mb": 125,
+      "gpu_pct": 2.92,
+      "swaps_per_s": 31.6,
+      "window_s": 30.0
+    },
+    {
+      "candidate": "static_png",
+      "file": "pubbles.png",
+      "kind": "static",
+      "file_mb": 1.43,
+      "first_frame_ms": 321,
+      "cpu_pct": 0.05,
+      "rss_mb": 99,
+      "peak_mb": 99,
+      "gpu_pct": 0.0,
+      "swaps_per_s": 0.0,
+      "window_s": 30.0
+    }
+  ]
+}
