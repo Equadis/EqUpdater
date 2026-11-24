@@ -25,8 +25,10 @@ import os
 import re
 import shlex
 import shutil
+import struct
 import subprocess
 import sys
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 WINDOWS = os.name == "nt"
@@ -172,6 +174,156 @@ def child_env(base: dict | None = None) -> dict:
     return env
 
 
+def program_problem(path: str) -> str | None:
+    """Why ``path`` cannot be a Windows program, or None when it looks like
+    one. Windows answers an empty or cut-off .exe with WinError 193, "%1 is
+    not a valid Win32 application" -- true, and no help to anybody. Read
+    here first, the problem can be named: "empty", "damaged". Raises OSError
+    when the file cannot be read at all."""
+    size = os.path.getsize(path)
+    if size == 0:
+        return "empty"
+    with open(path, "rb") as f:
+        head = f.read(64)
+        if len(head) < 64 or head[:2] != b"MZ":
+            return "damaged"
+        offset = struct.unpack_from("<I", head, 0x3c)[0]
+        if offset + 24 > size:
+            return "damaged"
+        f.seek(offset)
+        pe = f.read(24)
+    if len(pe) < 24 or pe[:4] != b"PE\0\0":
+        return "damaged"
+    # The sections must fit in the file: a download cut short keeps its
+    # headers and loses its end.
+    sections, opt = struct.unpack_from("<H", pe, 6)[0], struct.unpack_from("<H", pe, 20)[0]
+    table = offset + 24 + opt
+    with open(path, "rb") as f:
+        f.seek(table)
+        raw = f.read(40 * sections)
+    if len(raw) < 40 * sections:
+        return "damaged"
+    for i in range(sections):
+        raw_size, raw_ptr = struct.unpack_from("<II", raw, 40 * i + 16)
+        if raw_ptr and raw_ptr + raw_size > size:
+            return "damaged"
+    return None
+
+
+@contextmanager
+def external_dll_search():
+    """Do not hand the bundle's DLL folder to the game.
+
+    PyInstaller's bootloader calls SetDllDirectoryW with EqUpdater's own
+    folder, and a child process inherits it: a 32-bit VanillaFixes.exe would
+    then look for its DLLs among EqUpdater's 64-bit ones first. It is cleared
+    for the moment the child is created, and put back however that ends."""
+    if not WINDOWS or not frozen():
+        yield
+        return
+    import ctypes
+    from ctypes import wintypes
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    get_dir = kernel.GetDllDirectoryW
+    get_dir.argtypes = [wintypes.DWORD, wintypes.LPWSTR]
+    get_dir.restype = wintypes.DWORD
+    set_dir = kernel.SetDllDirectoryW
+    set_dir.argtypes = [wintypes.LPCWSTR]
+    set_dir.restype = wintypes.BOOL
+    size = get_dir(0, None)
+    previous = None
+    if size:
+        buf = ctypes.create_unicode_buffer(size)
+        if get_dir(size, buf):
+            previous = buf.value
+    set_dir(None)
+    try:
+        yield
+    finally:
+        set_dir(previous)
+
+
+class ShellProcess:
+    """A process started by ShellExecuteEx, with the part of Popen's face
+    the launch code uses: pid, poll() and wait()."""
+
+    def __init__(self, handle, pid):
+        self._handle, self.pid, self.returncode = handle, pid, None
+
+    def poll(self):
+        import ctypes
+        k = ctypes.windll.kernel32
+        if self.returncode is None and k.WaitForSingleObject(self._handle, 0) == 0:
+            code = ctypes.c_ulong()
+            k.GetExitCodeProcess(self._handle, ctypes.byref(code))
+            self.returncode = code.value
+            k.CloseHandle(self._handle)
+        return self.returncode
+
+    def wait(self, timeout=None):
+        import ctypes
+        if self.returncode is None:
+            ctypes.windll.kernel32.WaitForSingleObject(
+                self._handle, 0xFFFFFFFF if timeout is None else int(timeout * 1000))
+        return self.poll()
+
+
+def shell_start(path: str, cwd: str | None = None) -> ShellProcess:
+    """Start a program the way Explorer's double-click does (ShellExecuteEx,
+    "open"). Raises OSError with Windows' error when it cannot."""
+    import ctypes
+    from ctypes import wintypes
+
+    class SHELLEXECUTEINFOW(ctypes.Structure):
+        _fields_ = [("cbSize", wintypes.DWORD), ("fMask", wintypes.ULONG),
+                    ("hwnd", wintypes.HWND), ("lpVerb", wintypes.LPCWSTR),
+                    ("lpFile", wintypes.LPCWSTR),
+                    ("lpParameters", wintypes.LPCWSTR),
+                    ("lpDirectory", wintypes.LPCWSTR), ("nShow", ctypes.c_int),
+                    ("hInstApp", wintypes.HINSTANCE), ("lpIDList", ctypes.c_void_p),
+                    ("lpClass", wintypes.LPCWSTR), ("hkeyClass", wintypes.HKEY),
+                    ("dwHotKey", wintypes.DWORD), ("hIcon", wintypes.HANDLE),
+                    ("hProcess", wintypes.HANDLE)]
+    SEE_MASK_NOCLOSEPROCESS, SEE_MASK_NOASYNC, SEE_MASK_FLAG_NO_UI = \
+        0x40, 0x100, 0x400
+    info = SHELLEXECUTEINFOW()
+    info.cbSize = ctypes.sizeof(info)
+    info.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI
+    info.lpVerb = "open"
+    info.lpFile = path
+    info.lpDirectory = cwd
+    info.nShow = 1                                   # SW_SHOWNORMAL
+    shell32 = ctypes.WinDLL("shell32", use_last_error=True)
+    shell32.ShellExecuteExW.argtypes = [ctypes.POINTER(SHELLEXECUTEINFOW)]
+    shell32.ShellExecuteExW.restype = wintypes.BOOL
+    if not shell32.ShellExecuteExW(ctypes.byref(info)):
+        raise ctypes.WinError(ctypes.get_last_error())
+    if not info.hProcess:
+        raise OSError("the program was handed to another one; it cannot be watched")
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.GetProcessId.argtypes = [wintypes.HANDLE]
+    kernel.GetProcessId.restype = wintypes.DWORD
+    return ShellProcess(info.hProcess, kernel.GetProcessId(info.hProcess))
+
+
+@contextmanager
+def _environment(env: dict | None):
+    """This process's environment as ``env`` for a moment: ShellExecuteEx
+    takes no environment of its own, and the player's launcher variables
+    must still reach the game."""
+    if env is None:
+        yield
+        return
+    saved = dict(os.environ)
+    os.environ.clear()
+    os.environ.update(env)
+    try:
+        yield
+    finally:
+        os.environ.clear()
+        os.environ.update(saved)
+
+
 def spawn_detached(argv: list, cwd: str | None = None,
                    env: dict | None = None,
                    output: str | None = None,
@@ -191,13 +343,35 @@ def spawn_detached(argv: list, cwd: str | None = None,
         flags = (getattr(subprocess, "CREATE_NEW_CONSOLE" if console
                          else "DETACHED_PROCESS", 0)
                  | getattr(subprocess, "CREATE_BREAKAWAY_FROM_JOB", 0))
-        try:
-            return subprocess.Popen(argv, cwd=cwd, env=env,
-                                    creationflags=flags, close_fds=True)
-        except OSError:
-            flags &= ~getattr(subprocess, "CREATE_BREAKAWAY_FROM_JOB", 0)
-            return subprocess.Popen(argv, cwd=cwd, env=env,
-                                    creationflags=flags, close_fds=True)
+        with external_dll_search():
+            try:
+                try:
+                    return subprocess.Popen(argv, cwd=cwd, env=env,
+                                            creationflags=flags, close_fds=True)
+                except OSError as e:
+                    # A job that does not allow breaking away says "access
+                    # denied"; only that is worth the same call without it.
+                    if getattr(e, "winerror", None) != 5:
+                        raise
+                    flags &= ~getattr(subprocess, "CREATE_BREAKAWAY_FROM_JOB", 0)
+                    return subprocess.Popen(argv, cwd=cwd, env=env,
+                                            creationflags=flags, close_fds=True)
+            except OSError as e:
+                # Windows refused a file that is a whole program (193: "not a
+                # valid Win32 application", 216: "not compatible"). A player
+                # saw exactly this while a double-click on the same file
+                # worked, so the double-click's way is tried before giving up.
+                # A file that is not a whole program is not: the caller said
+                # so before it got here (program_problem).
+                if (getattr(e, "winerror", None) not in (193, 216)
+                        or len(argv) != 1
+                        or not str(argv[0]).lower().endswith(".exe")):
+                    raise
+                try:
+                    with _environment(env):
+                        return shell_start(argv[0], cwd)
+                except OSError:
+                    raise e from None
     sink = open(output, "wb") if output else subprocess.DEVNULL
     try:
         return subprocess.Popen(argv, cwd=cwd, env=child_env(env),

@@ -16,6 +16,12 @@ thread, with no traceback at all. In a child process started with
 (the verbose output names each test before it runs), and can show the stack
 of every thread at the moment of the crash.
 
+**A run that hangs says where.** A test waiting on something that never
+comes -- a dialog nobody answers on a CI display -- used to run into the CI
+job's own time limit, which cancels the job and keeps no log. The child now
+gives up after ``--hang-after`` seconds by itself: faulthandler prints every
+thread's stack and exits, and the report names the test that was running.
+
 On success it prints one line. On failure it prints each failing test's name,
 exception and traceback -- not the whole run -- and says where the full log is.
 
@@ -38,10 +44,20 @@ _OUTCOME = re.compile(r"\.\.\. (ok|FAIL|ERROR|skipped.*|expected failure|"
                       r"unexpected success)\s*$")
 
 
-def run_suite(log_path: str | None = None) -> tuple[bool, str]:
+#: Seconds before a run that has not finished is called hung. The suite takes
+#: two or three minutes; CI jobs give up at twenty.
+HANG_AFTER = 600
+
+
+def run_suite(log_path: str | None = None,
+              hang_after: int = HANG_AFTER) -> tuple[bool, str]:
     """Run the suite; return (passed, short report)."""
-    cmd = [sys.executable, "-X", "faulthandler", "-m", "unittest",
-           "discover", "-v", "-s", os.path.join(ROOT, "tests"), "-t", ROOT]
+    tests = os.path.join(ROOT, "tests")
+    boot = ("import faulthandler, unittest; "
+            f"faulthandler.dump_traceback_later({int(hang_after)}, exit=True); "
+            "unittest.main(module=None, argv=['unittest', 'discover', '-v', "
+            f"'-s', {tests!r}, '-t', {ROOT!r}])")
+    cmd = [sys.executable, "-X", "faulthandler", "-c", boot]
     proc = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
                           encoding="utf-8", errors="replace")
     output = (proc.stdout or "") + (proc.stderr or "")
@@ -72,8 +88,11 @@ def run_suite(log_path: str | None = None) -> tuple[bool, str]:
                 running = m.group("test")
             elif m:
                 running = None
-        report.append("The test process crashed (exit code %s)%s."
-                      % (proc.returncode, where))
+        hung = any("Timeout (" in l for l in lines)
+        report.append(("The test run hung and was stopped after %d s%s."
+                       % (hang_after, where)) if hung else
+                      ("The test process crashed (exit code %s)%s."
+                       % (proc.returncode, where)))
         if running:
             report.append("It was running: " + running)
         report.append("")
@@ -107,8 +126,10 @@ def run_suite(log_path: str | None = None) -> tuple[bool, str]:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--log", help="write the complete test output here")
+    ap.add_argument("--hang-after", type=int, default=HANG_AFTER,
+                    help="seconds before an unfinished run is stopped as hung")
     args = ap.parse_args()
-    passed, report = run_suite(args.log)
+    passed, report = run_suite(args.log, args.hang_after)
     # A failure's text can hold any character (translations, test data); a
     # console that cannot show one must not turn the report into a crash.
     try:

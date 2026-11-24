@@ -1,6 +1,6 @@
 # Release artifacts, both from the same commit:
 #
-#   EqUpdater-vX.Y.Z-Windows.exe            (windows-latest)
+#   EqUpdater-vX.Y.Z-Windows-Installer.exe  (windows-latest)
 #   EqUpdater-vX.Y.Z-Linux-x86_64.AppImage  (ubuntu-22.04: older glibc, so
 #                                            newer distributions run it too)
 #
@@ -70,8 +70,8 @@ jobs:
       - name: Keep the artifact
         uses: actions/upload-artifact@v4
         with:
-          name: EqUpdater-v${{ steps.version.outputs.version }}-Windows
-          path: dist/EqUpdater-v${{ steps.version.outputs.version }}-Windows.exe
+          name: EqUpdater-v${{ steps.version.outputs.version }}-Windows-Installer
+          path: dist/EqUpdater-v${{ steps.version.outputs.version }}-Windows-Installer.exe
 
       - name: Attach to the release
         if: github.event_name == 'release'
@@ -79,11 +79,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         # A copy without the version too: the README links to
-        # releases/latest/download/EqUpdater-Windows.exe, which GitHub
-        # serves from whichever release is the latest.
+        # releases/latest/download/EqUpdater-Windows-Installer.exe, which
+        # GitHub serves from whichever release is the latest. EqUpdater-Windows.exe
+        # is the same file under the old name, for links already posted
+        # elsewhere: without it they would stop working at this release.
         run: |
-          cp "dist/EqUpdater-v${{ steps.version.outputs.version }}-Windows.exe" dist/EqUpdater-Windows.exe
-          gh release upload "${{ github.event.release.tag_name }}" "dist/EqUpdater-v${{ steps.version.outputs.version }}-Windows.exe" dist/EqUpdater-Windows.exe --clobber
+          cp "dist/EqUpdater-v${{ steps.version.outputs.version }}-Windows-Installer.exe" dist/EqUpdater-Windows-Installer.exe
+          cp "dist/EqUpdater-v${{ steps.version.outputs.version }}-Windows-Installer.exe" dist/EqUpdater-Windows.exe
+          gh release upload "${{ github.event.release.tag_name }}" "dist/EqUpdater-v${{ steps.version.outputs.version }}-Windows-Installer.exe" dist/EqUpdater-Windows-Installer.exe dist/EqUpdater-Windows.exe --clobber
 
   linux:
     runs-on: ubuntu-22.04
