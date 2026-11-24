@@ -96,9 +96,50 @@ def icon_chat(color):
     return finish(im)
 
 
+def icon_download(color):
+    im, d = canvas()
+    c = S * K // 2
+    d.rectangle((c - 5 * K, 8 * K, c + 5 * K, 34 * K), fill=color)
+    d.polygon([(c - 16 * K, 32 * K), (c + 16 * K, 32 * K), (c, 50 * K)], fill=color)
+    d.rectangle((10 * K, 54 * K, 54 * K, 59 * K), fill=color)
+    return finish(im)
+
+
+def icon_remove(color):
+    im, d = canvas()
+    d.rectangle((14 * K, 14 * K, 50 * K, 19 * K), fill=color)
+    d.rectangle((26 * K, 8 * K, 38 * K, 14 * K), fill=color)
+    d.polygon([(18 * K, 22 * K), (46 * K, 22 * K), (43 * K, 58 * K), (21 * K, 58 * K)], fill=color)
+    return finish(im)
+
+
+def icon_release(color):
+    im, d = canvas()
+    d.arc((6 * K, 18 * K, 34 * K, 46 * K), 40, 320, fill=color, width=6 * K)
+    d.arc((30 * K, 18 * K, 58 * K, 46 * K), 220, 140, fill=color, width=6 * K)
+    return finish(im)
+
+
+def icon_link(color):
+    im, d = canvas()
+    d.rectangle((10 * K, 22 * K, 42 * K, 54 * K), outline=color, width=5 * K)
+    d.polygon([(34 * K, 8 * K), (56 * K, 8 * K), (56 * K, 30 * K)], fill=color)
+    d.line((26 * K, 38 * K, 54 * K, 10 * K), fill=color, width=5 * K)
+    return finish(im)
+
+
+def icon_check(color):
+    im, d = canvas()
+    d.line((12 * K, 34 * K, 26 * K, 48 * K), fill=color, width=8 * K)
+    d.line((26 * K, 48 * K, 52 * K, 16 * K), fill=color, width=8 * K)
+    return finish(im)
+
+
 def write_icons(skin, color, extra=True):
     icons = {"refresh": icon_refresh, "settings": icon_settings,
-             "arrow-down": icon_arrow_down}
+             "arrow-down": icon_arrow_down, "download": icon_download,
+             "remove": icon_remove, "release": icon_release, "link": icon_link,
+             "check": icon_check}
     if extra:
         icons.update({"support": icon_support, "discord": icon_chat})
     for name, fn in icons.items():

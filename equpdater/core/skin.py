@@ -66,6 +66,7 @@ COMPONENTS = (
     "text.error", "text.new", "text.ok",
     "icon.refresh", "icon.settings", "icon.arrow-down", "icon.discord",
     "icon.support", "icon.logo", "icon.external", "icon.update",
+    "icon.download", "icon.remove", "icon.release", "icon.link", "icon.check",
 )
 
 #: Implicit parents (``extends`` in a theme overrides these).

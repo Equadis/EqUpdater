@@ -15,14 +15,39 @@
     "scrim": "#a0020a1a"
   },
   "fonts": {
-    "body": { "family": "Arial", "size": 13 },
-    "dim": { "family": "Arial", "size": 11 },
-    "heading": { "family": "Arial", "size": 15, "bold": true },
-    "title": { "family": "Arial", "size": 30, "bold": true },
-    "button": { "family": "Arial", "size": 14, "bold": true },
-    "nav": { "family": "Arial", "size": 14, "bold": true }
+    "body": {
+      "family": "Arial",
+      "size": 13
+    },
+    "dim": {
+      "family": "Arial",
+      "size": 11
+    },
+    "heading": {
+      "family": "Arial",
+      "size": 15,
+      "bold": true
+    },
+    "title": {
+      "family": "Arial",
+      "size": 30,
+      "bold": true
+    },
+    "button": {
+      "family": "Arial",
+      "size": 14,
+      "bold": true
+    },
+    "nav": {
+      "family": "Arial",
+      "size": 14,
+      "bold": true
+    }
   },
-  "metrics": { "radius": 0, "scrollbarWidth": 6 },
+  "metrics": {
+    "radius": 0,
+    "scrollbarWidth": 6
+  },
   "background": {
     "color": "$bg",
     "static": "backgrounds/ocean-still.png",
@@ -32,37 +57,116 @@
     "fadeBottom": 200
   },
   "components": {
-    "panel": { "radius": 0, "padding": [18, 14, 14, 10] },
+    "panel": {
+      "radius": 0,
+      "padding": [
+        18,
+        14,
+        14,
+        10
+      ]
+    },
     "button": {
       "textures": {
-        "normal": "buttons/normal-normal.png", "hover": "buttons/normal-hover.png",
-        "pressed": "buttons/normal-pressed.png", "disabled": "buttons/normal-disabled.png",
+        "normal": "buttons/normal-normal.png",
+        "hover": "buttons/normal-hover.png",
+        "pressed": "buttons/normal-pressed.png",
+        "disabled": "buttons/normal-disabled.png",
         "selected": "buttons/normal-hover.png"
       },
-      "slice": [4, 4, 4, 4],
-      "textColors": { "normal": "$text", "hover": "$accentLight", "disabled": "$textDim" }
+      "slice": [
+        4,
+        4,
+        4,
+        4
+      ],
+      "textColors": {
+        "normal": "$text",
+        "hover": "$accentLight",
+        "disabled": "$textDim"
+      }
     },
     "button.play": {
       "textures": {
-        "normal": "buttons/play-normal.png", "hover": "buttons/play-hover.png",
-        "pressed": "buttons/play-pressed.png", "disabled": "buttons/play-disabled.png",
+        "normal": "buttons/play-normal.png",
+        "hover": "buttons/play-hover.png",
+        "pressed": "buttons/play-pressed.png",
+        "disabled": "buttons/play-disabled.png",
         "selected": "buttons/play-hover.png"
       },
-      "slice": [4, 4, 4, 4],
-      "textColors": { "normal": "#ffffff", "hover": "#ffffff", "disabled": "$textDim" },
+      "slice": [
+        4,
+        4,
+        4,
+        4
+      ],
+      "textColors": {
+        "normal": "#ffffff",
+        "hover": "#ffffff",
+        "disabled": "$textDim"
+      },
       "minHeight": 40,
-      "padding": [34, 8, 34, 8]
+      "padding": [
+        34,
+        8,
+        34,
+        8
+      ]
     },
-    "splitbutton.arrow": { "padding": [9, 8, 9, 8] },
+    "splitbutton.arrow": {
+      "padding": [
+        9,
+        8,
+        9,
+        8
+      ]
+    },
     "nav.tab": {
-      "textColors": { "normal": "$text", "hover": "$accentLight", "selected": "$accent" }
+      "textColors": {
+        "normal": "$text",
+        "hover": "$accentLight",
+        "selected": "$accent"
+      }
     },
-    "scrollbar": { "colors": { "selected": "#3a5f8a", "hover": "$accent", "pressed": "$accentLight" } },
-    "icon.logo": { "icon": "icons/logo.png" },
-    "icon.refresh": { "icon": "icons/refresh.png" },
-    "icon.settings": { "icon": "icons/settings.png" },
-    "icon.arrow-down": { "icon": "icons/arrow-down.png" },
-    "icon.discord": { "icon": "icons/discord.png" },
-    "icon.support": { "icon": "icons/coffee.png" }
+    "scrollbar": {
+      "colors": {
+        "selected": "#3a5f8a",
+        "hover": "$accent",
+        "pressed": "$accentLight"
+      }
+    },
+    "icon.logo": {
+      "icon": "icons/logo.png"
+    },
+    "icon.refresh": {
+      "icon": "icons/refresh.png"
+    },
+    "icon.settings": {
+      "icon": "icons/settings.png"
+    },
+    "icon.arrow-down": {
+      "icon": "icons/arrow-down.png"
+    },
+    "icon.discord": {
+      "icon": "icons/discord.png"
+    },
+    "icon.support": {
+      "icon": "icons/coffee.png"
+    },
+    "icon.download": {
+      "icon": "icons/download.png"
+    },
+    "icon.remove": {
+      "icon": "icons/remove.png"
+    },
+    "icon.release": {
+      "icon": "icons/release.png"
+    },
+    "icon.link": {
+      "icon": "icons/link.png"
+    },
+    "icon.check": {
+      "icon": "icons/check.png"
+    }
   }
 }

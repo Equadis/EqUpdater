@@ -377,6 +377,103 @@ class TestTweaksService(unittest.TestCase):
         self.pump.drain(self.tasks)
 
 
+class TestModsService(unittest.TestCase):
+    """Rows come from the lifted planner/config code; the service only shapes
+    them. Config is redirected to a temp file (never the real one)."""
+
+    def setUp(self):
+        from equpdater import config
+        from equpdater.core.mods_service import ModsService
+        from equpdater.core.ops_host import OpsHost, AutoDialogs
+        self.d = tempfile.mkdtemp()
+        self.game = os.path.join(self.d, "game")
+        os.makedirs(self.game)
+        self._cfg = config.CONFIG_FILE
+        config.CONFIG_FILE = os.path.join(self.d, "config.json")
+        self.addCleanup(setattr, config, "CONFIG_FILE", self._cfg)
+        self.events = []
+        self.pump = Pump()
+        self.tasks = TaskManager(2, self.pump)
+        s = {"game_dir": self.game}
+        self.settings = type("S", (), {"get": lambda _s, k, d=None: s.get(k, d)})()
+        self.dialogs = AutoDialogs(yes=True)
+        self.host = OpsHost(self.settings, events=lambda n, **kw: self.events.append(n),
+                            dialogs=self.dialogs)
+        self.svc = ModsService(self.host, self.tasks)
+
+    def items(self):
+        return self.svc.build_items()
+
+    def test_sections_and_counts_follow_the_game_folder(self):
+        for rel in ("VfPatcher.dll", "VanillaFixes.exe"):
+            with open(os.path.join(self.game, rel), "wb") as f:
+                f.write(b"x")
+        items = self.items()
+        heads = {i["title"]: i for i in items if i["kind"] == "header"}
+        self.assertEqual(list(heads), ["MANAGED", "INSTALLED LOCALLY", "AVAILABLE"])
+        self.assertEqual(heads["INSTALLED LOCALLY"]["count"], 1)
+        self.assertEqual(heads["INSTALLED LOCALLY"]["manageAll"], 1)
+        row = next(i for i in items if i.get("id") == "VanillaFixes")
+        self.assertEqual((row["section"], row["here"], row["managed"]),
+                         ("INSTALLED LOCALLY", True, False))
+        self.assertEqual(row["actionMode"], "adopt")          # "not managed"
+        self.assertEqual(sum(i["count"] for i in heads.values()), 12)
+
+    def test_a_closed_section_has_no_rows(self):
+        self.svc.open_sections["AVAILABLE"] = False
+        items = self.items()
+        self.assertFalse([i for i in items if i["kind"] == "mod" and i["section"] == "AVAILABLE"])
+        self.assertTrue(next(i for i in items if i.get("title") == "AVAILABLE")["count"])
+
+    def test_a_failed_install_shows_its_error_and_a_retry(self):
+        from equpdater import config
+        config.update_config(lambda c: c.setdefault("mods", {}).__setitem__(
+            "dxvk", {"managed": True, "error": "download blocked"}))
+        row = next(i for i in self.items() if i.get("id") == "dxvk")
+        self.assertEqual((row["hasError"], row["actionMode"]), (True, "retry"))
+        self.assertIn("download blocked", row["problem"])
+        self.assertEqual(row["problemSeverity"], "error")
+
+    def test_ignore_updates_is_saved_and_shown(self):
+        self.svc.set_ignore("dxvk", True)
+        from equpdater import config
+        self.assertTrue(config.load_config()["mods"]["dxvk"]["ignore_updates"])
+        self.assertTrue(next(i for i in self.items() if i.get("id") == "dxvk")["ignore"])
+
+    def test_clicks_route_to_the_lifted_methods(self):
+        from unittest import mock
+        h = self.host
+        for mode, method in (("adopt", "_adopt_mod"), ("act", "_update_mod"),
+                             ("recover", "_mod_force_replace"), ("retry", "_mod_recheck")):
+            with mock.patch.object(h, method) as m:
+                self.svc.click_action("dxvk", mode)
+                m.assert_called_once_with("dxvk")
+        with mock.patch.object(h, "_mod_force_replace") as m:
+            self.svc.force_replace("dxvk")
+            m.assert_called_once_with("dxvk")
+
+    def test_uninstall_asks_first_and_declining_changes_nothing(self):
+        for rel in ("VfPatcher.dll", "VanillaFixes.exe"):
+            with open(os.path.join(self.game, rel), "wb") as f:
+                f.write(b"x")
+        self.dialogs.yes = False
+        self.svc.uninstall("VanillaFixes")
+        self.assertTrue(os.path.exists(os.path.join(self.game, "VanillaFixes.exe")))
+        self.assertEqual([a[0] for a in self.dialogs.asked], ["yes_no"])
+        self.dialogs.yes = True
+        self.svc.uninstall("VanillaFixes")
+        self.assertFalse(os.path.exists(os.path.join(self.game, "VanillaFixes.exe")))
+
+    def test_rows_are_built_off_the_calling_thread_and_delivered_once(self):
+        got = []
+        self.svc.on_rows = got.append
+        self.svc.rebuild()
+        self.svc.rebuild()                 # a second request while one runs: shared
+        self.pump.drain(self.tasks)
+        self.assertGreaterEqual(len(got), 1)
+        self.assertLessEqual(self.tasks.started_count, 2)
+
+
 class TestPatchExeSafety(unittest.TestCase):
     """The 0-byte WoW.exe found on a dev machine: a bad cached base must never
     be written over the game."""

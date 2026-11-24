@@ -105,7 +105,10 @@ class Base(unittest.TestCase):
             after=lambda *a: None,
             _log_line=lambda *a: None, _render_mod_rows=lambda: None,
             _refresh_mods_badge=lambda: None, _refresh_manage_all=lambda: None,
-            _addons_verify=lambda **k: None)
+            _addons_verify=lambda **k: None,
+            # the dialog hooks the logic calls; the tests intercept messagebox
+            _ask_yes_no=lambda title, body, **kw: __import__(
+                "tkinter.messagebox", fromlist=["x"]).askyesno(title, body, **kw))
         cls = app.EqUpdaterApp
         for name in ("_found_mods", "_found_addons", "_record_mod_adoption",
                      "_record_addon_adoption", "_identify_adopted_addons",

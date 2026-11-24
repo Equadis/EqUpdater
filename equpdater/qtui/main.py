@@ -36,7 +36,8 @@ from ..core.launch import LaunchService                      # noqa: E402
 from ..core.news_service import Fetcher                      # noqa: E402
 from ..core.tasks import TaskManager                         # noqa: E402
 from ..core.tweaks_service import TweaksService              # noqa: E402
-from . import bridge                                         # noqa: E402
+from . import bridge, ops_bridge                             # noqa: E402
+from ..core.mods_service import ModsService                  # noqa: E402
 
 QML_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "qml")
 
@@ -98,6 +99,22 @@ def build(argv=None):
     news_bridge = bridge.NewsBridge(news_cache, tasks, fetcher, settings)
 
     tweaks_bridge = bridge.TweaksBridge(TweaksService(settings, tasks), app_bridge)
+    dialog_bridge = ops_bridge.DialogBridge()
+    host, holder = ops_bridge.make_host(settings, dialog_bridge, app_bridge, dispatcher)
+    mods_service = ModsService(host, tasks)
+    mods_bridge = ops_bridge.ModsBridge(mods_service, host, app_bridge)
+
+    def on_event(name, kw):
+        if name in ("mods_rows", "mods_finished"):
+            mods_service.rebuild()
+        elif name == "mods_badge":
+            app_bridge.setModUpdates(kw["count"])
+            mods_bridge.badgeChanged.emit()
+        elif name == "busy":
+            app_bridge.setBusy(kw["on"])
+        elif name == "status_error":
+            app_bridge.setStatus(kw["text"], True)
+    holder["handler"] = on_event
     launch_service = LaunchService(settings)
     launch_bridge = bridge.LaunchBridge(launch_service, tasks, app_bridge)
 
@@ -112,11 +129,13 @@ def build(argv=None):
     ctx = engine.rootContext()
     for name, obj in (("app", app_bridge), ("skin", skin_bridge),
                       ("settings", settings_bridge), ("news", news_bridge),
-                      ("tweaks", tweaks_bridge), ("launch", launch_bridge)):
+                      ("tweaks", tweaks_bridge), ("launch", launch_bridge),
+                      ("mods", mods_bridge), ("dialog", dialog_bridge)):
         ctx.setContextProperty(name, obj)
     marks["objects_ready_ms"] = round((time.perf_counter() - _T0) * 1000)
 
-    parts = dict(tweaks=tweaks_bridge, settings=settings, tasks=tasks, news=news_bridge,
+    parts = dict(mods=mods_bridge, mods_service=mods_service, host=host,
+                 dialog=dialog_bridge, tweaks=tweaks_bridge, settings=settings, tasks=tasks, news=news_bridge,
                  launch=launch_bridge, app=app_bridge, skin=skin_bridge,
                  settings_bridge=settings_bridge, marks=marks, fetcher=fetcher,
                  dispatcher=dispatcher, manager=manager, cache=news_cache)

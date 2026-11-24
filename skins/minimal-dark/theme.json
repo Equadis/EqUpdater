@@ -19,20 +19,71 @@
     "primaryPressed": "#325fba"
   },
   "fonts": {
-    "body": { "family": "Segoe UI", "size": 13 },
-    "dim": { "family": "Segoe UI", "size": 11 },
-    "heading": { "family": "Segoe UI", "size": 15, "bold": true },
-    "title": { "family": "Segoe UI", "size": 24, "bold": true },
-    "button": { "family": "Segoe UI", "size": 13, "bold": true },
-    "nav": { "family": "Segoe UI", "size": 13, "bold": true }
+    "body": {
+      "family": "Segoe UI",
+      "size": 13
+    },
+    "dim": {
+      "family": "Segoe UI",
+      "size": 11
+    },
+    "heading": {
+      "family": "Segoe UI",
+      "size": 15,
+      "bold": true
+    },
+    "title": {
+      "family": "Segoe UI",
+      "size": 24,
+      "bold": true
+    },
+    "button": {
+      "family": "Segoe UI",
+      "size": 13,
+      "bold": true
+    },
+    "nav": {
+      "family": "Segoe UI",
+      "size": 13,
+      "bold": true
+    }
   },
-  "background": { "color": "$bg" },
+  "background": {
+    "color": "$bg"
+  },
   "components": {
-    "icon.logo": { "icon": "icons/logo.png" },
-    "icon.refresh": { "icon": "icons/refresh.png" },
-    "icon.settings": { "icon": "icons/settings.png" },
-    "icon.arrow-down": { "icon": "icons/arrow-down.png" },
-    "icon.discord": { "icon": "icons/discord.png" },
-    "icon.support": { "icon": "icons/support.png" }
+    "icon.logo": {
+      "icon": "icons/logo.png"
+    },
+    "icon.refresh": {
+      "icon": "icons/refresh.png"
+    },
+    "icon.settings": {
+      "icon": "icons/settings.png"
+    },
+    "icon.arrow-down": {
+      "icon": "icons/arrow-down.png"
+    },
+    "icon.discord": {
+      "icon": "icons/discord.png"
+    },
+    "icon.support": {
+      "icon": "icons/support.png"
+    },
+    "icon.download": {
+      "icon": "icons/download.png"
+    },
+    "icon.remove": {
+      "icon": "icons/remove.png"
+    },
+    "icon.release": {
+      "icon": "icons/release.png"
+    },
+    "icon.link": {
+      "icon": "icons/link.png"
+    },
+    "icon.check": {
+      "icon": "icons/check.png"
+    }
   }
 }

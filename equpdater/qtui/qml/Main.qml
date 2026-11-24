@@ -98,6 +98,7 @@ Window {
                 visible: app.tab === modelData.id
                 source: modelData.id === "news" ? "pages/NewsPage.qml"
                       : modelData.id === "tweaks" ? "pages/TweaksPage.qml"
+                      : modelData.id === "mods" ? "pages/ModsPage.qml"
                       : "pages/PlaceholderPage.qml"
                 onLoaded: if (item.pageName !== undefined) item.pageName = app.t(modelData.label)
             }
@@ -179,4 +180,5 @@ Window {
     }
 
     SettingsOverlay { id: settingsView; anchors.fill: parent }
+    DialogHost { anchors.fill: parent; z: 100 }
 }

@@ -569,13 +569,27 @@ class AppBridge(QObject):
     def statusIsError(self):
         return self._status_err
 
-    @Property(bool, constant=True)
+    busyChanged = Signal()
+    _busy = False
+    _mod_updates = 0
+
+    @Property(bool, notify=busyChanged)
     def busy(self):
-        return False
+        return self._busy
+
+    def setBusy(self, on: bool):
+        if on != self._busy:
+            self._busy = on
+            self.busyChanged.emit()
 
     @Property(int, notify=countsChanged)
     def modUpdates(self):
-        return 0
+        return self._mod_updates
+
+    def setModUpdates(self, n: int):
+        if n != self._mod_updates:
+            self._mod_updates = n
+            self.countsChanged.emit()
 
     @Property(int, notify=countsChanged)
     def addonUpdates(self):

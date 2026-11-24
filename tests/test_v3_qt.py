@@ -292,6 +292,73 @@ class TestTweaksPage(Base):
         self.assertEqual(self.qml_errors(), [])
 
 
+class TestModsPage(Base):
+    def open_page(self):
+        p = self.start()
+        p["app"].tab = "mods"
+        pump(until=lambda: p["mods"].model.rowCount() > 0, limit=6000)
+        pump(300)
+        self.assertEqual(self.qml_errors(), [])
+        return p
+
+    def test_page_lists_every_mod_in_sections_and_renders_in_both_skins(self):
+        p = self.open_page()
+        lm = p["mods"].model
+        kinds = [lm.index(i).data(Qt.ItemDataRole.UserRole + 2) for i in range(lm.rowCount())]
+        self.assertEqual(kinds.count("header"), 3)
+        self.assertEqual(kinds.count("mod"), 12)
+        for sid in p["manager"].skins:
+            p["settings_bridge"].setSkin(sid)
+            pump(200)
+        self.assertEqual(self.qml_errors(), [])
+
+    def test_one_mod_changing_repaints_one_row_and_nothing_else(self):
+        from equpdater import config
+        p = self.open_page()
+        lm = p["mods"].model
+        before = dict(lm.stats)
+        config.update_config(lambda c: c.setdefault("mods", {}).setdefault(
+            "dxvk", {}).__setitem__("ignore_updates", True))
+        p["mods_service"].rebuild()
+        pump(until=lambda: lm.stats["changed"] > before["changed"], limit=4000)
+        pump(100)
+        after = lm.stats
+        self.assertEqual(after["changed"] - before["changed"], 1)
+        self.assertEqual((after["inserted"], after["removed"], after["resets"]),
+                         (before["inserted"], before["removed"], before["resets"]))
+
+    def test_scroll_position_survives_a_row_update(self):
+        from equpdater import config
+        p = self.open_page()
+        lv = self.lst("modsList")
+        lv.setProperty("contentY", 120)
+        pump(100)
+        config.update_config(lambda c: c.setdefault("mods", {}).setdefault(
+            "nampower", {}).__setitem__("ignore_updates", True))
+        p["mods_service"].rebuild()
+        pump(400)
+        self.assertAlmostEqual(lv.property("contentY"), 120, delta=1)
+
+    def test_collapsing_a_section_removes_only_its_rows(self):
+        p = self.open_page()
+        lm = p["mods"].model
+        before = dict(lm.stats)
+        p["mods"].toggleSection("AVAILABLE")
+        pump(until=lambda: lm.rowCount() < 15, limit=4000)
+        self.assertEqual(lm.rowCount(), 3)                    # the three headers; this profile has no game files
+        self.assertEqual(lm.stats["resets"], before["resets"])
+
+    def test_dialog_blocks_its_caller_until_answered(self):
+        p = self.start()
+        d = p["dialog"]
+        d.auto = None
+        result = []
+        QTimer.singleShot(50, lambda: (self.assertTrue(d.open), d.answer(True)))
+        result.append(d.ask("yes_no", "Uninstall?", "body"))
+        self.assertEqual(result, [True])
+        self.assertFalse(d.open)
+
+
 class TestOffline(Base):
     def test_offline_shows_cache_and_an_error_not_an_empty_page(self):
         p = self.start()

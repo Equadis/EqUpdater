@@ -13,3 +13,5 @@ SkinMenu 1.0 SkinMenu.qml
 Background 1.0 Background.qml
 VideoLayer 1.0 VideoLayer.qml
 SkinNumberField 1.0 SkinNumberField.qml
+SkinIconButton 1.0 SkinIconButton.qml
+SkinToolTipArea 1.0 SkinToolTipArea.qml
