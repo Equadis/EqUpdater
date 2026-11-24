@@ -1,39 +1,63 @@
-# OctoBot integration assessment (Phase 6 input)
+# OctoBot integration: request/billing architecture and recommendation
 
-Source: https://github.com/Equadis/OctoBot (public), inspected 2026-11-24. Endpoints verified live with `curl`.
+Inspected 2026-11-24 from https://github.com/Equadis/OctoBot (public) and the live endpoints. **Nothing in OctoBot or Cloudflare was changed.** Prices below are from Cloudflare's public pricing as returned by search on 2026-11-24 and must be re-checked on the pricing page before any decision.
 
-## Actual data sources
+## 1. What exists
 
-| Data | Endpoint | Producer / cadence | Headers | Notes |
+| Data | Where | Produced by | Response headers |
+|---|---|---|---|
+| Population: `{all, nzoth, yshaarj, cthun}`, each `{timestamp, online, source}` | `https://octobot-population.eqvoice.workers.dev/api/latest` | Worker **cron `* * * * *`** inserts into D1 `readings` | `cache-control: no-store` (all Worker responses) |
+| Status: `{schema, sample:{timestamp, website, realms{}, tcp, auth, latency_ms, source_error}}` | `…/api/status/latest` | same cron | `no-store` |
+| Same data, static | `https://equadis.github.io/OctoBot/live.json`, `status/latest.json`, `realms.json` | GitHub Actions every 5 min (best effort) | `max-age=600`, ETag, CORS `*` |
+
+`wrangler.toml`: `workers_dev = true` (served from `*.workers.dev`), one D1 database, one cron. `/api/latest` runs a `SELECT` on D1 per request (`index.js` ~L145); other endpoints write `viewer_presence` rows — **the launcher must never call those**.
+
+## 2. The five layers (what is and is not billed)
+
+| Layer | Effect of `Cache-Control: max-age=30` on a Worker response |
+|---|---|
+| Client cache | The launcher can honour it (it would skip requests inside 30 s) — but players' clients differ, so this alone does not reduce load much |
+| Cloudflare edge cache | **Not applied.** A Worker runs *before* the cache; the Cache API does nothing on `*.workers.dev` (Cloudflare docs: "any *.workers.dev deployments will have no impact"). Edge caching needs a custom domain (or Cloudflare's newer Workers Caching, whose availability/pricing I could not verify) |
+| Worker invocations | Billed per request, **cached or not**, while the Worker is in the path |
+| D1 reads | Only if the handler queries; today `/api/latest` does. 25 B rows read/month are included on paid, 5 M/day on free: reads are not the bottleneck |
+| Upstream collection | Fixed: 1 cron/minute regardless of how many launchers exist. Unaffected by clients |
+| GitHub Pages | Static CDN (Fastly), no Worker, no per-request cost; but updated only every 5–10 min and best-effort; soft limits ~100 GB/month bandwidth |
+
+So the earlier suggestion ("add `max-age=30` to the Worker") **would not make cost flat** on workers.dev. Correction accepted.
+
+## 3. Options
+
+| | A. Poll today's Worker | B. Poll GitHub Pages JSON | C. New combined snapshot as a *static* object (proposal) |
+|---|---|---|---|
+| Freshness | ≤ 1 min | 5–15 min | ≤ 1 min |
+| Infrastructure change | none | none | cron additionally writes one `snapshot.json` to a public static origin (R2 public bucket on a custom domain with cache rules, or Workers Static Assets/KV behind a cached route). **Needs your approval; not done** |
+| Cost scales with launchers? | **Yes**, linearly (Worker request each) | Effectively no | No (served from CDN edge; origin touched ~once per cache TTL per region) |
+| Requests per launcher per min | 2 (population + status) | 2 (or 1 with ETag 304) | **1** |
+
+Snapshot shape (≈300–500 B): `{schema:1, generated_ms, population:{all,nzoth,yshaarj,cthun:{online,ts}}, status:{website,realms{},tcp,auth,latency_ms,ts}, incidents:[…]}` — one object with its own freshness timestamps, so the launcher decides *stale* locally and never infers *offline* from a failed request.
+
+## 4. Projected cost (request charges only)
+
+Assumptions: every active launcher polls once per minute with ±15 s jitter; "evening" = 6 active hours/day × 30 days; "sustained" = all day. Workers Paid ($5/mo) includes 10 M requests, overage $0.30/M *(unverified this session)*. Free tier 100 k Worker requests/day.
+
+| Concurrent launchers | A: Worker, **2 req/min** (evening) | A, sustained | A with one combined Worker request (1/min), evening | C: static snapshot |
 |---|---|---|---|---|
-| Population per realm + All | `https://octobot-population.eqvoice.workers.dev/api/latest` | Cloudflare Worker cron, **every 1 min**, stored in D1 | `Cache-Control: no-store`, CORS `*` | `{all,nzoth,yshaarj,cthun}` each `{timestamp, online, source}`. Realm counts from in-game `.server info`; `all` from official census. Failed fetch records nothing (never 0). |
-| Status (online/offline/auth/tcp/latency) | `…/api/status/latest` | same Worker, 1 min | `no-store` | `{schema:1, source, sample:{timestamp, website, realms{…:"online"…}, tcp, auth, latency_ms, source_error}}`. Failed/blocked probe → **unknown**, and offline needs consecutive explicit offline readings. |
-| Status health/history | `…/api/status/health`, `…/api/status/history?since=` | same | | `health` gives last-reading freshness; history paginated (`has_more`, `next_since`). Not needed for the launcher. |
-| Static fallback | `https://equadis.github.io/OctoBot/live.json`, `status/latest.json` | GitHub Actions, **5 min best-effort** (`population.yml`, `status.yml`) | `max-age=600`, `ETag`, CORS `*` | Pages/CDN-served: effectively free, but up to ~15 min stale. |
-| Realm list | `…/realms.json` | static | `max-age=600` | ids + display names (“N’Zoth (Normal)”, “Y’Shaarj (PvP)”, “C’Thun (Hardcore)”). Use for realm names; do not hardcode. |
+| 100 | 2.2 M/mo (72 k/day: inside the free tier) | 8.6 M/mo (288 k/day: over the free tier ⇒ $5 plan) | 1.1 M ⇒ $5 | ≈ $0 |
+| 1,000 | 21.6 M/mo ⇒ **≈ $8.5** | 86 M ⇒ **≈ $28** | 10.8 M ⇒ ≈ $5.2 | ≈ $0 |
+| 5,000 | 108 M ⇒ **≈ $34** | 432 M ⇒ **≈ $132** | 54 M ⇒ ≈ $18 | ≈ $0 |
+| 10,000 | 216 M ⇒ **≈ $67** | 864 M ⇒ **≈ $261** | 108 M ⇒ ≈ $35 | ≈ $0 (bandwidth: 10 k × 1440 × 30 × 400 B ≈ 170 GB/mo, mostly 304s/edge) |
 
-The website itself polls `/api/latest` every 60 s and merges with the GitHub fallback — the launcher should mirror that semantics.
+D1 reads: ≤ 3 rows per request ⇒ even 864 M requests ≈ 2.6 B rows, ~10 % of the paid inclusion: negligible. Worker CPU time: tiny per request; not a factor.
 
-## Semantics to adopt (authoritative = OctoBot)
-States: `online`, `offline`, `degraded` (website/auth/tcp disagree with realm label — derive exactly as `docs/status-dashboard.js` does; **to be copied from source in Phase 6, not guessed**), `unknown` (probe failed / `source_error`), plus launcher-side overlays **stale** (last sample older than 3× cadence) and **unavailable** (our request failed — shows last good value, never “offline”). Uptime/incident data: derive from `status/history.json`/`bot-history.json` only if cheap; otherwise omit v1.
+These are small absolute numbers; the point is the **shape**: A grows with users, C does not. At 1,000 concurrent the free tier is already gone under A.
 
-## Refresh strategy
-- Active window: 60 s; unfocused 5 min; minimised: paused; on activate: refresh if last > 30 s.
-- Conditional GET on static files (`If-None-Match`); Worker endpoints are `no-store` so use `If-Modified-Since` only if added upstream.
-- Single in-flight request per endpoint (TaskManager dedupe), jitter ±10 s, exponential backoff 60→120→240→… cap 15 min, reset on success. Persist last good payload to `cache/server.json`.
-- Fetch population + status in **one tick** (2 requests/min/user worst case).
-- Not recommended: WebSockets/SSE (none exist upstream; data only changes once a minute).
+## 5. Recommendation
+1. **Phase 6 default: option B+ now, C when approved.** Ship the client against a *snapshot interface* (one URL, one schema, ETag-conditional, freshness-stamped). Initially feed it by combining `live.json` + `status/latest.json` (GitHub Pages, no infra change, free, 5–15 min stale and labelled as such). Switch the URL to a static snapshot when you approve option C — no client change.
+2. Never poll `/api/latest` directly from every launcher.
+3. Client behaviour (implemented in `core/server.py` in Phase 6): 60 s active (±15 s jitter), 5 min unfocused, paused minimised, one refresh on re-activation if older than 30 s; conditional GET; exponential backoff 60 s → 15 min on failure, reset on success; last good snapshot persisted to `cache/server.json`; states `online/offline/degraded/unknown` from OctoBot's own semantics, plus launcher-side `stale` (older than 3× cadence) and `unavailable` (our fetch failed — shows last good value, **never offline**).
+4. Placement: a compact footer chip (dot + total online; popover with per-realm numbers and "updated Xm ago"), identical across skins.
 
-## Infrastructure cost (Worker + D1, current `no-store`)
-Requests/day = users × active-minutes/day × 2 endpoints. Assume 2 h active/day (120 min).
-
-| Concurrent users (assumed 4× daily users) | Worker requests/day | vs Workers free tier (100k/day) |
-|---|---|---|
-| 100 | 100×120×2 = 24,000 | 24% |
-| 1,000 | 240,000 | **exceeds free tier → paid plan (~$5/mo incl. 10 M requests)** |
-| 10,000 | 2.4 M | within paid plan quota; D1 reads depend on whether handlers query D1 per request |
-
-Peak rate at 10,000 concurrent ≈ 333 req/s — fine for Workers, but **each uncached call may hit D1**. **Recommended upstream change (needs your approval, not applied):** add `Cache-Control: public, max-age=30, stale-while-revalidate=60` to `/api/latest` and `/api/status/latest`. Then Cloudflare edge answers repeats, origin/D1 load collapses to ~2–4 req/min regardless of user count and cost is flat. Without it, launcher polling is ≈ proportional to users. Alternative requiring no upstream change: poll only the GitHub Pages JSON (5 min cadence, CDN, free) — acceptable but ≥ 5–15 min stale.
-
-## UI placement (to evaluate on all five skins in Phase 6)
-Recommended: compact **footer status chip** (dot + total online + tooltip/popover listing realms, last update, stale marker) — it fits every skin and the existing footer layout; News page gets no extra panel.
+## 6. Open items needing you
+- Approve (or reject) producing a static snapshot from the existing cron (R2/Static Assets). I will draft the exact patch as a PR against OctoBot for review; nothing deployed.
+- Confirm current Cloudflare prices before relying on the table.
+- Population `nzoth/yshaarj/cthun` come from in-game `.server info`, `all` from the website census (`realms.json` notes some realms as "waiting for verified feed"): the UI will show per-realm figures only when present and label the source.

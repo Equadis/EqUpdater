@@ -5,7 +5,7 @@ Item {
     id: root
     property string text: ""
     property bool checked: false
-    readonly property var spec: skin.theme.components["checkbox"]
+    readonly property var spec: Style.theme.components["checkbox"]
     readonly property string vstate: Style.stateOf(enabled, false, false, hover.hovered)
     signal toggled()
     implicitWidth: row.implicitWidth
@@ -48,8 +48,8 @@ Item {
             id: label
             text: root.text
             color: Style.pick(root.spec.textColors, root.vstate, "#fff")
-            font.family: skin.theme.fonts.body.family
-            font.pixelSize: skin.theme.fonts.body.size
+            font.family: Style.theme.fonts.body.family
+            font.pixelSize: Style.theme.fonts.body.size
             anchors.verticalCenter: parent.verticalCenter
         }
     }

@@ -5,8 +5,8 @@ import EqUi
 // Thin overlay scrollbar, skinned. Attach with `C.ScrollBar.vertical: SkinScrollBar {}`.
 C.ScrollBar {
     id: bar
-    readonly property var spec: skin.theme.components["scrollbar"]
-    readonly property int w: skin.theme.metrics.scrollbarWidth || 8
+    readonly property var spec: Style.theme.components["scrollbar"]
+    readonly property int w: Style.theme.metrics.scrollbarWidth || 8
     policy: C.ScrollBar.AsNeeded
     minimumSize: 0.08
     padding: 2
@@ -20,7 +20,7 @@ C.ScrollBar {
             radius: bar.spec.radius
             color: Style.pick(bar.spec.colors, bar.pressed ? "pressed" : (bar.hovered ? "hover" : "selected"), "#888")
             opacity: bar.active ? 1.0 : 0.0
-            Behavior on opacity { NumberAnimation { duration: skin.theme.metrics.animationMs || 120 } }
+            Behavior on opacity { NumberAnimation { duration: Style.theme.metrics.animationMs || 120 } }
         }
         BorderImage {
             anchors.fill: parent

@@ -11,7 +11,7 @@ import EqUi
 // Video is still supported for skins that ship it (animationKind "video").
 Item {
     id: root
-    readonly property var bg: skin.theme.background
+    readonly property var bg: Style.theme.background
     // One switch decides whether anything animates: the setting, the skin
     // having an animation, and the window being visible/focused as configured.
     readonly property bool animate: settings.animatedBackground
@@ -70,7 +70,7 @@ Item {
         anchors { left: parent.left; right: parent.right; top: parent.top }
         height: root.bg.fadeTop
         gradient: Gradient {
-            GradientStop { position: 0.0; color: Style.pick(skin.theme.components["window"].colors, "normal", "#000") }
+            GradientStop { position: 0.0; color: Style.pick(Style.theme.components["window"].colors, "normal", "#000") }
             GradientStop { position: 1.0; color: "transparent" }
         }
     }
@@ -80,7 +80,7 @@ Item {
         height: root.bg.fadeBottom
         gradient: Gradient {
             GradientStop { position: 0.0; color: "transparent" }
-            GradientStop { position: 1.0; color: Style.pick(skin.theme.components["window"].colors, "normal", "#000") }
+            GradientStop { position: 1.0; color: Style.pick(Style.theme.components["window"].colors, "normal", "#000") }
         }
     }
 }

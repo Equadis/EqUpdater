@@ -1,0 +1,377 @@
+{
+ "machine": {
+  "cpu": 12,
+  "python": "3.12.10",
+  "ram_gb": 31.9
+ },
+ "old": "D:/EqUpdater-queue",
+ "new": "D:\\EqUpdater",
+ "old_anim_on_first_launch_empty_cache": {
+  "which": "old",
+  "visible_ms": 2691,
+  "interactive_ms": 3648,
+  "requests": 12
+ },
+ "old_anim_on_cached": {
+  "visible_ms": 3103,
+  "interactive_ms": 3121,
+  "idle_cpu_pct": 46.9,
+  "rss_mb": 98.0,
+  "requests": 0,
+  "runs": 5
+ },
+ "old_anim_on_cached_rows": [
+  {
+   "which": "old",
+   "visible_ms": 3099,
+   "interactive_ms": 3117,
+   "requests": 0,
+   "idle_cpu_pct": 45.3,
+   "rss_mb": 98.0
+  },
+  {
+   "which": "old",
+   "visible_ms": 3097,
+   "interactive_ms": 3107,
+   "requests": 0,
+   "idle_cpu_pct": 56.1,
+   "rss_mb": 98.14
+  },
+  {
+   "which": "old",
+   "visible_ms": 3114,
+   "interactive_ms": 3132,
+   "requests": 0,
+   "idle_cpu_pct": 46.9,
+   "rss_mb": 97.56
+  },
+  {
+   "which": "old",
+   "visible_ms": 3127,
+   "interactive_ms": 3135,
+   "requests": 0,
+   "idle_cpu_pct": 49.2,
+   "rss_mb": 96.41
+  },
+  {
+   "which": "old",
+   "visible_ms": 3103,
+   "interactive_ms": 3121,
+   "requests": 0,
+   "idle_cpu_pct": 46.9,
+   "rss_mb": 98.33
+  }
+ ],
+ "old_anim_off_first_launch_empty_cache": {
+  "which": "old",
+  "visible_ms": 2714,
+  "interactive_ms": 3648,
+  "requests": 12
+ },
+ "old_anim_off_cached": {
+  "visible_ms": 3113,
+  "interactive_ms": 3116,
+  "idle_cpu_pct": 0.2,
+  "rss_mb": 80.4,
+  "requests": 0,
+  "runs": 5
+ },
+ "old_anim_off_cached_rows": [
+  {
+   "which": "old",
+   "visible_ms": 3113,
+   "interactive_ms": 3116,
+   "requests": 0,
+   "idle_cpu_pct": 0.2,
+   "rss_mb": 80.05
+  },
+  {
+   "which": "old",
+   "visible_ms": 3100,
+   "interactive_ms": 3106,
+   "requests": 0,
+   "idle_cpu_pct": 0.0,
+   "rss_mb": 80.09
+  },
+  {
+   "which": "old",
+   "visible_ms": 3117,
+   "interactive_ms": 3119,
+   "requests": 0,
+   "idle_cpu_pct": 0.2,
+   "rss_mb": 80.66
+  },
+  {
+   "which": "old",
+   "visible_ms": 3129,
+   "interactive_ms": 3135,
+   "requests": 0,
+   "idle_cpu_pct": 0.3,
+   "rss_mb": 80.47
+  },
+  {
+   "which": "old",
+   "visible_ms": 3074,
+   "interactive_ms": 3083,
+   "requests": 0,
+   "idle_cpu_pct": 0.0,
+   "rss_mb": 80.4
+  }
+ ],
+ "new_anim_on_first_launch_empty_cache": {
+  "which": "new",
+  "visible_ms": 1334,
+  "interactive_ms": 1489,
+  "python_marks": {
+   "process_to_main_ms": 294,
+   "objects_ready_ms": 655,
+   "qml_loaded_ms": 1256,
+   "first_frame_ms": 1415,
+   "interactive_ms": 1415,
+   "epoch_interactive": 1795487149.8108542
+  }
+ },
+ "new_anim_on_cached": {
+  "visible_ms": 1613,
+  "interactive_ms": 1782,
+  "idle_cpu_pct": 0.0,
+  "rss_mb": 225.7,
+  "requests": null,
+  "runs": 5
+ },
+ "new_anim_on_cached_rows": [
+  {
+   "which": "new",
+   "visible_ms": 1300,
+   "interactive_ms": 1465,
+   "python_marks": {
+    "process_to_main_ms": 289,
+    "objects_ready_ms": 654,
+    "qml_loaded_ms": 1224,
+    "first_frame_ms": 1389,
+    "interactive_ms": 1389,
+    "epoch_interactive": 1795487151.7278543
+   },
+   "idle_cpu_pct": 1.6,
+   "rss_mb": 236.86
+  },
+  {
+   "which": "new",
+   "visible_ms": 1638,
+   "interactive_ms": 1813,
+   "python_marks": {
+    "process_to_main_ms": 297,
+    "objects_ready_ms": 658,
+    "qml_loaded_ms": 1564,
+    "first_frame_ms": 1735,
+    "interactive_ms": 1737,
+    "epoch_interactive": 1795487167.0011895
+   },
+   "idle_cpu_pct": 0.0,
+   "rss_mb": 225.55
+  },
+  {
+   "which": "new",
+   "visible_ms": 1609,
+   "interactive_ms": 1782,
+   "python_marks": {
+    "process_to_main_ms": 298,
+    "objects_ready_ms": 657,
+    "qml_loaded_ms": 1540,
+    "first_frame_ms": 1709,
+    "interactive_ms": 1710,
+    "epoch_interactive": 1795487182.2507923
+   },
+   "idle_cpu_pct": 0.2,
+   "rss_mb": 225.82
+  },
+  {
+   "which": "new",
+   "visible_ms": 1613,
+   "interactive_ms": 1774,
+   "python_marks": {
+    "process_to_main_ms": 297,
+    "objects_ready_ms": 662,
+    "qml_loaded_ms": 1537,
+    "first_frame_ms": 1701,
+    "interactive_ms": 1703,
+    "epoch_interactive": 1795487197.4843502
+   },
+   "idle_cpu_pct": 0.0,
+   "rss_mb": 224.32
+  },
+  {
+   "which": "new",
+   "visible_ms": 1651,
+   "interactive_ms": 1824,
+   "python_marks": {
+    "process_to_main_ms": 299,
+    "objects_ready_ms": 671,
+    "qml_loaded_ms": 1582,
+    "first_frame_ms": 1750,
+    "interactive_ms": 1752,
+    "epoch_interactive": 1795487212.766212
+   },
+   "idle_cpu_pct": 0.0,
+   "rss_mb": 225.68
+  }
+ ],
+ "new_anim_off_first_launch_empty_cache": {
+  "which": "new",
+  "visible_ms": 1491,
+  "interactive_ms": 1651,
+  "python_marks": {
+   "process_to_main_ms": 345,
+   "objects_ready_ms": 756,
+   "qml_loaded_ms": 1410,
+   "first_frame_ms": 1571,
+   "interactive_ms": 1571,
+   "epoch_interactive": 1795487227.8895042
+  }
+ },
+ "new_anim_off_cached": {
+  "visible_ms": 1804,
+  "interactive_ms": 2008,
+  "idle_cpu_pct": 0.3,
+  "rss_mb": 222.5,
+  "requests": null,
+  "runs": 5
+ },
+ "new_anim_off_cached_rows": [
+  {
+   "which": "new",
+   "visible_ms": 1252,
+   "interactive_ms": 1417,
+   "python_marks": {
+    "process_to_main_ms": 296,
+    "objects_ready_ms": 664,
+    "qml_loaded_ms": 1173,
+    "first_frame_ms": 1342,
+    "interactive_ms": 1342,
+    "epoch_interactive": 1795487229.7572527
+   },
+   "idle_cpu_pct": 4.4,
+   "rss_mb": 230.93
+  },
+  {
+   "which": "new",
+   "visible_ms": 1642,
+   "interactive_ms": 1800,
+   "python_marks": {
+    "process_to_main_ms": 297,
+    "objects_ready_ms": 661,
+    "qml_loaded_ms": 1567,
+    "first_frame_ms": 1728,
+    "interactive_ms": 1730,
+    "epoch_interactive": 1795487245.029099
+   },
+   "idle_cpu_pct": 0.0,
+   "rss_mb": 222.48
+  },
+  {
+   "which": "new",
+   "visible_ms": 1882,
+   "interactive_ms": 2089,
+   "python_marks": {
+    "process_to_main_ms": 336,
+    "objects_ready_ms": 748,
+    "qml_loaded_ms": 1809,
+    "first_frame_ms": 2011,
+    "interactive_ms": 2011,
+    "epoch_interactive": 1795487260.5798044
+   },
+   "idle_cpu_pct": 0.5,
+   "rss_mb": 222.54
+  },
+  {
+   "which": "new",
+   "visible_ms": 1804,
+   "interactive_ms": 2008,
+   "python_marks": {
+    "process_to_main_ms": 304,
+    "objects_ready_ms": 726,
+    "qml_loaded_ms": 1729,
+    "first_frame_ms": 1930,
+    "interactive_ms": 1932,
+    "epoch_interactive": 1795487276.0515482
+   },
+   "idle_cpu_pct": 0.3,
+   "rss_mb": 222.34
+  },
+  {
+   "which": "new",
+   "visible_ms": 1926,
+   "interactive_ms": 2113,
+   "python_marks": {
+    "process_to_main_ms": 330,
+    "objects_ready_ms": 769,
+    "qml_loaded_ms": 1836,
+    "first_frame_ms": 2024,
+    "interactive_ms": 2024,
+    "epoch_interactive": 1795487291.6402762
+   },
+   "idle_cpu_pct": 0.0,
+   "rss_mb": 222.77
+  }
+ ],
+ "scenarios_old": {
+  "scroll_ann": {
+   "n": 240,
+   "p50_ms": 2.29,
+   "p95_ms": 3.94,
+   "p99_ms": 5.48,
+   "max_ms": 7.23,
+   "over_16ms": 0,
+   "over_33ms": 0
+  },
+  "scroll_patch": {
+   "n": 240,
+   "p50_ms": 2.07,
+   "p95_ms": 3.7,
+   "p99_ms": 5.46,
+   "max_ms": 7.12,
+   "over_16ms": 0,
+   "over_33ms": 0
+  },
+  "expand_ann": {
+   "n": 18,
+   "p50_ms": 19.33,
+   "p95_ms": 159.39,
+   "p99_ms": 159.39,
+   "max_ms": 159.39,
+   "over_16ms": 15,
+   "over_33ms": 8
+  },
+  "tab_first_visit": {
+   "n": 5,
+   "p50_ms": 45.42,
+   "p95_ms": 109.28,
+   "p99_ms": 109.28,
+   "max_ms": 109.28,
+   "over_16ms": 4,
+   "over_33ms": 4
+  },
+  "tab_revisit": {
+   "n": 10,
+   "p50_ms": 23.53,
+   "p95_ms": 35.95,
+   "p99_ms": 35.95,
+   "max_ms": 35.95,
+   "over_16ms": 8,
+   "over_33ms": 2
+  },
+  "resize": {
+   "n": 40,
+   "p50_ms": 217.04,
+   "p95_ms": 524.51,
+   "p99_ms": 1399.72,
+   "max_ms": 1399.72,
+   "over_16ms": 39,
+   "over_33ms": 39
+  },
+  "network_requests": 17
+ },
+ "scenarios_new": {
+  "error": "Traceback (most recent call last):\n  File \"D:\\EqUpdater\\tools\\bench\\qt_scenarios.py\", line 99, in <module>\n    lv = {n: next(i for i in walk(win.property(\"contentItem\")) if i.objectName() == n)\n                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^\nRuntimeError: Can't find converter for 'QQuickItem*'.\n"
+ }
+}

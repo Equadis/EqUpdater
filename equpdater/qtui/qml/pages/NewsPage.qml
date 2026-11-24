@@ -9,11 +9,11 @@ Item {
         id: left
         section: news.announcements
         anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
-        width: (parent.width - skin.theme.layout.panelGap) * 0.52
+        width: (parent.width - Style.theme.layout.panelGap) * 0.52
     }
     NewsPanel {
         section: news.changelog
         anchors { left: left.right; right: parent.right; top: parent.top; bottom: parent.bottom
-                  leftMargin: skin.theme.layout.panelGap }
+                  leftMargin: Style.theme.layout.panelGap }
     }
 }

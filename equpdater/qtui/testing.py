@@ -15,6 +15,7 @@ counts them, so a test can assert "scrolling made no request".
 from __future__ import annotations
 
 import json
+import os
 import time
 
 from .. import news
@@ -60,3 +61,17 @@ class FixtureFetcher:
     def feed(self):
         self.requests += 1
         return []
+
+
+# ── a whole fake forum ───────────────────────────────────────────────────────
+# Lives in tools/bench/fakesite.py (stdlib only, so the 2.x app can be run
+# against the very same forum); loaded from there when a run asks for it.
+
+def FakeSiteOpener(path):                                      # noqa: N802
+    import importlib.util
+    here = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    spec = importlib.util.spec_from_file_location(
+        "fakesite", os.path.join(here, "tools", "bench", "fakesite.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.FakeSiteOpener(path)

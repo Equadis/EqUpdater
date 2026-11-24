@@ -6,7 +6,7 @@ Item {
     property string text: ""
     property bool selected: false
     property int badge: 0
-    readonly property var spec: skin.theme.components["nav.tab"]
+    readonly property var spec: Style.theme.components["nav.tab"]
     readonly property string vstate: Style.stateOf(enabled, false, selected, hover.hovered)
     signal clicked()
     implicitWidth: label.implicitWidth + spec.padding[0] + spec.padding[2]
@@ -49,14 +49,14 @@ Item {
         width: Math.max(16, bt.implicitWidth + 8)
         height: 16
         radius: 8
-        color: Style.pick(skin.theme.components["badge"].colors, "normal", "#fa0")
+        color: Style.pick(Style.theme.components["badge"].colors, "normal", "#fa0")
         Text {
             id: bt
             anchors.centerIn: parent
             text: root.badge
             font.pixelSize: 10
             font.bold: true
-            color: Style.pick(skin.theme.components["badge"].textColors, "normal", "#000")
+            color: Style.pick(Style.theme.components["badge"].textColors, "normal", "#000")
         }
     }
     HoverHandler { id: hover; cursorShape: Qt.PointingHandCursor }

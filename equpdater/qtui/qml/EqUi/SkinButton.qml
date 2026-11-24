@@ -10,7 +10,7 @@ Item {
     property bool selected: false
     property string iconKind: ""
     property int iconSize: 14
-    readonly property var spec: skin.theme.components[kind]
+    readonly property var spec: Style.theme.components[kind]
     readonly property bool hovered: hover.hovered
     readonly property bool pressed: tap.pressed
     readonly property string vstate: Style.stateOf(enabled, pressed, selected, hovered)
@@ -50,7 +50,7 @@ Item {
         anchors.margins: -2
         visible: root.activeFocus && root.focusReason === Qt.TabFocusReason
         color: "transparent"
-        border.color: Style.pick(skin.theme.components["text.link"].textColors, "normal", "#fff")
+        border.color: Style.pick(Style.theme.components["text.link"].textColors, "normal", "#fff")
         border.width: 1
         radius: root.spec.radius
     }

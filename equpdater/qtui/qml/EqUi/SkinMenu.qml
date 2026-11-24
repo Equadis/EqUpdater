@@ -9,7 +9,7 @@ C.Popup {
     property string heading: ""
     property var entries: []
     signal chosen(string label)
-    readonly property var spec: skin.theme.components["menu"]
+    readonly property var spec: Style.theme.components["menu"]
     padding: spec.padding[0]
     closePolicy: C.Popup.CloseOnEscape | C.Popup.CloseOnPressOutside
     modal: false
@@ -27,22 +27,22 @@ C.Popup {
             kind: "text.heading"
             text: root.heading
             leftPadding: 10; rightPadding: 10; topPadding: 6; bottomPadding: 6
-            font.pixelSize: skin.theme.fonts.body.size
+            font.pixelSize: Style.theme.fonts.body.size
         }
         Rectangle {
             visible: root.heading !== ""
             width: parent.width; height: 1
-            color: Style.pick(skin.theme.components["divider"].colors, "normal", "#444")
+            color: Style.pick(Style.theme.components["divider"].colors, "normal", "#444")
         }
         Repeater {
             model: root.entries
             delegate: Item {
                 width: Math.max(220, implicitWidth)
                 implicitWidth: cb.implicitWidth + 20
-                implicitHeight: skin.theme.components["menu.item"].minHeight
+                implicitHeight: Style.theme.components["menu.item"].minHeight
                 Rectangle {
                     anchors.fill: parent
-                    color: Style.pick(skin.theme.components["menu.item"].colors,
+                    color: Style.pick(Style.theme.components["menu.item"].colors,
                                       ma.containsMouse ? "hover" : "normal", "transparent")
                 }
                 SkinCheckBox {

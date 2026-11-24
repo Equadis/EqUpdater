@@ -14,7 +14,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: Style.pick(skin.theme.components["scrim"].colors, "normal", "#99000000")
+        color: Style.pick(Style.theme.components["scrim"].colors, "normal", "#99000000")
         TapHandler { onTapped: root.close() }
     }
     SkinPanel {
@@ -35,7 +35,7 @@ Item {
                              onClicked: root.close() }
             }
             SkinText { kind: "text.heading"; text: app.t("Skin")
-                       font.pixelSize: skin.theme.fonts.body.size }
+                       font.pixelSize: Style.theme.fonts.body.size }
             ListView {
                 id: skins
                 width: parent.width
@@ -69,7 +69,7 @@ Item {
                              onClicked: settings.restoreDefaultSkin() }
             }
             Rectangle { width: parent.width; height: 1
-                        color: Style.pick(skin.theme.components["divider"].colors, "normal", "#444") }
+                        color: Style.pick(Style.theme.components["divider"].colors, "normal", "#444") }
             SkinCheckBox { text: app.t("Animated background")
                            checked: settings.animatedBackground
                            onToggled: settings.animatedBackground = !settings.animatedBackground }

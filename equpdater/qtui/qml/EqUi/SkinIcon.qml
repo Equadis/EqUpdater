@@ -5,7 +5,7 @@ import QtQuick
 Image {
     property string kind: "icon.refresh"
     property int size: 16
-    source: skin.theme.components[kind].icon
+    source: Style.theme.components[kind].icon
     sourceSize.width: size * 2
     sourceSize.height: size * 2
     width: size

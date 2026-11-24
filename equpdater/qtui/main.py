@@ -11,6 +11,7 @@ Test/benchmark hooks (environment, all optional):
     EQU3_MARKS=file      write start-up timing marks to this JSON file
     EQU3_EXIT_AFTER_MS   quit after this long (benchmarks)
     EQU3_NEWS_FIXTURE    serve news from a JSON fixture (no network)
+    EQU3_FAKE_SITE       same fixture, served as forum HTML to the real parsers
     EQU3_OFFLINE=1       every request fails (offline behaviour)
     EQU3_SKIN=<id>       override the saved skin for this run
 """
@@ -75,7 +76,13 @@ def build(argv=None):
                                             app_bridge)
 
     fixture = os.environ.get("EQU3_NEWS_FIXTURE")
-    if os.environ.get("EQU3_OFFLINE") == "1":
+    site = os.environ.get("EQU3_FAKE_SITE")
+    if site:                                   # real parsers, fake forum
+        from .testing import FakeSiteOpener
+        opener = FakeSiteOpener(site)
+        fetcher = Fetcher(opener=lambda req, timeout: opener(req, timeout))
+        fetcher.site = opener
+    elif os.environ.get("EQU3_OFFLINE") == "1":
         fetcher = OfflineFetcher()
     elif fixture:
         from .testing import FixtureFetcher
@@ -130,6 +137,7 @@ def run(argv=None) -> int:
         # Cached news is already in the models (they sync in the constructor);
         # slow work starts only now, after the first frame.
         marks["interactive_ms"] = round((time.perf_counter() - _T0) * 1000)
+        marks["epoch_interactive"] = time.time()    # for cross-process timing
         p["news"].start()
         p["launch"].refresh()
         out = os.environ.get("EQU3_MARKS")

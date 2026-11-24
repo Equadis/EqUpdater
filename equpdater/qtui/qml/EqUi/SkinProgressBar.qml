@@ -5,7 +5,7 @@ Item {
     id: root
     property real value: 0          // 0..1
     property bool indeterminate: false
-    readonly property var spec: skin.theme.components["progress"]
+    readonly property var spec: Style.theme.components["progress"]
     implicitHeight: 10
     Accessible.role: Accessible.ProgressBar
     Rectangle {

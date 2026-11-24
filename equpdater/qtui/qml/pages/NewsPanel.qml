@@ -50,7 +50,7 @@ SkinPanel {
         id: rule
         anchors { left: parent.left; right: parent.right; top: head.bottom; topMargin: 6 }
         height: 1
-        color: Style.pick(skin.theme.components["divider"].colors, "normal", "#444")
+        color: Style.pick(Style.theme.components["divider"].colors, "normal", "#444")
     }
     SkinText {
         id: banner
@@ -179,10 +179,10 @@ SkinPanel {
                                     textFormat: TextEdit.RichText
                                     text: model.bodyHtml
                                     visible: model.hasBody
-                                    color: Style.pick(skin.theme.components["text.body"].textColors, "normal", "#fff")
-                                    selectionColor: Style.pick(skin.theme.components["text.link"].textColors, "normal", "#58f")
-                                    font.family: skin.theme.components["text.body"].font.family
-                                    font.pixelSize: skin.theme.components["text.body"].font.size
+                                    color: Style.pick(Style.theme.components["text.body"].textColors, "normal", "#fff")
+                                    selectionColor: Style.pick(Style.theme.components["text.link"].textColors, "normal", "#58f")
+                                    font.family: Style.theme.components["text.body"].font.family
+                                    font.pixelSize: Style.theme.components["text.body"].font.size
                                     onLinkActivated: function (link) { root.section.openUrl(link) }
                                     HoverHandler {
                                         cursorShape: edit.hoveredLink !== "" ? Qt.PointingHandCursor : Qt.IBeamCursor
@@ -219,7 +219,7 @@ SkinPanel {
 
                 Rectangle {
                     width: parent.width; height: 1
-                    color: Style.pick(skin.theme.components["divider"].colors, "normal", "#444")
+                    color: Style.pick(Style.theme.components["divider"].colors, "normal", "#444")
                 }
             }
         }

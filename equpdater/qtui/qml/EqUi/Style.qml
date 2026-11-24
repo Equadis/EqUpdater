@@ -4,6 +4,12 @@ import QtQuick
 // Pure helpers for reading a resolved component spec. No colours, paths or
 // sizes live in QML: everything comes from the skin (see core/skin.py).
 QtObject {
+    // The resolved theme, converted to a JS object ONCE per skin change.
+    // Reading `skin.theme` in every component would rebuild the whole nested
+    // map from Python on each access (measured: dominated start-up and skin
+    // switching), so everything reads this instead.
+    readonly property var theme: skin.theme
+
     function pick(map, state, fallback) {
         if (!map) return fallback
         var v = map[state]

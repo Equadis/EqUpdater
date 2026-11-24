@@ -12,14 +12,14 @@ Window {
     minimumWidth: 860
     minimumHeight: 600
     title: "EqUpdater"
-    color: Style.pick(skin.theme.components["window"].colors, "normal", "#000")
+    color: Style.pick(Style.theme.components["window"].colors, "normal", "#000")
 
     // Only these two facts reach Python; it decides what animates.
     onVisibilityChanged: function (v) { app.setWindowState(win.visibility === Window.Minimized, win.active) }
     onActiveChanged: app.setWindowState(win.visibility === Window.Minimized, win.active)
     Component.onCompleted: app.windowShown()
 
-    readonly property var layout: skin.theme.layout
+    readonly property var layout: Style.theme.layout
     readonly property var pages: [
         { id: "news", label: "NEWS" }, { id: "tweaks", label: "TWEAKS" },
         { id: "addons", label: "ADDONS" }, { id: "mods", label: "MODS" },

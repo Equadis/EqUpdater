@@ -9,7 +9,7 @@ Item {
     onPlayChanged: play ? player.play() : player.pause()
     MediaPlayer {
         id: player
-        source: skin.theme.background.animation
+        source: Style.theme.background.animation
         loops: MediaPlayer.Infinite
         videoOutput: out
         Component.onCompleted: if (root.play) play()

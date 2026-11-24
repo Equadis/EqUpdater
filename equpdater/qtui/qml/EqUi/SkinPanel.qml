@@ -7,7 +7,7 @@ Item {
     id: root
     property string kind: "panel"
     default property alias content: contentArea.data
-    readonly property var spec: skin.theme.components[kind]
+    readonly property var spec: Style.theme.components[kind]
     readonly property bool textured: Style.has(spec.textures, "normal")
     property alias contentItem: contentArea
     property real padLeft: spec.padding[0]
