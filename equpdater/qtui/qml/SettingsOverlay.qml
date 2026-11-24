@@ -261,6 +261,9 @@ Item {
                     SkinButton { kind: "button.small"; text: app.t("Game Diagnostics")
                                  onClicked: { root.close(); diag.openView("attempt") }
                                  SkinToolTipArea { tip: app.t("What happened after you pressed PLAY, a check of the game folder, and a report you can send for help.") } }
+                    SkinButton { objectName: "openLogsButton"; kind: "button.small"; text: app.t("Open logs folder")
+                                 onClicked: general.openLogsFolder()
+                                 SkinToolTipArea { tip: app.t("Where EqUpdater saves a report if it stops with an error. Nothing is sent anywhere: attach a report yourself if you ask for help.") } }
                     SkinButton { kind: "button.small"; text: app.t("Show Session Log")
                                  onClicked: { general.refreshLog(); root.showLog = true }
                                  SkinToolTipArea { tip: app.t("Everything EqUpdater has done since it started: what it checked, what it changed and why anything failed.") } }

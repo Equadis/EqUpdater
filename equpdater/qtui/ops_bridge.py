@@ -8,6 +8,7 @@ window had, without blocking painting or the workers.
 
 from __future__ import annotations
 
+import os
 import threading
 
 from PySide6.QtCore import (QCoreApplication, QEventLoop, QObject, QThread, QTimer,
@@ -488,6 +489,24 @@ class GeneralBridge(QObject):
     def setLauncher(self, key, value):
         self.service.launcher.set(key, value)
         self.changed.emit()
+
+    @Slot(result=bool)
+    def openLogsFolder(self):
+        """Settings -> Troubleshooting: where crash reports are kept."""
+        from ..core import crashlog
+        d = crashlog.logs_dir()
+        if not d or not os.path.isdir(d):
+            return False
+        try:
+            platforms.open_folder(d)
+        except OSError:
+            return False
+        return True
+
+    @Property(int, notify=changed)
+    def crashReports(self):
+        from ..core import crashlog
+        return len(crashlog.list_reports())
 
     @Slot(result=str)
     def excludeFromDefender(self):

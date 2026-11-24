@@ -274,7 +274,46 @@ def restart_app():
     QGuiApplication.instance().quit()
 
 
+def _qt_message(mode, context, message):
+    """Qt's own warnings and errors go into the session log (and so into the
+    support ZIP); a flood of the same line is cut short."""
+    from ..core.logsink import log
+    from PySide6.QtCore import QtMsgType
+    if mode in (QtMsgType.QtWarningMsg, QtMsgType.QtCriticalMsg, QtMsgType.QtFatalMsg):
+        if "font directory" in message or "no longer ships fonts" in message:
+            return
+        _qt_message.seen = getattr(_qt_message, "seen", {})
+        n = _qt_message.seen[message] = _qt_message.seen.get(message, 0) + 1
+        if n <= 3:
+            log("Qt: " + message.strip()[:400], "err" if mode != QtMsgType.QtWarningMsg else "dim")
+
+
 def run(argv=None) -> int:
+    from ..core import crashlog, single
+    from ..core import settings as _cs
+    data = os.environ.get("EQU3_DATA_DIR") or _cs.data_dir()
+    lock = single.SingleInstance(data)
+    if not os.environ.get("EQU3_ALLOW_MULTI") and not lock.acquire():
+        single.tell_user()
+        return 3
+    if os.name == "nt":
+        try:                                    # taskbar grouping apart from 2.x
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("eqomdx.EqUpdater.3")
+        except Exception:                       # noqa: BLE001
+            pass
+    from .bridge import APP_VERSION_V3
+    crashlog.install(os.path.join(data, "logs"), APP_VERSION_V3)
+    try:
+        return _run(argv)
+    finally:
+        crashlog.clean_exit()
+        lock.release()
+
+
+def _run(argv=None) -> int:
+    from PySide6.QtCore import qInstallMessageHandler
+    qInstallMessageHandler(_qt_message)
     app, engine, p = build(argv)
     marks = p["marks"]
     engine.load(QUrl.fromLocalFile(os.path.join(QML_DIR, "Main.qml")))

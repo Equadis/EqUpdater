@@ -289,8 +289,28 @@ class OpsHost(AntivirusOps, LaunchOps, SettingsOps, MpqPageOps, ModsRows, Addons
     def _refresh_manage_all(self):
         self.events("addons_footer")
 
+    _offering = False
+
     def _offer_manage_found(self):
-        self.events("offer_manage_found")
+        """Ask once per game folder, when the addons have been looked at and
+        there is something to ask about (the lifted ``_manage_all_found`` asks).
+        The rows and the "Manage all" links stay for anybody who says no."""
+        if os.environ.get("EQUPDATER_NO_MIGRATION_PROMPT"):
+            return
+        client = self._game_path.get().strip()
+        if not client or load_config().get("found_offered_for") == client:
+            return
+        if self._running or self._offering or self._btn_mode == "busy":
+            self.after(3000, self._offer_manage_found)             # one question at a time
+            return
+        if not self._found_mods() and not self._found_addons():
+            return
+        update_config(lambda c: c.__setitem__("found_offered_for", client))
+        self._offering = True
+        try:
+            self._manage_all_found()
+        finally:
+            self._offering = False
 
     def _after_identify(self):
         self.events("addons_rows", keep_scroll=True)

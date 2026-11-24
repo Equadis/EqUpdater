@@ -56,7 +56,7 @@ Point at the folder (Find…, or Choose a folder…). If the torrent was never f
 | Output | What |
 |---|---|
 | `dist/EqUpdater3/EqUpdater3.exe` (+ `_internal`) | the folder build, about 111 MB on disk (PySide6/Qt is 76 MB of it) |
-| `dist/EqUpdater3-v<version>-Windows-Installer.exe` | the one-file beta installer, about 60 MB |
+| `dist/EqUpdater3-v<version>-Windows-Installer.exe` | the one-file beta installer, about 68 MB (the Classic artwork added 8) |
 
 * It is a **separate product beside 2.x**: installs to `%LOCALAPPDATA%\Programs\EqUpdater3`, runs `EqUpdater3.exe`, adds its own Start-menu entry "EqUpdater 3 Beta" and offers a desktop one. **No 2.x shortcut, folder or setting is moved or written** (a test checks a 2.x `.lnk` is untouched).
 * **Refuses while EqUpdater 2 is running** (or the beta is), says why, changes nothing.

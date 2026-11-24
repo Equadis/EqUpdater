@@ -1,0 +1,30 @@
+# Builds the EqUpdater 3 beta installer and keeps it as a workflow artifact.
+# Manual only (workflow_dispatch), and it publishes nothing: no release, no tag.
+# The build runs the headless self-test (tools/build_v3.py) and fails if it fails.
+name: beta-package
+
+on:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade pillow certifi pyside6 pyinstaller psutil
+
+      - name: Test suite, then build, self-test and package
+        run: python tools/build_v3.py --release --setup
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EqUpdater3-beta-windows
+          path: dist/EqUpdater3-v*-Windows-Installer.exe
+          if-no-files-found: error

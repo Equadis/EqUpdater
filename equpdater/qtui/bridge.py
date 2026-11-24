@@ -33,7 +33,7 @@ from ..core.tasks import TaskManager
 from ..core.tweaks_service import TweaksService
 from ..i18n import tr
 
-APP_VERSION_V3 = "3.0.0-dev"
+APP_VERSION_V3 = "3.0.0-beta.1"
 
 
 class Dispatcher(QObject):
