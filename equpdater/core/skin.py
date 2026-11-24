@@ -57,7 +57,7 @@ STATES = ("normal", "hover", "pressed", "disabled", "selected")
 #: The stable component ids. Documented in docs/v3/SKINNING.md. A skin may
 #: define any subset; every id always resolves (to the built-in theme at worst).
 COMPONENTS = (
-    "window", "panel", "dialog", "panel.header", "divider", "scrim",
+    "window", "panel", "dialog", "sidebar", "panel.header", "divider", "scrim",
     "button", "button.primary", "button.play", "button.small", "button.link",
     "splitbutton.arrow",
     "nav.tab", "checkbox", "input", "menu", "menu.item", "progress", "scrollbar",
@@ -70,7 +70,7 @@ COMPONENTS = (
 )
 
 #: Implicit parents (``extends`` in a theme overrides these).
-PARENT = {"panel.header": "panel", "dialog": "panel", "button.primary": "button",
+PARENT = {"panel.header": "panel", "dialog": "panel", "sidebar": "panel", "button.primary": "button",
           "button.play": "button.primary", "button.small": "button",
           "button.link": "button", "menu.item": "button",
           "splitbutton.arrow": "button.play"}

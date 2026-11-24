@@ -1,0 +1,340 @@
+{
+  "palette": {
+    "bg": "#0b0a07",
+    "panel": "#e00f0d08",
+    "dialog": "#f2100e09",
+    "panelBorder": "#4b5526",
+    "text": "#e9e0c4",
+    "textDim": "#a89f80",
+    "accent": "#e8c14a",
+    "accentLight": "#f6dc8a",
+    "link": "#f0cf6a",
+    "danger": "#e0795a",
+    "ok": "#9bd05a",
+    "new": "#ff7a4a",
+    "scrim": "#b3050400",
+    "buttonFace": "#4a5826",
+    "buttonHover": "#5d6e30",
+    "buttonPressed": "#353f1b",
+    "buttonDisabled": "#2d2f26",
+    "primary": "#4f9a2e",
+    "primaryHover": "#62b53a",
+    "primaryPressed": "#2f6a17"
+  },
+  "fonts": {
+    "body": {
+      "family": "Friz Quadrata",
+      "size": 12
+    },
+    "dim": {
+      "family": "Friz Quadrata",
+      "size": 10
+    },
+    "heading": {
+      "family": "Friz Quadrata",
+      "size": 14,
+      "bold": true
+    },
+    "title": {
+      "family": "Friz Quadrata",
+      "size": 22,
+      "bold": true
+    },
+    "button": {
+      "family": "Friz Quadrata",
+      "size": 12,
+      "bold": true
+    },
+    "nav": {
+      "family": "Friz Quadrata",
+      "size": 13,
+      "bold": true
+    }
+  },
+  "metrics": {
+    "radius": 4,
+    "spacing": 6,
+    "panelPadding": 10,
+    "scrollbarWidth": 7,
+    "animationMs": 100
+  },
+  "background": {
+    "color": "$bg",
+    "static": "backgrounds/twilight.webp",
+    "darken": 0.9,
+    "fadeTop": 0,
+    "fadeBottom": 90
+  },
+  "components": {
+    "panel": {
+      "textures": {
+        "normal": "panels/frame.png"
+      },
+      "slice": [
+        16,
+        16,
+        16,
+        16
+      ],
+      "padding": [
+        18,
+        14,
+        16,
+        12
+      ]
+    },
+    "dialog": {
+      "textures": {
+        "normal": "panels/frame.png"
+      },
+      "slice": [
+        16,
+        16,
+        16,
+        16
+      ],
+      "padding": [
+        20,
+        16,
+        18,
+        14
+      ]
+    },
+    "sidebar": {
+      "textures": {
+        "normal": "panels/frame.png"
+      },
+      "slice": [
+        16,
+        16,
+        16,
+        16
+      ],
+      "padding": [
+        14,
+        12,
+        12,
+        10
+      ]
+    },
+    "button": {
+      "textures": {
+        "normal": "buttons/normal-normal.png",
+        "hover": "buttons/normal-hover.png",
+        "pressed": "buttons/normal-pressed.png",
+        "disabled": "buttons/normal-disabled.png",
+        "selected": "buttons/normal-hover.png"
+      },
+      "slice": [
+        10,
+        10,
+        10,
+        10
+      ],
+      "textColors": {
+        "normal": "#e8c14a",
+        "hover": "#fff3c4",
+        "pressed": "#d4ae3c",
+        "disabled": "#85806a",
+        "selected": "#fff3c4"
+      },
+      "minHeight": 26,
+      "padding": [
+        12,
+        3,
+        12,
+        3
+      ]
+    },
+    "button.small": {
+      "minHeight": 22,
+      "padding": [
+        9,
+        2,
+        9,
+        2
+      ]
+    },
+    "button.play": {
+      "textures": {
+        "normal": "buttons/play-normal.png",
+        "hover": "buttons/play-hover.png",
+        "pressed": "buttons/play-pressed.png",
+        "disabled": "buttons/play-disabled.png",
+        "selected": "buttons/play-hover.png"
+      },
+      "slice": [
+        10,
+        10,
+        10,
+        10
+      ],
+      "textColors": {
+        "normal": "#fff6cf",
+        "hover": "#fff3c4",
+        "pressed": "#d4ae3c",
+        "disabled": "#85806a",
+        "selected": "#fff3c4"
+      },
+      "minHeight": 40,
+      "padding": [
+        34,
+        6,
+        34,
+        6
+      ]
+    },
+    "nav.tab": {
+      "textColors": {
+        "normal": "#cdbf8c",
+        "hover": "#fff3c4",
+        "selected": "#e8c14a"
+      }
+    },
+    "input": {
+      "colors": {
+        "normal": "#e6141208",
+        "hover": "#e61a1809",
+        "selected": "#e61a1809",
+        "disabled": "#e0201f17"
+      },
+      "borderColors": {
+        "normal": "#5a6730",
+        "hover": "#8a9c45",
+        "selected": "#e8c14a"
+      },
+      "radius": 3,
+      "minHeight": 24,
+      "padding": [
+        8,
+        3,
+        8,
+        3
+      ]
+    },
+    "checkbox": {
+      "colors": {
+        "normal": "#e6141208",
+        "selected": "#e8c14a"
+      },
+      "borderColors": {
+        "normal": "#6b7a33"
+      }
+    },
+    "menu": {
+      "colors": {
+        "normal": "#f5100e09"
+      },
+      "borderColors": {
+        "normal": "#6b7a33"
+      },
+      "borderWidth": 1
+    },
+    "menu.item": {
+      "colors": {
+        "normal": "#00000000",
+        "hover": "#664a5826"
+      },
+      "minHeight": 24
+    },
+    "tooltip": {
+      "colors": {
+        "normal": "#f5100e09"
+      },
+      "borderColors": {
+        "normal": "#8a6f24"
+      },
+      "textColors": {
+        "normal": "#e9e0c4"
+      }
+    },
+    "progress": {
+      "colors": {
+        "normal": "#e6141208",
+        "selected": "#7fae3a"
+      },
+      "borderColors": {
+        "normal": "#5a6730"
+      },
+      "radius": 3
+    },
+    "scrollbar": {
+      "colors": {
+        "normal": "#00000000",
+        "hover": "#8a9c45",
+        "pressed": "#e8c14a",
+        "selected": "#4b5526"
+      },
+      "radius": 3
+    },
+    "divider": {
+      "colors": {
+        "normal": "#4b5526"
+      }
+    },
+    "badge": {
+      "colors": {
+        "normal": "#e8c14a"
+      },
+      "textColors": {
+        "normal": "#1a1608"
+      }
+    },
+    "text.heading": {
+      "textColors": {
+        "normal": "#e8c14a"
+      }
+    },
+    "panel.header": {
+      "textColors": {
+        "normal": "#e8c14a"
+      }
+    },
+    "icon.logo": {
+      "icon": "icons/logo.png"
+    },
+    "icon.refresh": {
+      "icon": "icons/refresh.png"
+    },
+    "icon.settings": {
+      "icon": "icons/settings.png"
+    },
+    "icon.arrow-down": {
+      "icon": "icons/arrow-down.png"
+    },
+    "icon.discord": {
+      "icon": "icons/discord.png"
+    },
+    "icon.support": {
+      "icon": "icons/support.png"
+    },
+    "icon.download": {
+      "icon": "icons/download.png"
+    },
+    "icon.remove": {
+      "icon": "icons/remove.png"
+    },
+    "icon.release": {
+      "icon": "icons/release.png"
+    },
+    "icon.link": {
+      "icon": "icons/link.png"
+    },
+    "icon.check": {
+      "icon": "icons/check.png"
+    },
+    "icon.update": {
+      "icon": "icons/swap.png"
+    }
+  },
+  "layout": {
+    "headerHeight": 80,
+    "logoSize": 40,
+    "navSpacing": 22,
+    "contentMargin": 28,
+    "panelGap": 10,
+    "footerHeight": 84,
+    "navRight": 44,
+    "sidebarWidth": 244
+  }
+}

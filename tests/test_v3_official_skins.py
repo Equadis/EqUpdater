@@ -7,7 +7,7 @@ from equpdater.core import skin as S
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKINS = os.path.join(ROOT, "skins")
-OFFICIAL = {"bubbles", "classic-2004", "minimal", "minimal-dark", "minimal-light"}
+OFFICIAL = {"bubbles", "classic-2004", "minimal", "minimal-dark", "minimal-light", "turtle-wow", "battle-net"}
 
 
 def lum(hex_colour: str) -> float:
@@ -27,7 +27,7 @@ class TestOfficialSkins(unittest.TestCase):
     def setUpClass(cls):
         cls.skins = S.discover(SKINS)
 
-    def test_exactly_the_five_official_skins_ship(self):
+    def test_exactly_the_seven_official_skins_ship(self):
         self.assertEqual(set(self.skins), OFFICIAL)
 
     def test_every_skin_loads_with_no_problems(self):
@@ -61,6 +61,8 @@ class TestOfficialSkins(unittest.TestCase):
         self.assertEqual(names["minimal-dark"], "Minimal Dark")
         self.assertEqual(names["minimal-light"], "Minimal Light")
         self.assertEqual(names["bubbles"], "Bubbles")
+        self.assertEqual(names["turtle-wow"], "Turtle WoW")
+        self.assertEqual(names["battle-net"], "Battle.net")
 
     def test_minimal_skins_are_colours_and_icons_only(self):
         for sid in ("minimal", "minimal-dark", "minimal-light"):
@@ -91,6 +93,30 @@ class TestOfficialSkins(unittest.TestCase):
             self.assertGreaterEqual(contrast(p["text"], p["bg"]), 7.0, f"{sid} text on window")
             self.assertGreaterEqual(contrast(p["text"], p["buttonFace"]), 4.5, f"{sid} button text")
             self.assertGreaterEqual(contrast("#ffffff", p["primary"]), 4.5, f"{sid} play button")
+
+    def test_turtle_and_battlenet_text_is_readable_on_their_panels_and_buttons(self):
+        for sid in ("turtle-wow", "battle-net"):
+            p = self.skins[sid].theme["palette"]
+            self.assertGreaterEqual(contrast(p["text"], p["panel"]), 7.0, f"{sid} body")
+            self.assertGreaterEqual(contrast(p["textDim"], p["panel"]), 4.5, f"{sid} dim")
+            self.assertGreaterEqual(contrast(p["accent"], p["panel"]), 4.5, f"{sid} accent")
+            self.assertGreaterEqual(contrast("#ffffff", p["primary"]), 3.0, f"{sid} play")
+
+    def test_turtle_and_battlenet_are_full_skins_not_palettes(self):
+        for sid in ("turtle-wow", "battle-net"):
+            c = self.skins[sid].theme["components"]
+            for cid in ("panel", "dialog", "sidebar", "button", "button.play"):
+                self.assertTrue(c[cid].get("textures"), f"{sid}: {cid} has no texture")
+            self.assertTrue(self.skins[sid].theme["background"].get("static"), sid)
+            for cid in ("input", "menu", "tooltip", "progress", "scrollbar", "checkbox", "nav.tab"):
+                self.assertNotEqual(c[cid], self.skins["minimal-dark"].theme["components"][cid], f"{sid}: {cid}")
+        tw, bn = (self.skins[s].theme for s in ("turtle-wow", "battle-net"))
+        self.assertEqual(tw["fonts"]["body"]["family"], "Friz Quadrata")
+        self.assertLess(tw["layout"]["headerHeight"], 96)                       # compact
+        self.assertEqual(bn["layout"]["navAlign"], "left")
+        self.assertEqual(bn["layout"]["sidebarDefault"], "expanded")
+        self.assertGreaterEqual(bn["components"]["button.play"]["minHeight"], 50)  # prominent
+        self.assertTrue(bn["palette"]["accent"].lower() in ("#148eff", "#0e86ff", "#00aeff"))
 
     def test_light_is_light_and_dark_is_dark(self):
         self.assertGreater(lum(self.skins["minimal-light"].theme["palette"]["bg"]), 0.6)

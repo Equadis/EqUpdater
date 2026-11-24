@@ -25,6 +25,7 @@ Colours are `#RRGGBB` or `#AARRGGBB` (alpha first, as Qt writes it); `$name` ref
 | `window` | the window behind everything | main window | colour only |
 | `panel` | the framed area of each page (extends nothing) | News, Tweaks, Mods, Addons, MPQ | nine-slice |
 | `dialog` | Settings, Diagnostics, Setup, custom mod/addon, questions (extends `panel`) | overlays | nine-slice |
+| `sidebar` | the social sidebar (extends `panel`) | friends list | nine-slice |
 | `panel.header` | the title line of a panel (extends `panel`) | panel titles | text colour/font |
 | `divider` | thin rule between rows and sections | everywhere | colour |
 | `scrim` | the dim layer behind a dialog | overlays | colour (use alpha) |

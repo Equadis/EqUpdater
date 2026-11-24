@@ -69,7 +69,7 @@ States, scaling and sizes — images
 Files are only read if: path is relative and stays inside the skin folder (no `..`, absolute paths, drive letters, links to elsewhere); extension is allowed; size under the limit; images carry the right file header. Anything else is skipped and reported. A skin cannot run code, read the game folder, or reach the network.
 
 ## Layout
-`layout.json` (or `theme.json → layout`) may set: `headerHeight logoSize navSpacing contentMargin panelGap footerHeight navRight`. Positions of the main areas are otherwise fixed so every skin has the same features.
+`layout.json` (or `theme.json → layout`) may set: `headerHeight logoSize navSpacing contentMargin panelGap footerHeight navRight`, `navAlign` (`left` puts the tabs beside the logo) with `navLeftMargin`, and `sidebarWidth` / `sidebarDefault` (`expanded` or `collapsed`) for the social sidebar. Positions of the main areas are otherwise fixed so every skin has the same features.
 
 ## Troubleshooting
 Settings → Skin shows ⚠ and the list of problems for the selected skin. Typical: *file not found* (check case and folder), *not the image type its name says* (re-export), *leaves the skin folder* (use relative paths without `..`), *skin_api N* (the skin is newer than the app).
@@ -78,4 +78,4 @@ Settings → Skin shows ⚠ and the list of problems for the selected skin. Typi
 * `COMPONENTS.md`: every component id, its keys, states and what uses it.
 * `SKIN_ASSETS.md`: the five official skins, how their art is made, sizes and limits.
 * `starter-skin/`: a complete colours-only skin to copy.
-* The five official skins: Bubbles (default), Classic (2004), Minimal, Minimal Dark, Minimal Light. Settings → Skin lists them first, then yours.
+* The seven official skins: Bubbles (default), Classic (2004), Minimal, Minimal Dark, Minimal Light, Turtle WoW, Battle.net. Settings → Skin lists them first, then yours.

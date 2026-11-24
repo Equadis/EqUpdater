@@ -49,6 +49,7 @@ Window {
         anchors { left: parent.left; right: parent.right; top: parent.top }
         height: win.layout.headerHeight
         Row {
+            id: logoRow
             anchors { left: parent.left; leftMargin: win.layout.contentMargin
                       verticalCenter: parent.verticalCenter }
             spacing: 14
@@ -59,8 +60,11 @@ Window {
         }
         Row {
             id: nav
-            anchors { right: parent.right; rightMargin: win.layout.navRight
-                      verticalCenter: parent.verticalCenter; verticalCenterOffset: 4 }
+            // `navAlign: "left"` puts the tabs beside the logo (Battle.net's way)
+            readonly property bool alignLeft: win.layout.navAlign === "left"
+            x: alignLeft ? logoRow.x + logoRow.width + (win.layout.navLeftMargin || 40)
+                    : parent.width - width - win.layout.navRight
+            anchors { verticalCenter: parent.verticalCenter; verticalCenterOffset: 4 }
             spacing: win.layout.navSpacing
             Repeater {
                 model: win.pages

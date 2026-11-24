@@ -1,6 +1,6 @@
 # Official skins: assets and how they are made
 
-EqUpdater ships five skins. `python tools/skins/build_poc_assets.py` (Bubbles, Minimal Dark) and `python tools/skins/build_official_skins.py` (Minimal, Minimal Light, Classic) rebuild every image and `theme.json` of the skins they own, so the art can be swapped and the skins regenerated. Players never run them: a skin is only files. Screenshots: `bench-results/shots/skin-*.png`.
+EqUpdater ships seven skins. `python tools/skins/build_poc_assets.py` (Bubbles, Minimal Dark) and `python tools/skins/build_official_skins.py` (Minimal, Minimal Light, Classic) rebuild every image and `theme.json` of the skins they own, so the art can be swapped and the skins regenerated. Players never run them: a skin is only files. Screenshots: `bench-results/shots/skin-*.png`.
 
 | Skin | Look | Animated | Textures | Disk |
 |---|---|---|---|---|
@@ -35,3 +35,12 @@ PNG/WebP/JPEG images 12 MB each; animation 40 MB; fonts 6 MB; every path relativ
 ## Making a new skin from the starter
 
 `docs/v3/starter-skin/` is a complete, colours-only skin (it loads with no problems; a test checks it). Copy it to `<app data>/v3/skins/<id>/`, change `id` and `name`, then edit `theme.json` (see `COMPONENTS.md`) and add images where you want textures.
+
+
+## Turtle WoW and Battle.net
+
+Built by `tools/skins/build_social_skins.py`. They take their *look* from the two launchers (colour, type, proportions, how navigation and buttons behave) but **none of either launcher's artwork is used**: the landscape (sky, moon, ridges, tower, forest), the glow background, the frames and the buttons are drawn from scratch in the script, so there is no redistribution question as there is for Classic (2004). Both are full skins: their own panel, dialog, sidebar, button (four states, ordinary and PLAY), input, checkbox, menu, tooltip, progress, scrollbar, divider and badge looks, their own type and spacing, and their own `layout`.
+
+Layout keys they use beyond the common ones: `navAlign: "left"` and `navLeftMargin` (navigation beside the logo, Battle.net), `sidebarWidth` and `sidebarDefault: "expanded"|"collapsed"` (the social sidebar).
+
+"Turtle WoW" and "Battle.net" name the look being echoed. They are other companies' products and names; EqUpdater is not affiliated with or endorsed by either, and both skins keep the EqUpdater name and logo.

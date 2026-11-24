@@ -1,0 +1,343 @@
+{
+  "palette": {
+    "bg": "#070b14",
+    "panel": "#ee141b29",
+    "dialog": "#ff1a2233",
+    "panelBorder": "#232d3f",
+    "text": "#e9eef7",
+    "textDim": "#8a97ad",
+    "accent": "#148eff",
+    "accentLight": "#4fb0ff",
+    "link": "#4fb0ff",
+    "danger": "#ff5a5f",
+    "ok": "#3ddc84",
+    "new": "#ff5a5f",
+    "scrim": "#b0020610",
+    "buttonFace": "#202a3b",
+    "buttonHover": "#2b3850",
+    "buttonPressed": "#18202e",
+    "buttonDisabled": "#171c29",
+    "primary": "#148eff",
+    "primaryHover": "#3aa0ff",
+    "primaryPressed": "#0f74d4"
+  },
+  "fonts": {
+    "body": {
+      "family": "Segoe UI",
+      "size": 13
+    },
+    "dim": {
+      "family": "Segoe UI",
+      "size": 11
+    },
+    "heading": {
+      "family": "Segoe UI",
+      "size": 15,
+      "bold": true
+    },
+    "title": {
+      "family": "Segoe UI",
+      "size": 20,
+      "bold": true
+    },
+    "button": {
+      "family": "Segoe UI",
+      "size": 13,
+      "bold": true
+    },
+    "nav": {
+      "family": "Segoe UI",
+      "size": 14,
+      "bold": true
+    }
+  },
+  "metrics": {
+    "radius": 6,
+    "spacing": 10,
+    "panelPadding": 16,
+    "scrollbarWidth": 8,
+    "animationMs": 140
+  },
+  "background": {
+    "color": "$bg",
+    "static": "backgrounds/navy-glow.webp",
+    "darken": 1.0,
+    "fadeTop": 0,
+    "fadeBottom": 0
+  },
+  "components": {
+    "panel": {
+      "textures": {
+        "normal": "panels/card.png"
+      },
+      "slice": [
+        14,
+        14,
+        14,
+        14
+      ],
+      "padding": [
+        18,
+        14,
+        16,
+        12
+      ]
+    },
+    "dialog": {
+      "textures": {
+        "normal": "panels/dialog.png"
+      },
+      "slice": [
+        14,
+        14,
+        14,
+        14
+      ],
+      "padding": [
+        22,
+        18,
+        20,
+        16
+      ]
+    },
+    "sidebar": {
+      "textures": {
+        "normal": "panels/sidebar.png"
+      },
+      "slice": [
+        4,
+        4,
+        4,
+        4
+      ],
+      "padding": [
+        14,
+        14,
+        12,
+        12
+      ]
+    },
+    "button": {
+      "textures": {
+        "normal": "buttons/normal-normal.png",
+        "hover": "buttons/normal-hover.png",
+        "pressed": "buttons/normal-pressed.png",
+        "disabled": "buttons/normal-disabled.png",
+        "selected": "buttons/normal-hover.png"
+      },
+      "slice": [
+        8,
+        8,
+        8,
+        8
+      ],
+      "textColors": {
+        "normal": "#e9eef7",
+        "hover": "#ffffff",
+        "pressed": "#c9d6ea",
+        "disabled": "#5f6b82",
+        "selected": "#ffffff"
+      },
+      "minHeight": 32,
+      "padding": [
+        16,
+        6,
+        16,
+        6
+      ]
+    },
+    "button.small": {
+      "minHeight": 26,
+      "padding": [
+        12,
+        4,
+        12,
+        4
+      ]
+    },
+    "button.play": {
+      "textures": {
+        "normal": "buttons/play-normal.png",
+        "hover": "buttons/play-hover.png",
+        "pressed": "buttons/play-pressed.png",
+        "disabled": "buttons/play-disabled.png",
+        "selected": "buttons/play-hover.png"
+      },
+      "slice": [
+        12,
+        12,
+        12,
+        12
+      ],
+      "textColors": {
+        "normal": "#ffffff",
+        "hover": "#ffffff",
+        "pressed": "#dbe9ff",
+        "disabled": "#6b7790"
+      },
+      "minHeight": 54,
+      "padding": [
+        44,
+        10,
+        44,
+        10
+      ]
+    },
+    "nav.tab": {
+      "textColors": {
+        "normal": "#9aa8c0",
+        "hover": "#ffffff",
+        "selected": "#ffffff"
+      }
+    },
+    "input": {
+      "colors": {
+        "normal": "#e60d1320",
+        "hover": "#e6101829",
+        "selected": "#e6101829",
+        "disabled": "#e0151a26"
+      },
+      "borderColors": {
+        "normal": "#2c3a56",
+        "hover": "#41567f",
+        "selected": "#148eff"
+      },
+      "radius": 4,
+      "minHeight": 30,
+      "padding": [
+        10,
+        5,
+        10,
+        5
+      ]
+    },
+    "checkbox": {
+      "colors": {
+        "normal": "#0d1320",
+        "selected": "#148eff"
+      },
+      "borderColors": {
+        "normal": "#41567f"
+      }
+    },
+    "menu": {
+      "colors": {
+        "normal": "#fa161d2c"
+      },
+      "borderColors": {
+        "normal": "#2c3a56"
+      },
+      "borderWidth": 1,
+      "radius": 6
+    },
+    "menu.item": {
+      "colors": {
+        "normal": "#00000000",
+        "hover": "#55148eff"
+      },
+      "minHeight": 30
+    },
+    "tooltip": {
+      "colors": {
+        "normal": "#fa0f1522"
+      },
+      "borderColors": {
+        "normal": "#2c3a56"
+      },
+      "textColors": {
+        "normal": "#e9eef7"
+      }
+    },
+    "progress": {
+      "colors": {
+        "normal": "#18202e",
+        "selected": "#148eff"
+      },
+      "borderColors": {
+        "normal": "#232d3f"
+      },
+      "radius": 3
+    },
+    "scrollbar": {
+      "colors": {
+        "normal": "#00000000",
+        "hover": "#41567f",
+        "pressed": "#148eff",
+        "selected": "#2c3a56"
+      },
+      "radius": 4
+    },
+    "divider": {
+      "colors": {
+        "normal": "#222c3e"
+      }
+    },
+    "badge": {
+      "colors": {
+        "normal": "#148eff"
+      },
+      "textColors": {
+        "normal": "#ffffff"
+      }
+    },
+    "text.heading": {
+      "textColors": {
+        "normal": "#ffffff"
+      }
+    },
+    "panel.header": {
+      "textColors": {
+        "normal": "#ffffff"
+      }
+    },
+    "icon.logo": {
+      "icon": "icons/logo.png"
+    },
+    "icon.refresh": {
+      "icon": "icons/refresh.png"
+    },
+    "icon.settings": {
+      "icon": "icons/settings.png"
+    },
+    "icon.arrow-down": {
+      "icon": "icons/arrow-down.png"
+    },
+    "icon.discord": {
+      "icon": "icons/discord.png"
+    },
+    "icon.support": {
+      "icon": "icons/support.png"
+    },
+    "icon.download": {
+      "icon": "icons/download.png"
+    },
+    "icon.remove": {
+      "icon": "icons/remove.png"
+    },
+    "icon.release": {
+      "icon": "icons/release.png"
+    },
+    "icon.link": {
+      "icon": "icons/link.png"
+    },
+    "icon.check": {
+      "icon": "icons/check.png"
+    },
+    "icon.update": {
+      "icon": "icons/swap.png"
+    }
+  },
+  "layout": {
+    "headerHeight": 72,
+    "logoSize": 34,
+    "navSpacing": 6,
+    "contentMargin": 28,
+    "panelGap": 14,
+    "footerHeight": 108,
+    "navAlign": "left",
+    "navLeftMargin": 40,
+    "navRight": 90,
+    "sidebarWidth": 272,
+    "sidebarDefault": "expanded"
+  }
+}
