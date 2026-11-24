@@ -11,6 +11,11 @@ import io
 import os
 import sys
 import unittest
+
+try:
+    from tests.ns import patch_all
+except ImportError:      # run as a script
+    from ns import patch_all
 import urllib.error
 from unittest import mock
 
@@ -63,9 +68,9 @@ class Base(unittest.TestCase):
         def update(fn, *a, **k):
             fn(self.cfg)
             return self.cfg
-        for p in (mock.patch.object(app, "load_config", lambda *a, **k: self.cfg),
-                  mock.patch.object(app, "update_config", update),
-                  mock.patch.object(app, "log")):
+        for p in (patch_all(app, "load_config", lambda *a, **k: self.cfg),
+                  patch_all(app, "update_config", update),
+                  patch_all(app, "log")):
             p.start()
             self.addCleanup(p.stop)
         app.ADDON_LOOKUP_FAILURES.clear()
@@ -73,7 +78,7 @@ class Base(unittest.TestCase):
 
 class TestRefs(Base):
     def lookup(self, body, pin=None):
-        with mock.patch.object(app, "secure_urlopen",
+        with patch_all(app, "secure_urlopen",
                                return_value=Response(body)) as op:
             sha = app._git_refs_sha(REPO, pin)
         return sha, op.call_args[0][0].full_url
@@ -105,7 +110,7 @@ class TestRefs(Base):
             ("0" * 40, "capabilities^{}")))[0])
 
     def test_an_html_page_is_not_mistaken_for_refs(self):
-        with mock.patch.object(app, "secure_urlopen",
+        with patch_all(app, "secure_urlopen",
                                return_value=Response(b"<html>", "text/html")):
             with self.assertRaises(ValueError):
                 app._git_refs_sha(REPO)
@@ -114,45 +119,45 @@ class TestRefs(Base):
 class TestLookupSurvivesTheApiLimit(Base):
     def test_twenty_addons_spend_none_of_the_allowance(self):
         api = mock.Mock(side_effect=limited())
-        with mock.patch.object(app, "_git_refs_sha", return_value=NEW), \
-                mock.patch.object(app, "_api_json", api):
+        with patch_all(app, "_git_refs_sha", return_value=NEW), \
+                patch_all(app, "_api_json", api):
             for i in range(20):
                 self.assertEqual(app.addon_remote_sha(
                     f"https://github.com/o/addon{i}", force=True), NEW)
         self.assertEqual(api.call_count, 0)
 
     def test_when_refs_are_unavailable_the_api_still_answers(self):
-        with mock.patch.object(app, "_git_refs_sha",
+        with patch_all(app, "_git_refs_sha",
                                side_effect=urllib.error.URLError("blocked")), \
-                mock.patch.object(app, "_api_json",
+                patch_all(app, "_api_json",
                                   return_value=[{"sha": NEW}]):
             self.assertEqual(app.addon_remote_sha(REPO, force=True), NEW)
 
     def test_a_commit_pin_goes_to_the_api(self):
         refs = mock.Mock()
-        with mock.patch.object(app, "_git_refs_sha", refs), \
-                mock.patch.object(app, "_api_json",
+        with patch_all(app, "_git_refs_sha", refs), \
+                patch_all(app, "_api_json",
                                   return_value={"sha": OLD}):
             self.assertEqual(app.addon_remote_sha(REPO, ref=OLD, force=True), OLD)
         self.assertEqual(refs.call_count, 0)
 
     def test_both_failing_keeps_the_specific_reason(self):
-        with mock.patch.object(app, "_git_refs_sha",
+        with patch_all(app, "_git_refs_sha",
                                side_effect=urllib.error.URLError("blocked")), \
-                mock.patch.object(app, "_api_json", side_effect=limited()):
+                patch_all(app, "_api_json", side_effect=limited()):
             self.assertIsNone(app.addon_remote_sha(REPO, force=True))
         reason = app.addon_lookup_reason(REPO)
         self.assertIn("limit", reason.lower())
 
     def test_failure_is_not_cached_and_recovers(self):
-        with mock.patch.object(app, "_git_refs_sha",
+        with patch_all(app, "_git_refs_sha",
                                side_effect=urllib.error.URLError("offline")), \
-                mock.patch.object(app, "_api_json",
+                patch_all(app, "_api_json",
                                   side_effect=urllib.error.URLError("offline")):
             self.assertIsNone(app.addon_remote_sha(REPO))
         self.assertIn("offline", app.addon_lookup_reason(REPO))
         self.assertEqual(self.cfg.get("addon_sha_cache", {}), {})
-        with mock.patch.object(app, "_git_refs_sha", return_value=NEW):
+        with patch_all(app, "_git_refs_sha", return_value=NEW):
             self.assertEqual(app.addon_remote_sha(REPO), NEW)
         self.assertIsNone(app.addon_lookup_reason(REPO))
 

@@ -7,6 +7,11 @@ import shutil
 import sys
 import tempfile
 import unittest
+
+try:
+    from tests.ns import patch_all
+except ImportError:      # run as a script
+    from ns import patch_all
 from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -72,7 +77,7 @@ class TestOctoLogin(unittest.TestCase):
         def fetch(req, **kw):
             urls.append(req.full_url)
             return Resp(DLL)
-        with mock.patch.object(self.app, "secure_urlopen", fetch):
+        with patch_all(self.app, "secure_urlopen", fetch):
             written = self.app.install_mod(
                 self.mod, self.client,
                 release("OctoLogin-v1.1.0.zip", "OctoLogin.dll"))
@@ -86,7 +91,7 @@ class TestOctoLogin(unittest.TestCase):
     def test_a_mod_without_dest_still_lands_under_the_asset_name(self):
         helpers = next(m for m in self.app.MODS_REGISTRY
                        if m["id"] == "VanillaHelpers")
-        with mock.patch.object(self.app, "secure_urlopen",
+        with patch_all(self.app, "secure_urlopen",
                                lambda req, **kw: Resp(DLL)):
             written = self.app.install_mod(
                 helpers, self.client, {"tag_name": "v1", "assets": [

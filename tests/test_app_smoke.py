@@ -19,6 +19,11 @@ import textwrap
 import threading
 import time
 import unittest
+
+try:
+    from tests.ns import patch_all
+except ImportError:      # run as a script
+    from ns import patch_all
 from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -364,7 +369,7 @@ class TestAppStarts(unittest.TestCase):
             view.close()
         self.assertEqual(spawn.call_count, 0)
         self.assertIsNone(self.app._diag_view)
-        with mock.patch.object(self.app, "_prompt_av_exclusion", lambda: None):
+        with patch_all(self.app, "_prompt_av_exclusion", lambda: None):
             self.app._close_settings()
         self.app.update()
 
@@ -623,8 +628,8 @@ class TestAppStarts(unittest.TestCase):
         saved = (app._mod_updates_count, app._addon_updates_count, app._btn_mode)
         try:
             self.updall(0, 2)
-            with mock.patch.object(app, "_update_all_preview", return_value=True), \
-                    mock.patch.object(app, "_addon_update_all", side_effect=lambda:
+            with patch_all(app, "_update_all_preview", return_value=True), \
+                    patch_all(app, "_addon_update_all", side_effect=lambda:
                                       setattr(app, "_addons_busy", True)) as run, \
                     mock.patch.object(app._game_path, "get", return_value="C:/game"):
                 # As _addon_apply does: busy at once, before its thread starts.
@@ -651,14 +656,14 @@ class TestAppStarts(unittest.TestCase):
         saved = (app._mod_updates_count, app._addon_updates_count, app._btn_mode)
         try:
             self.updall(1, 1)
-            with mock.patch.object(app, "_update_all_preview", return_value=True), \
+            with patch_all(app, "_update_all_preview", return_value=True), \
                     mock.patch.object(self.app_mod.threading, "Thread"), \
                     mock.patch.object(app._game_path, "get", return_value="C:/game"):
                 app._update_all()
             self.assertTrue(app._update_all_chain)
             # Between the halves nothing is busy, and the spinner stays.
             self.assertEqual(self.updall(1, 1), ("hidden", "normal"))
-            with mock.patch.object(app, "_addon_update_all"):
+            with patch_all(app, "_addon_update_all"):
                 app._chain_addon_update_all()
             self.assertFalse(app._update_all_chain)
         finally:
@@ -968,7 +973,7 @@ class TestAppStarts(unittest.TestCase):
         with open(os.path.join(client, "dlls.txt"), "w") as f:
             f.write("nampower.dll\n")
         with mock.patch("tkinter.messagebox.askyesno", return_value=True), \
-                mock.patch.object(m, "_fetch_release_cached") as lookup:
+                patch_all(m, "_fetch_release_cached") as lookup:
             self.app._mod_uninstall("nampower")
         # None for this mod. (A background check of another mod's release
         # can land meanwhile -- on a slow CI machine, it did.)
@@ -1043,16 +1048,16 @@ class TestAppStarts(unittest.TestCase):
         # Not while something else runs; this test starts from an idle PLAY.
         self.addCleanup(setattr, self.app, "_btn_mode", self.app._btn_mode)
         self.app._btn_mode = "play"
-        with mock.patch.object(self.app, "_apply_mods") as apply:
+        with patch_all(self.app, "_apply_mods") as apply:
             self.app._mod_install("nampower")
         apply.assert_called_once_with()
         self.assertEqual(self.app._mod_pending_state["nampower"],
                          {"enabled": True})
         self.app._mod_pending_state.clear()
         # Backing out of a question installs nothing.
-        with mock.patch.object(self.app, "_confirm_res_fix_toggle",
+        with patch_all(self.app, "_confirm_res_fix_toggle",
                                return_value=False), \
-                mock.patch.object(self.app, "_apply_mods") as apply:
+                patch_all(self.app, "_apply_mods") as apply:
             self.app._mod_install("no1600x1200")
         apply.assert_not_called()
         self.app._mod_pending_state.clear()
@@ -1081,7 +1086,7 @@ class TestAppStarts(unittest.TestCase):
         with mock.patch.object(m.platforms, "spawn_detached") as spawn, \
                 mock.patch("tkinter.messagebox.askyesno",
                            return_value=True) as ask, \
-                mock.patch.object(self.app, "_mod_force_replace") as replace:
+                patch_all(self.app, "_mod_force_replace") as replace:
             self.app._launch_game()
         spawn.assert_not_called()
         self.assertIn(tr("{program} is empty.", program="VanillaFixes.exe"),
@@ -2343,7 +2348,7 @@ class TestLoginDoctorWindow(unittest.TestCase):
         net = [ld.Check(ld.PASS, "{host} resolves", {"host": h}, "network")
                for h in ld.DNS_HOSTS]
         for p in (mock.patch.object(ld, "network_checks", return_value=net),
-                  mock.patch.object(self.m, "get_client_version",
+                  patch_all(self.m, "get_client_version",
                                     return_value="1.18.1 (7272)"),
                   mock.patch.object(self.m.platforms, "client_in_use",
                                     return_value=False)):

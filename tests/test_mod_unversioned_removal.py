@@ -3,6 +3,11 @@ import copy
 import os
 import tempfile
 import unittest
+
+try:
+    from tests.ns import patch_all
+except ImportError:
+    from ns import patch_all
 from types import SimpleNamespace
 from unittest import mock
 
@@ -33,13 +38,13 @@ class TestUnversionedRemoval(unittest.TestCase):
             worker = SimpleNamespace(
                 _mod_pending_state={mod['id']: {'enabled': enabled}},
                 after=lambda *args: None)
-            with mock.patch.object(app, 'MODS_REGISTRY', [mod]), \
-                    mock.patch.object(app, 'load_config', side_effect=lambda: copy.deepcopy(cfg)), \
-                    mock.patch.object(app, 'update_config', side_effect=update), \
-                    mock.patch.object(app, '_fetch_release_cached', return_value=None) as lookup, \
-                    mock.patch.object(app, 'install_mod') as install, \
-                    mock.patch.object(app, 'log'), \
-                    mock.patch.object(app, 'reconcile_dlls_txt', return_value=[]):
+            with patch_all(app, 'MODS_REGISTRY', [mod]), \
+                    patch_all(app, 'load_config', side_effect=lambda: copy.deepcopy(cfg)), \
+                    patch_all(app, 'update_config', side_effect=update), \
+                    patch_all(app, '_fetch_release_cached', return_value=None) as lookup, \
+                    patch_all(app, 'install_mod') as install, \
+                    patch_all(app, 'log'), \
+                    patch_all(app, 'reconcile_dlls_txt', return_value=[]):
                 app.EqUpdaterApp._apply_mods_worker(worker, client)
             remaining = [rel for rel in files
                          if os.path.exists(os.path.join(client, rel))]

@@ -4,12 +4,13 @@
 
 Copies each named top-level assignment/function/class verbatim (source
 segments from ``ast``), in the order they appear in app.py, removes them from
-app.py and leaves a re-export import so no call site or test changes. No
+app.py and inserts a re-export import so no call site or test changes. No
 logic is edited by this tool; run pyflakes and the suite afterwards.
 """
 import ast
 import sys
 
+NL = chr(10)
 dest, rest = sys.argv[1], sys.argv[2:]
 hdr = rest[rest.index("--header") + 1]
 names = [n for n in rest[:rest.index("--header")]]
@@ -31,7 +32,6 @@ for node in tree.body:
         start = node.lineno - 1
         if getattr(node, "decorator_list", None):
             start = node.decorator_list[0].lineno - 1
-        # include comment lines directly above
         while start > 0 and lines[start - 1].lstrip().startswith("#"):
             start -= 1
         picked.append((start, node.end_lineno, tn))
@@ -39,11 +39,19 @@ found = {n for _, _, tn in picked for n in tn}
 missing = want - found
 if missing:
     sys.exit(f"not found at top level: {sorted(missing)}")
-body = "".join("".join(lines[s:e]) + "\n\n" for s, e, _ in picked)
-open(dest, "w", encoding="utf-8").write(open(hdr, encoding="utf-8").read() + "\n" + body.rstrip() + "\n")
+body = "".join("".join(lines[s:e]) + NL + NL for s, e, _ in picked)
+open(dest, "w", encoding="utf-8").write(
+    open(hdr, encoding="utf-8").read() + NL + body.rstrip() + NL)
 remove = set()
 for s, e, _ in picked:
     remove.update(range(s, e))
 kept = [l for i, l in enumerate(lines) if i not in remove]
-open(src_path, "w", encoding="utf-8").write("".join(kept))
-print("lifted", sorted(found))
+app = "".join(kept)
+# re-export so every call site and test keeps its name
+modname = dest.replace("\\", "/")[:-3].split("equpdater/")[-1].replace("/", ".")
+block = ("from ." + modname + " import (  # noqa: E402,F401" + NL + "    "
+         + ("," + NL + "    ").join(sorted(found)) + ")" + NL + NL)
+marker = "# Secure networking lives in core/net.py"
+app = app.replace(marker, "# " + modname + " (lifted by tools/lift.py)" + NL + block + marker, 1)
+open(src_path, "w", encoding="utf-8").write(app)
+print("lifted", len(found), "names into", dest)

@@ -11,6 +11,11 @@ import json
 import os
 import sys
 import unittest
+
+try:
+    from tests.ns import patch_all
+except ImportError:      # run as a script
+    from ns import patch_all
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -491,8 +496,8 @@ class TestAnnouncementsFallbackOrder(unittest.TestCase):
             if isinstance(feed, Exception):
                 raise feed
             return feed
-        with mock.patch.object(app, "fetch_latest_post", topic), \
-                mock.patch.object(app, "fetch_news_feed", news_feed):
+        with patch_all(app, "fetch_latest_post", topic), \
+                patch_all(app, "fetch_news_feed", news_feed):
             try:
                 return app.fetch_featured_post(), calls
             except self.n.ForumError as exc:
@@ -677,9 +682,9 @@ class TestNewsPanelsReadTheForums(unittest.TestCase):
                                                         "Cross Realm BGs are live."),
         })
         self.patches = [
-            mock.patch.object(app, "_news_open", self.site.opener),
-            mock.patch.object(app, "load_config", lambda *a, **k: self.cfg),
-            mock.patch.object(app, "update_config", update),
+            patch_all(app, "_news_open", self.site.opener),
+            patch_all(app, "load_config", lambda *a, **k: self.cfg),
+            patch_all(app, "update_config", update),
         ]
         for p in self.patches:
             p.start()
@@ -959,7 +964,7 @@ class TestAnnouncementsList(unittest.TestCase):
             "viewtopic.php?t=99": topic_page(99, "Topic 99", "Opening post 99."),
         })
         self.patches = [mock.patch.object(self.m.threading, "Thread", thread),
-                        mock.patch.object(self.m, "_news_open", self.site.opener)]
+                        patch_all(self.m, "_news_open", self.site.opener)]
         for p in self.patches:
             p.start()
         self.app._ann_reset()
@@ -1263,8 +1268,8 @@ class TestAnnouncementsList(unittest.TestCase):
         def page(forum, start, **k):
             asked.append(start)
             return pages[start]
-        with mock.patch.object(self.m, "fetch_forum_page", side_effect=page), \
-                mock.patch.object(self.m, "fetch_first_post",
+        with patch_all(self.m, "fetch_forum_page", side_effect=page), \
+                patch_all(self.m, "fetch_first_post",
                                   side_effect=self.m.ForumError("x", "u", "w")):
             items = self.m.fetch_patch_notes(8)
             self.assertEqual(len(items), 8)

@@ -20,6 +20,11 @@ import sys
 import tempfile
 import time
 import unittest
+
+try:
+    from tests.ns import patch_all
+except ImportError:      # run as a script
+    from ns import patch_all
 import urllib.error
 import zipfile
 from unittest import mock
@@ -172,7 +177,7 @@ class TestFailedUpdateKeepsTheInstalledCopy(unittest.TestCase):
         shutil.rmtree(self.client, ignore_errors=True)
 
     def install(self, data):
-        with mock.patch.object(self.m, "_download_archive", return_value=data):
+        with patch_all(self.m, "_download_archive", return_value=data):
             self.m.install_addon_files(self.client, "Questie", OCTO, "f" * 40)
 
     def assert_intact(self):
@@ -263,9 +268,9 @@ class TestFailuresReachTheUI(unittest.TestCase):
         self.logs_opened = []
         self.patches = [
             mock.patch.object(self.m.threading, "Thread", _InlineThread),
-            mock.patch.object(self.m, "log",
+            patch_all(self.m, "log",
                               lambda msg, tag="": self.logged.append(msg)),
-            mock.patch.object(self.m, "addon_install_source", lambda g: g),
+            patch_all(self.m, "addon_install_source", lambda g: g),
             mock.patch("tkinter.messagebox.askyesno",
                        lambda t, b, **kw: self.asked.append((t, b)) or True),
             mock.patch.object(a, "_addons_verify", lambda *x, **k: None),
@@ -304,7 +309,7 @@ class TestFailuresReachTheUI(unittest.TestCase):
                 raise RuntimeError("x") from e
         rec = self.rec("Questie")
         self.app._addons_status["available"] = [rec]
-        with mock.patch.object(self.m, "addon_remote_sha", sha):
+        with patch_all(self.m, "addon_remote_sha", sha):
             self.app._addon_apply([rec])
             self.pump()
         self.assertEqual(len(self.asked), 1)
@@ -324,9 +329,9 @@ class TestFailuresReachTheUI(unittest.TestCase):
 
     def test_buttons_come_back(self):
         busy = []
-        with mock.patch.object(self.m, "addon_remote_sha",
+        with patch_all(self.m, "addon_remote_sha",
                                side_effect=TimeoutError("timed out")), \
-                mock.patch.object(self.app, "_refresh_ready_state",
+                patch_all(self.app, "_refresh_ready_state",
                                   lambda: busy.append(1)):
             self.app._addon_apply([self.rec("Questie")])
             self.pump()
@@ -343,9 +348,9 @@ class TestFailuresReachTheUI(unittest.TestCase):
                              .__setitem__("Questie", old))
         rec = self.rec("Questie", status="updateAvailable")
         self.app._addons_status["addons"]["Questie"] = rec
-        with mock.patch.object(self.m, "addon_remote_sha",
+        with patch_all(self.m, "addon_remote_sha",
                                return_value="b" * 40), \
-                mock.patch.object(self.m, "_download_archive",
+                patch_all(self.m, "_download_archive",
                                   return_value=b"<html>challenge</html>"):
             self.app._addon_apply([rec])
             self.pump()
@@ -376,8 +381,8 @@ class TestFailuresReachTheUI(unittest.TestCase):
             return good
         recs = [self.rec(n, git=f"https://octowow.st/git/someone/{n}")
                 for n in ("Dns", "Good", "Http")]
-        with mock.patch.object(self.m, "addon_remote_sha", sha), \
-                mock.patch.object(self.m, "_download_archive", download):
+        with patch_all(self.m, "addon_remote_sha", sha), \
+                patch_all(self.m, "_download_archive", download):
             self.app._addon_apply(recs)
             self.pump()
         self.assertEqual(len(self.asked), 1)
@@ -416,9 +421,9 @@ class TestFailuresReachTheUI(unittest.TestCase):
         before = cv.yview()[0]
         self.assertGreater(before, 0.3)
         rec = a._addons_status["available"][40]
-        with mock.patch.object(self.m, "addon_remote_sha",
+        with patch_all(self.m, "addon_remote_sha",
                                return_value="e" * 40), \
-                mock.patch.object(self.m, "_download_archive",
+                patch_all(self.m, "_download_archive",
                                   return_value=_zip({"x.toc": "x"})):
             a._addon_apply([rec])
             self.pump()
@@ -427,9 +432,9 @@ class TestFailuresReachTheUI(unittest.TestCase):
         self.assertAlmostEqual(cv.yview()[0], before, delta=0.05)
 
     def test_success_shows_no_dialog(self):
-        with mock.patch.object(self.m, "addon_remote_sha",
+        with patch_all(self.m, "addon_remote_sha",
                                return_value="d" * 40), \
-                mock.patch.object(self.m, "_download_archive",
+                patch_all(self.m, "_download_archive",
                                   return_value=_zip({"Ok.toc": "x"})):
             self.app._addon_apply([self.rec("Ok")])
             self.pump()

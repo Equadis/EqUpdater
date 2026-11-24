@@ -10,6 +10,11 @@ what it did before.
 import os
 import sys
 import unittest
+
+try:
+    from tests.ns import patch_all
+except ImportError:      # run as a script
+    from ns import patch_all
 from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -163,9 +168,9 @@ class TestAddonSources(unittest.TestCase):
         def api_json(url, timeout=10):
             asked.append(url)
             return [{"sha": NEW}]
-        with mock.patch.object(self.app, "_api_json", api_json), \
-                mock.patch.object(self.app, "load_config", lambda: {}), \
-                mock.patch.object(self.app, "update_config", lambda f: {}):
+        with patch_all(self.app, "_api_json", api_json), \
+                patch_all(self.app, "load_config", lambda: {}), \
+                patch_all(self.app, "update_config", lambda f: {}):
             sha = self.app.addon_remote_sha(REPO, force=True)
         self.assertEqual(sha, NEW)
         self.assertEqual(asked, [f"{API}/commits?limit=1"])
@@ -182,9 +187,9 @@ class TestAddonSources(unittest.TestCase):
 
             def __exit__(self, *a):
                 return False
-        with mock.patch.object(self.app, "secure_urlopen",
+        with patch_all(self.app, "secure_urlopen",
                                lambda *a, **k: Response()), \
-                mock.patch.object(self.app, "load_config", lambda: {}):
+                patch_all(self.app, "load_config", lambda: {}):
             with self.assertRaises(RuntimeError) as ctx:
                 self.app.addon_remote_sha(REPO, force=True, raise_errors=True)
         self.assertEqual(str(ctx.exception), self.app.DDOS_CHECK)
@@ -363,8 +368,8 @@ class TestArchiveFallback(unittest.TestCase):
         self.app._ARCHIVES.clear()
         self.downloads = []
         self.patches = [
-            mock.patch.object(self.app, "load_config", lambda: {}),
-            mock.patch.object(self.app, "update_config", lambda f: {}),
+            patch_all(self.app, "load_config", lambda: {}),
+            patch_all(self.app, "update_config", lambda f: {}),
         ]
         for p in self.patches:
             p.start()
@@ -391,23 +396,23 @@ class TestArchiveFallback(unittest.TestCase):
         self.assertIsNone(self.app.archive_commit(b"<html>Just a moment</html>"))
 
     def test_blocked_api_reads_the_default_branch_archive(self):
-        with mock.patch.object(self.app, "_api_json", self.blocked_api), \
-                mock.patch.object(self.app, "_download_archive",
+        with patch_all(self.app, "_api_json", self.blocked_api), \
+                patch_all(self.app, "_download_archive",
                                   self.archive(make_archive(NEW.encode()))):
             sha = self.app.addon_remote_sha(REPO, force=True, raise_errors=True)
         self.assertEqual(sha, NEW)
         self.assertEqual(self.downloads, [f"{REPO}/archive/HEAD.zip"])
 
     def test_a_pinned_branch_reads_its_own_archive(self):
-        with mock.patch.object(self.app, "_api_json", self.blocked_api), \
-                mock.patch.object(self.app, "_download_archive",
+        with patch_all(self.app, "_api_json", self.blocked_api), \
+                patch_all(self.app, "_download_archive",
                                   self.archive(make_archive(NEW.encode()))):
             self.app.addon_remote_sha(REPO, branch="dev", force=True)
         self.assertEqual(self.downloads, [f"{REPO}/archive/dev.zip"])
 
     def test_an_archive_that_does_not_say_is_an_error(self):
-        with mock.patch.object(self.app, "_api_json", self.blocked_api), \
-                mock.patch.object(self.app, "_download_archive",
+        with patch_all(self.app, "_api_json", self.blocked_api), \
+                patch_all(self.app, "_download_archive",
                                   self.archive(make_archive(b""))):
             self.assertIsNone(self.app.addon_remote_sha(REPO, force=True))
             with self.assertRaises(RuntimeError):
@@ -415,16 +420,16 @@ class TestArchiveFallback(unittest.TestCase):
 
     def test_a_working_api_is_used_as_before(self):
         """Once OctoWoW allowlists EqUpdater/, nothing here runs."""
-        with mock.patch.object(self.app, "_api_json",
+        with patch_all(self.app, "_api_json",
                                lambda url, timeout=10: [{"sha": NEW}]), \
-                mock.patch.object(self.app, "_download_archive",
+                patch_all(self.app, "_download_archive",
                                   self.archive(make_archive(OLD.encode()))):
             self.assertEqual(self.app.addon_remote_sha(REPO, force=True), NEW)
         self.assertEqual(self.downloads, [])
 
     def test_only_gitea_falls_back(self):
-        with mock.patch.object(self.app, "_api_json", self.blocked_api), \
-                mock.patch.object(self.app, "_download_archive",
+        with patch_all(self.app, "_api_json", self.blocked_api), \
+                patch_all(self.app, "_download_archive",
                                   self.archive(make_archive(NEW.encode()))):
             self.assertIsNone(self.app.addon_remote_sha(
                 "https://github.com/o/r", force=True))
@@ -438,10 +443,10 @@ class TestArchiveFallback(unittest.TestCase):
             data = make_archive(NEW.encode(),
                                 ("GitAddonsManager-main/GitAddonsManager.toc",
                                  "GitAddonsManager-main/core.lua"))
-            with mock.patch.object(self.app, "_api_json", self.blocked_api), \
-                    mock.patch.object(self.app, "_download_archive",
+            with patch_all(self.app, "_api_json", self.blocked_api), \
+                    patch_all(self.app, "_download_archive",
                                       self.archive(data)), \
-                    mock.patch.object(self.app, "log", lambda *a, **k: None):
+                    patch_all(self.app, "log", lambda *a, **k: None):
                 sha = self.app.addon_remote_sha(REPO, force=True, raise_errors=True)
                 self.app.install_addon_files(client, "GitAddonsManager", REPO, sha)
             self.assertEqual(len(self.downloads), 1)
@@ -453,7 +458,7 @@ class TestArchiveFallback(unittest.TestCase):
 
     def test_a_changed_addon_is_held_back_with_replace_offered(self):
         app = self.app
-        with mock.patch.object(app, "_api_json", self.blocked_api):
+        with patch_all(app, "_api_json", self.blocked_api):
             anc = app.ancestry(REPO, OLD, NEW, fetch=app._api_json)
         self.assertIs(anc, app.Ancestry.UNKNOWN)
         saved = app.new_addon_record(managed=True, git=REPO, sha=OLD)

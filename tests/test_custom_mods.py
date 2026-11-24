@@ -8,6 +8,11 @@ import shutil
 import sys
 import tempfile
 import unittest
+
+try:
+    from tests.ns import patch_all
+except ImportError:      # run as a script
+    from ns import patch_all
 from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -107,8 +112,8 @@ class CustomModBase(unittest.TestCase):
         def update(mutator, *a, **k):
             mutator(self.cfg)
             return self.cfg
-        self.patches = [mock.patch.object(app, "load_config", load),
-                        mock.patch.object(app, "update_config", update)]
+        self.patches = [patch_all(app, "load_config", load),
+                        patch_all(app, "update_config", update)]
         for p in self.patches:
             p.start()
         self.client = tempfile.mkdtemp(prefix="equ-custom-mod-")
@@ -271,7 +276,7 @@ class TestInstall(CustomModBase):
         def fetch(req, **kw):
             urls.append(req.full_url)
             return Resp(DLL)
-        with mock.patch.object(self.app, "secure_urlopen", fetch):
+        with patch_all(self.app, "secure_urlopen", fetch):
             written = self.app.install_mod(
                 self.mod(), self.client,
                 release("Other.dll", "CoolMod.dll", "CoolMod-src.zip"))
@@ -282,7 +287,7 @@ class TestInstall(CustomModBase):
             self.assertEqual(f.read(), DLL)
 
     def test_a_name_with_wildcards_is_matched_exactly(self):
-        with mock.patch.object(self.app, "secure_urlopen",
+        with patch_all(self.app, "secure_urlopen",
                                lambda req, **kw: Resp(DLL)):
             written = self.app.install_mod(
                 self.mod(dll="Mod[1].dll"), self.client,
@@ -295,7 +300,7 @@ class TestInstall(CustomModBase):
                      "forge": "octowow.st/git"}):
             self.app.load_custom_mods({})
             self.cfg.clear()
-            with mock.patch.object(self.app, "secure_urlopen",
+            with patch_all(self.app, "secure_urlopen",
                                    lambda req, **kw: Resp(DLL)):
                 written = self.app.install_mod(
                     self.mod(src), self.client, release("CoolMod.dll"))
@@ -303,11 +308,11 @@ class TestInstall(CustomModBase):
 
     def test_latest_release_for_each_host(self):
         calls = []
-        with mock.patch.object(self.app, "_github_latest",
+        with patch_all(self.app, "_github_latest",
                                lambda *a, **k: calls.append("gh") or {}), \
-                mock.patch.object(self.app, "_codeberg_latest",
+                patch_all(self.app, "_codeberg_latest",
                                   lambda *a, **k: calls.append("cb") or {}), \
-                mock.patch.object(self.app, "_gitea_latest",
+                patch_all(self.app, "_gitea_latest",
                                   lambda api, *a, **k: calls.append(api) or {}):
             self.app._release_latest({"kind": "github_release", "owner": "a",
                                       "repo": "b"})
@@ -347,7 +352,7 @@ class TestModWithoutDll(CustomModBase):
         return next(m for m in self.app.MODS_REGISTRY if m["id"] == mid)
 
     def install(self, mod, names=("CoolMod-2.0.zip",), files=ADDON_ZIP):
-        with mock.patch.object(self.app, "secure_urlopen",
+        with patch_all(self.app, "secure_urlopen",
                                lambda req, **kw: Resp(zip_bytes(files))):
             return self.app.install_mod(mod, self.client, release(*names))
 
@@ -406,7 +411,7 @@ class TestModWithoutDll(CustomModBase):
 
     def test_an_mpq_goes_to_data(self):
         mod = self.add(["Data/patch-Z.mpq"], "patch-Z.mpq")
-        with mock.patch.object(self.app, "secure_urlopen",
+        with patch_all(self.app, "secure_urlopen",
                                lambda req, **kw: Resp(b"MPQ")):
             written = self.app.install_mod(mod, self.client,
                                            release("patch-Z.mpq"))
@@ -478,11 +483,11 @@ class TestDialog(unittest.TestCase):
             mock.patch.object(self.m.threading, "Thread", _thread),
             # Closing a dialog is "confirm": never let it reach a Windows
             # prompt or a reconcile here.
-            mock.patch.object(self.app, "_prompt_av_exclusion", lambda: None),
-            mock.patch.object(self.app, "_offer_reconcile", lambda *a, **k: None),
-            mock.patch.object(self.m, "_release_latest",
+            patch_all(self.app, "_prompt_av_exclusion", lambda: None),
+            patch_all(self.app, "_offer_reconcile", lambda *a, **k: None),
+            patch_all(self.m, "_release_latest",
                               lambda src, **k: release("CoolMod.dll", "Other.dll")),
-            mock.patch.object(self.app, "_update_mod", self.updates.append),
+            patch_all(self.app, "_update_mod", self.updates.append),
             mock.patch("tkinter.messagebox.askyesno",
                        lambda t, b, **kw: self.asked.append((t, b)) or True),
         ]
@@ -562,9 +567,9 @@ class TestDialog(unittest.TestCase):
         a._open_custom_mod_dialog()
         dialog = a._settings_overlay
         ui = a._custom_mod_ui
-        with mock.patch.object(self.m, "_release_latest",
+        with patch_all(self.m, "_release_latest",
                                lambda src, **k: release("CoolMod-2.0.zip")), \
-                mock.patch.object(self.m, "secure_urlopen",
+                patch_all(self.m, "secure_urlopen",
                                   lambda req, **kw: Resp(zip_bytes(ADDON_ZIP))):
             ui["url"].set("https://github.com/someone/CoolMod")
             ui["find"]()
@@ -590,7 +595,7 @@ class TestDialog(unittest.TestCase):
         a = self.app
         a._open_custom_mod_dialog()
         ui = a._custom_mod_ui
-        with mock.patch.object(self.m, "_release_latest",
+        with patch_all(self.m, "_release_latest",
                                lambda src, **k: release("UnitXP_SP3.dll")):
             ui["url"].set("https://github.com/brues-code/UnitXP_SP3")
             ui["find"]()
@@ -606,7 +611,7 @@ class TestDialog(unittest.TestCase):
             UnitXP_SP3={"enabled": True, "installed_version": "v1"}))
         applied = []
         ui = self.open_fork()
-        with mock.patch.object(self.app, "_apply_mods",
+        with patch_all(self.app, "_apply_mods",
                                lambda: applied.append(dict(
                                    self.app._mod_pending_state))):
             ui["install"]()

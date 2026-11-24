@@ -148,4 +148,8 @@ def secure_urlopen(req, timeout, allowed_hosts=None):
     `req` may be a URL string or a urllib Request."""
     url = req.full_url if isinstance(req, urllib.request.Request) else req
     _check_url(url, allowed_hosts)
+    if os.environ.get("EQUPDATER_OFFLINE"):
+        # Tests and benchmarks: no real traffic, ever. A fake that replaces
+        # secure_urlopen never gets here; anything that forgot to fails fast.
+        raise OSError("network disabled (EQUPDATER_OFFLINE is set): " + url)
     return _build()["_SECURE_OPENER"].open(req, timeout=timeout)

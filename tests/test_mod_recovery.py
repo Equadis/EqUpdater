@@ -7,6 +7,11 @@ import json
 import os
 import tempfile
 import unittest
+
+try:
+    from tests.ns import patch_all
+except ImportError:      # run as a script
+    from ns import patch_all
 import zipfile
 from types import SimpleNamespace
 from unittest import mock
@@ -105,9 +110,9 @@ class TestLookup(Base):
         super().setUp()
         self.mod = registry_mod("VanillaHelpers")
         self.cfg = {}
-        patches = [mock.patch.object(app, "load_config",
+        patches = [patch_all(app, "load_config",
                                      side_effect=lambda: self.cfg),
-                   mock.patch.object(app, "update_config",
+                   patch_all(app, "update_config",
                                      side_effect=lambda fn: fn(self.cfg))]
         for p in patches:
             p.start()
@@ -118,7 +123,7 @@ class TestLookup(Base):
          "browser_download_url": "https://github.com/x", "digest": "sha256:ab"}]}
 
     def test_failure_says_why_is_not_cached_and_retry_recovers(self):
-        with mock.patch.object(app, "_release_latest",
+        with patch_all(app, "_release_latest",
                                side_effect=RuntimeError("HTTP 500 from github")):
             self.assertIsNone(app._fetch_release_cached(self.mod))
         look = app.MOD_LOOKUPS[self.mod["id"]]
@@ -126,14 +131,14 @@ class TestLookup(Base):
         self.assertIn("HTTP 500", look["reason"])
         self.assertNotIn("mod_release_cache", self.cfg)
 
-        with mock.patch.object(app, "_release_latest",
+        with patch_all(app, "_release_latest",
                                return_value=self.RELEASE):
             rel = app._fetch_release_cached(self.mod)
         self.assertEqual(rel["tag_name"], "v1.2")
         self.assertEqual(app.MOD_LOOKUPS[self.mod["id"]]["outcome"], "fetched")
 
     def test_cache_answers_then_force_goes_past_it(self):
-        with mock.patch.object(app, "_release_latest",
+        with patch_all(app, "_release_latest",
                                return_value=self.RELEASE) as latest:
             app._fetch_release_cached(self.mod)
             app._fetch_release_cached(self.mod)
@@ -143,24 +148,24 @@ class TestLookup(Base):
             self.assertEqual(latest.call_count, 2)
 
     def test_failed_force_does_not_serve_the_stale_entry(self):
-        with mock.patch.object(app, "_release_latest",
+        with patch_all(app, "_release_latest",
                                return_value=self.RELEASE):
             app._fetch_release_cached(self.mod)
-        with mock.patch.object(app, "_release_latest",
+        with patch_all(app, "_release_latest",
                                side_effect=RuntimeError("down")):
             self.assertIsNone(app._fetch_release_cached(self.mod, force=True))
 
     def test_release_without_the_mods_file_is_not_an_answer(self):
         renamed = {"tag_name": "v2", "assets": [
             {"name": "Renamed.dll", "size": 1, "browser_download_url": "x"}]}
-        with mock.patch.object(app, "_release_latest", return_value=renamed):
+        with patch_all(app, "_release_latest", return_value=renamed):
             self.assertIsNone(app._fetch_release_cached(self.mod))
         look = app.MOD_LOOKUPS[self.mod["id"]]
         self.assertEqual(look["outcome"], "no-asset")
         self.assertIn("v2", look["reason"])
 
     def test_diagnostic_line_names_mod_source_and_cause(self):
-        with mock.patch.object(app, "_release_latest",
+        with patch_all(app, "_release_latest",
                                side_effect=RuntimeError("HTTP 500")):
             app._fetch_release_cached(self.mod)
         line = app.mod_lookup_line(self.mod, {"installed_version": None})
@@ -179,7 +184,7 @@ class TestIdentification(Base):
     def test_exact_digest_identifies_without_a_download(self):
         mod = registry_mod("nampower")
         write_files(self.client, ["nampower.dll"], b"the release")
-        with mock.patch.object(app, "install_mod") as install:
+        with patch_all(app, "install_mod") as install:
             self.assertTrue(app.identify_installed_release(
                 mod, ["nampower.dll"], self.client,
                 self.digest_release(b"the release")))
@@ -196,9 +201,9 @@ class TestIdentification(Base):
         def install(m, target, release=None):
             write_files(target, files, release["body"])
             return list(files)
-        with mock.patch.object(app, "install_mod", side_effect=install), \
-                mock.patch.object(app, "APP_DATA_DIR", self.client + "-data"), \
-                mock.patch.object(app, "log"):
+        with patch_all(app, "install_mod", side_effect=install), \
+                patch_all(app, "APP_DATA_DIR", self.client + "-data"), \
+                patch_all(app, "log"):
             rel = {"tag_name": "v1", "body": b"exact", "assets": [
                 {"name": "vanillafixes-1.zip", "size": 1,
                  "browser_download_url": "x"}]}
@@ -222,16 +227,16 @@ class TestIdentification(Base):
             fn(cfg)
             return cfg
         worker = SimpleNamespace()
-        with mock.patch.object(app, "load_config", side_effect=lambda: cfg), \
-                mock.patch.object(app, "update_config", side_effect=update), \
-                mock.patch.object(app, "log"), \
-                mock.patch.object(app, "_fetch_release_cached",
+        with patch_all(app, "load_config", side_effect=lambda: cfg), \
+                patch_all(app, "update_config", side_effect=update), \
+                patch_all(app, "log"), \
+                patch_all(app, "_fetch_release_cached",
                                   return_value=release), \
-                mock.patch.object(app, "release_by_tag",
+                patch_all(app, "release_by_tag",
                                   return_value=by_tag) as tag_lookup, \
                 mock.patch.object(app.octolauncher, "version_hints",
                                   return_value=hints or {}), \
-                mock.patch.object(app, "MODS_REGISTRY",
+                patch_all(app, "MODS_REGISTRY",
                                   [registry_mod("nampower")]):
             names = app.EqUpdaterApp._identify_unversioned_mods(
                 worker, self.client)
@@ -329,22 +334,22 @@ class TestApply(Base):
         install = install or (lambda m, c, release=None:
                               write_files(c, m["installed_files"], b"replaced")
                               or list(m["installed_files"]))
-        with mock.patch.object(app, "MODS_REGISTRY", [mod]), \
-                mock.patch.object(app, "load_config",
+        with patch_all(app, "MODS_REGISTRY", [mod]), \
+                patch_all(app, "load_config",
                                   side_effect=lambda: copy.deepcopy(cfg)), \
-                mock.patch.object(app, "update_config", side_effect=update), \
-                mock.patch.object(app, "_fetch_release_cached",
+                patch_all(app, "update_config", side_effect=update), \
+                patch_all(app, "_fetch_release_cached",
                                   return_value=release) as self.lookup, \
-                mock.patch.object(app, "fetch_mod_latest_version_cached",
+                patch_all(app, "fetch_mod_latest_version_cached",
                                   return_value=mod["source"].get("pinned_version")), \
-                mock.patch.object(app, "install_mod",
+                patch_all(app, "install_mod",
                                   side_effect=install) as self.install, \
-                mock.patch.object(app, "APP_DATA_DIR", self.client + "-data"), \
-                mock.patch.object(app, "add_dll"), \
-                mock.patch.object(app, "remove_dll"), \
-                mock.patch.object(app, "ensure_dll", return_value=False), \
-                mock.patch.object(app, "log"), \
-                mock.patch.object(app, "reconcile_dlls_txt", return_value=[]):
+                patch_all(app, "APP_DATA_DIR", self.client + "-data"), \
+                patch_all(app, "add_dll"), \
+                patch_all(app, "remove_dll"), \
+                patch_all(app, "ensure_dll", return_value=False), \
+                patch_all(app, "log"), \
+                patch_all(app, "reconcile_dlls_txt", return_value=[]):
             app.EqUpdaterApp._apply_mods_worker(
                 worker, self.client, mod["id"] if targeted else None, force)
         return cfg["mods"].get(mod["id"])

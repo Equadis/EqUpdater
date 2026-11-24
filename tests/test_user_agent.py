@@ -10,6 +10,11 @@ import os
 import sys
 import time
 import unittest
+
+try:
+    from tests.ns import patch_all
+except ImportError:      # run as a script
+    from ns import patch_all
 from unittest import mock
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -59,7 +64,7 @@ class TestUserAgent(unittest.TestCase):
         def opener(req, **kw):
             sent.append(req.get_header("User-agent"))
             return Resp()
-        with mock.patch.object(self.app, "secure_urlopen", opener):
+        with patch_all(self.app, "secure_urlopen", opener):
             self.app._api_json("https://octowow.st/git/api/v1/repos/a/b")
         self.assertEqual(sent, [self.branding.USER_AGENT])
 
@@ -128,9 +133,9 @@ class TestCompareOnlyWhenTheCommitChanged(unittest.TestCase):
             self.asked.append((installed, remote))
             return self.answer
         self.patches = [
-            mock.patch.object(app, "load_config", lambda *a, **k: self.cfg),
-            mock.patch.object(app, "update_config", update),
-            mock.patch.object(app, "ancestry", ancestry),
+            patch_all(app, "load_config", lambda *a, **k: self.cfg),
+            patch_all(app, "update_config", update),
+            patch_all(app, "ancestry", ancestry),
         ]
         for p in self.patches:
             p.start()
@@ -184,7 +189,7 @@ class TestCompareOnlyWhenTheCommitChanged(unittest.TestCase):
         self.assertEqual(len(self.asked), 2)
 
     def test_the_cache_stays_small(self):
-        with mock.patch.object(self.app, "ADDON_ANCESTRY_CACHE_MAX", 3):
+        with patch_all(self.app, "ADDON_ANCESTRY_CACHE_MAX", 3):
             for i in range(6):
                 self.check(self.OLD, f"{i:040d}")
         self.assertEqual(len(self.cfg["addon_ancestry_cache"]), 3)

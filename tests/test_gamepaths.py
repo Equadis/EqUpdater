@@ -12,6 +12,11 @@ import shutil
 import sys
 import tempfile
 import unittest
+
+try:
+    from tests.ns import patch_all
+except ImportError:      # run as a script
+    from ns import patch_all
 import zipfile
 from unittest import mock
 
@@ -191,7 +196,7 @@ class TestAppUsesOneFolder(Base):
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w") as zf:
             zf.writestr("Atlas-abc/Atlas.toc", "toc")
-        with mock.patch.object(m, "_download_archive", return_value=buf.getvalue()):
+        with patch_all(m, "_download_archive", return_value=buf.getvalue()):
             m.install_addon_files(self.client, "Atlas", "https://github.com/a/Atlas", "f" * 40)
         self.assertEqual(self.listing("Interface"), ["AddOns"])
         self.assertEqual(self.listing("Interface", "AddOns"), ["Atlas", "pfUI"])
@@ -200,7 +205,7 @@ class TestAppUsesOneFolder(Base):
         m = self.app()
         self.addon("Addons", "pfUI", {"pfUI.toc": "a"})
         self.addon("AddOns", "pfUI", {"pfUI.toc": "b"})
-        with mock.patch.object(m, "_download_archive", return_value=b"") as dl:
+        with patch_all(m, "_download_archive", return_value=b"") as dl:
             with self.assertRaises(self.gp.AddonDirConflict):
                 m.install_addon_files(self.client, "pfUI", "https://github.com/a/pfUI", "f" * 40)
         dl.assert_not_called()

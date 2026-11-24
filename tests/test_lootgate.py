@@ -9,6 +9,11 @@ import subprocess
 import sys
 import tempfile
 import unittest
+
+try:
+    from tests.ns import patch_all
+except ImportError:      # run as a script
+    from ns import patch_all
 from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -169,12 +174,12 @@ class TestCheckboxAndLaunch(unittest.TestCase):
         self.exe = os.path.join(self.dir, "WoW.exe")
         self.cfg = {"out_dir": self.dir}
         patchers = [
-            mock.patch.object(app, "load_config", lambda *a, **k: self.cfg),
+            patch_all(app, "load_config", lambda *a, **k: self.cfg),
             # load_tweaks_config moved to core/tweaks.py: patch what it reads
             mock.patch.dict(app.load_tweaks_config.__globals__,
                             {"load_config": lambda *a, **k: self.cfg}),
-            mock.patch.object(app, "client_exe_locked", lambda d: False),
-            mock.patch.object(app, "writable_addons_path",
+            patch_all(app, "client_exe_locked", lambda d: False),
+            patch_all(app, "writable_addons_path",
                               lambda d: os.path.join(d, "Interface", "AddOns")),
         ]
         for p in patchers:
@@ -230,7 +235,7 @@ class TestCheckboxAndLaunch(unittest.TestCase):
     def test_running_game_is_not_written_to(self):
         fake_exe(self.exe, lootgate.JNZ)
         self.cfg["tweaks"] = {"alwaysAutoLoot": False}
-        with mock.patch.object(self.app, "client_exe_locked", lambda d: True):
+        with patch_all(self.app, "client_exe_locked", lambda d: True):
             notes = self.app.enforce_autoloot(self.dir)
         self.assertIs(lootgate.exe_state(self.exe), True)
         self.assertTrue(any("in use" in n for n in notes))

@@ -3,6 +3,11 @@ import copy
 import os
 import tempfile
 import unittest
+
+try:
+    from tests.ns import patch_all
+except ImportError:      # run as a script
+    from ns import patch_all
 from types import SimpleNamespace
 from unittest import mock
 
@@ -20,9 +25,9 @@ class TestDefenderOffer(unittest.TestCase):
             fn(self.cfg)
             return self.cfg
         for patch in (
-                mock.patch.object(app, "load_config",
+                patch_all(app, "load_config",
                                   side_effect=lambda *a: copy.deepcopy(self.cfg)),
-                mock.patch.object(app, "update_config", side_effect=update),
+                patch_all(app, "update_config", side_effect=update),
                 mock.patch.object(app.platforms, "WINDOWS", True),
                 mock.patch.dict(os.environ, {"EQUPDATER_NO_DEFENDER_PROMPT": ""})):
             patch.start()

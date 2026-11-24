@@ -8,6 +8,11 @@ import os
 import sys
 import time
 import unittest
+
+try:
+    from tests.ns import patch_all
+except ImportError:      # run as a script
+    from ns import patch_all
 from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -29,9 +34,9 @@ class TestReleaseFreshness(unittest.TestCase):
             mutator(self.cfg)
             return self.cfg
         self.patches = [
-            mock.patch.object(app, "load_config", lambda *a, **k: self.cfg),
-            mock.patch.object(app, "update_config", update),
-            mock.patch.object(app, "_release_latest", self.latest),
+            patch_all(app, "load_config", lambda *a, **k: self.cfg),
+            patch_all(app, "update_config", update),
+            patch_all(app, "_release_latest", self.latest),
         ]
         for p in self.patches:
             p.start()
@@ -85,7 +90,7 @@ class TestReleaseFreshness(unittest.TestCase):
     def test_the_launch_check_asks_for_fresh_releases(self):
         seen = []
         fake = mock.Mock()
-        with mock.patch.object(self.app, "fetch_mod_latest_version_cached",
+        with patch_all(self.app, "fetch_mod_latest_version_cached",
                                lambda mod, **kw: seen.append(kw) or None):
             self.app.EqUpdaterApp._load_mods_state(
                 fake, max_age=self.app._MOD_VERSION_STARTUP_MAX_AGE)

@@ -8,6 +8,11 @@ import os
 import struct
 import tempfile
 import unittest
+
+try:
+    from tests.ns import patch_all
+except ImportError:      # run as a script
+    from ns import patch_all
 from types import SimpleNamespace
 from unittest import mock
 
@@ -78,7 +83,7 @@ class Base(unittest.TestCase):
                     side_effect=lambda *a: copy.deepcopy(self.cfg))),
                 ("update_config", mock.patch.object(
                     app, "update_config", side_effect=update)),
-                ("log", mock.patch.object(app, "log"))):
+                ("log", patch_all(app, "log"))):
             setattr(self, name, patch.start())
             self.addCleanup(patch.stop)
 
@@ -238,10 +243,10 @@ class TestModsFoundOnDisk(Base):
         host = SimpleNamespace(
             _mod_pending_state={mod["id"]: {"enabled": True}},
             after=lambda *a: None)
-        with mock.patch.object(app, "MODS_REGISTRY", [mod]), \
-                mock.patch.object(app, "_fetch_release_cached", return_value=None), \
-                mock.patch.object(app, "install_mod") as install, \
-                mock.patch.object(app, "reconcile_dlls_txt", return_value=[]):
+        with patch_all(app, "MODS_REGISTRY", [mod]), \
+                patch_all(app, "_fetch_release_cached", return_value=None), \
+                patch_all(app, "install_mod") as install, \
+                patch_all(app, "reconcile_dlls_txt", return_value=[]):
             app.EqUpdaterApp._apply_mods_worker(host, self.client)
         install.assert_not_called()
         with open(os.path.join(self.client, "VanillaMultiMonitorFix.dll"),
@@ -277,12 +282,12 @@ class TestModsFoundOnDisk(Base):
             return list(out)
         rel = {"tag_name": "0.2", "assets": [
             {"name": "release.zip", "size": 1, "browser_download_url": "x"}]}
-        with mock.patch.object(app, "install_mod", side_effect=fake_install):
+        with patch_all(app, "install_mod", side_effect=fake_install):
             self.assertTrue(app.identify_installed_release(
                 mod, ["VanillaMultiMonitorFix.dll",
                       "VMMFix_preferred_monitor.txt"], self.client, rel))
         self.put("VanillaMultiMonitorFix.dll", content=b"another build")
-        with mock.patch.object(app, "install_mod", side_effect=fake_install):
+        with patch_all(app, "install_mod", side_effect=fake_install):
             self.assertFalse(app.identify_installed_release(
                 mod, ["VanillaMultiMonitorFix.dll",
                       "VMMFix_preferred_monitor.txt"], self.client, rel))
@@ -296,7 +301,7 @@ class TestAddonsFound(Base):
         self.root = os.path.join(self.client, "Interface", "AddOns")
         self.dir = os.path.join(self.root, self.FOLDER)
         os.makedirs(self.dir)
-        patch = mock.patch.object(app, "addons_path", return_value=self.root)
+        patch = patch_all(app, "addons_path", return_value=self.root)
         patch.start()
         self.addCleanup(patch.stop)
 
@@ -315,8 +320,8 @@ class TestAddonsFound(Base):
     def test_a_clean_clone_gets_its_commit_without_a_download(self):
         self.clone()
         self.adopt()
-        with mock.patch.object(app, "addon_remote_sha") as remote, \
-                mock.patch.object(app, "install_addon_files") as install:
+        with patch_all(app, "addon_remote_sha") as remote, \
+                patch_all(app, "install_addon_files") as install:
             self.host()._identify_adopted_addons(self.client)
         rec = self.cfg["addons"][self.FOLDER]
         self.assertEqual((rec["sha"], rec["branch"]), (SHA, "main"))
@@ -339,7 +344,7 @@ class TestAddonsFound(Base):
             f.write(b"my edit\n")
         self.adopt()
         host = self.host(_addon_is_commit=lambda *a: False)
-        with mock.patch.object(app, "addon_remote_sha", return_value="b" * 40):
+        with patch_all(app, "addon_remote_sha", return_value="b" * 40):
             app.EqUpdaterApp._identify_adopted_addons(host, self.client)
         self.assertIsNone(self.cfg["addons"][self.FOLDER]["sha"])
 
@@ -347,14 +352,14 @@ class TestAddonsFound(Base):
         self.clone(remote="https://github.com/someone/else.git")
         self.adopt()
         host = self.host(_addon_is_commit=lambda *a: False)
-        with mock.patch.object(app, "addon_remote_sha", return_value="b" * 40):
+        with patch_all(app, "addon_remote_sha", return_value="b" * 40):
             app.EqUpdaterApp._identify_adopted_addons(host, self.client)
         self.assertIsNone(self.cfg["addons"][self.FOLDER]["sha"])
 
     def test_a_folder_matching_the_latest_commit_exactly_gets_it(self):
         self.adopt()
         host = self.host(_addon_is_commit=lambda *a: True)
-        with mock.patch.object(app, "addon_remote_sha", return_value="b" * 40):
+        with patch_all(app, "addon_remote_sha", return_value="b" * 40):
             app.EqUpdaterApp._identify_adopted_addons(host, self.client)
         self.assertEqual(self.cfg["addons"][self.FOLDER]["sha"], "b" * 40)
 
@@ -362,7 +367,7 @@ class TestAddonsFound(Base):
         self.adopt()
         compare = mock.Mock(return_value=False)
         host = self.host(_addon_is_commit=compare)
-        with mock.patch.object(app, "addon_remote_sha", return_value="b" * 40):
+        with patch_all(app, "addon_remote_sha", return_value="b" * 40):
             app.EqUpdaterApp._identify_adopted_addons(host, self.client)
             app.EqUpdaterApp._identify_adopted_addons(host, self.client)
         self.assertEqual(compare.call_count, 1)
@@ -371,7 +376,7 @@ class TestAddonsFound(Base):
         self.adopt()
         compare = mock.Mock(return_value=None)
         host = self.host(_addon_is_commit=compare)
-        with mock.patch.object(app, "addon_remote_sha", return_value="b" * 40):
+        with patch_all(app, "addon_remote_sha", return_value="b" * 40):
             app.EqUpdaterApp._identify_adopted_addons(host, self.client)
             app.EqUpdaterApp._identify_adopted_addons(host, self.client)
         self.assertEqual(compare.call_count, 2)
@@ -395,7 +400,7 @@ class TestManageAll(Base):
         super().setUp()
         self.root = os.path.join(self.client, "Interface", "AddOns")
         os.makedirs(self.root)
-        patch = mock.patch.object(app, "addons_path", return_value=self.root)
+        patch = patch_all(app, "addons_path", return_value=self.root)
         patch.start()
         self.addCleanup(patch.stop)
         self.put("nampower.dll", "VanillaFixes.exe", "VfPatcher.dll")
