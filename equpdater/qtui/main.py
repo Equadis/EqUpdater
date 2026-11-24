@@ -45,6 +45,7 @@ from ..core.settings_service import GeneralService          # noqa: E402
 from ..core.diagnostics_service import DiagnosticsService  # noqa: E402
 from ..core.custom_service import CustomSourceService      # noqa: E402
 from ..core.setup_service import SetupService                # noqa: E402
+from ..core.server import ServerFeed                        # noqa: E402
 from .. import i18n                                          # noqa: E402
 
 QML_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "qml")
@@ -85,6 +86,7 @@ def build(argv=None):
     if os.environ.get("EQU3_SKIN"):
         settings.data["skin"] = os.environ["EQU3_SKIN"]
     news_cache = core_settings.open_news_cache(data)
+    server_cache = core_settings.open_server_cache(data)
 
     app = QGuiApplication.instance() or QGuiApplication(argv or sys.argv)
     app.setApplicationName("EqUpdater")
@@ -126,6 +128,17 @@ def build(argv=None):
     else:
         fetcher = Fetcher()
     news_bridge = bridge.NewsBridge(news_cache, tasks, fetcher, settings)
+    server_fixture = os.environ.get("EQU3_SERVER_FIXTURE")
+    if server_fixture:
+        from .testing import server_fixture_fetch
+        server_feed = ServerFeed(server_cache, fetch=server_fixture_fetch(server_fixture))
+    else:
+        server_feed = ServerFeed(server_cache)
+    server_bridge = bridge.ServerBridge(
+        server_feed, tasks, settings,
+        offline=(os.environ.get("EQU3_OFFLINE") == "1" or bool(os.environ.get("EQUPDATER_OFFLINE")))
+        and not server_fixture)
+    app_bridge.window_hooks.append(server_bridge.window_state)
 
     tweaks_bridge = bridge.TweaksBridge(TweaksService(settings, tasks), app_bridge)
     dialog_bridge = ops_bridge.DialogBridge(dispatcher)
@@ -214,12 +227,12 @@ def build(argv=None):
     for name, obj in (("app", app_bridge), ("skin", skin_bridge),
                       ("settings", settings_bridge), ("news", news_bridge),
                       ("tweaks", tweaks_bridge), ("launch", launch_bridge),
-                      ("mods", mods_bridge), ("addons", addons_bridge), ("mpq", mpq_bridge), ("general", general_bridge), ("diag", diag_bridge), ("setup", setup_bridge), ("customSrc", custom_bridge),
+                      ("mods", mods_bridge), ("addons", addons_bridge), ("mpq", mpq_bridge), ("general", general_bridge), ("diag", diag_bridge), ("server", server_bridge), ("setup", setup_bridge), ("customSrc", custom_bridge),
                       ("dialog", dialog_bridge)):
         ctx.setContextProperty(name, obj)
     marks["objects_ready_ms"] = round((time.perf_counter() - _T0) * 1000)
 
-    parts = dict(setup=setup_bridge, setup_service=setup_service, custom=custom_bridge, custom_service=custom_service, diag=diag_bridge, diag_service=diag_service, general=general_bridge, general_service=general_service, mpq=mpq_bridge, mpq_service=mpq_service, addons=addons_bridge, addons_service=addons_service,
+    parts = dict(server=server_bridge, server_feed=server_feed, setup=setup_bridge, setup_service=setup_service, custom=custom_bridge, custom_service=custom_service, diag=diag_bridge, diag_service=diag_service, general=general_bridge, general_service=general_service, mpq=mpq_bridge, mpq_service=mpq_service, addons=addons_bridge, addons_service=addons_service,
                  mods=mods_bridge, mods_service=mods_service, host=host,
                  dialog=dialog_bridge, tweaks=tweaks_bridge, settings=settings, tasks=tasks, news=news_bridge,
                  launch=launch_bridge, app=app_bridge, skin=skin_bridge,
@@ -277,6 +290,7 @@ def run(argv=None) -> int:
         marks["interactive_ms"] = round((time.perf_counter() - _T0) * 1000)
         marks["epoch_interactive"] = time.time()    # for cross-process timing
         p["news"].start()
+        p["server"].start()
         p["launch"].refresh()
         # one-time, version-gated migrations (the 1.3 re-patch for installs that
         # predate it), off the UI thread and after the first frame

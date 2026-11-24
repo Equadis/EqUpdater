@@ -921,4 +921,50 @@ STRINGS = {
         'Wähle zuerst den Spielordner.',
     'Windows Defender is not used on this system.':
         'Windows Defender wird auf diesem System nicht verwendet.',
+    'Could not refresh just now; showing the last known values.':
+        'Aktualisierung gerade nicht möglich; die zuletzt bekannten Werte werden angezeigt.',
+    'Data from OctoBot. Server status is not checked by EqUpdater.':
+        'Daten von OctoBot. EqUpdater prüft den Serverstatus nicht selbst.',
+    'Login response':
+        'Login-Antwort',
+    'No server information yet':
+        'Noch keine Serverinformationen',
+    'Player count: {source}':
+        'Spielerzahl: {source}',
+    'Players online':
+        'Spieler online',
+    'Server offline':
+        'Server offline',
+    'Server online':
+        'Server online',
+    'Server partly available':
+        'Server teilweise verfügbar',
+    'Server status checked {when}; it may have changed.':
+        'Serverstatus geprüft {when}; er kann sich geändert haben.',
+    'Server status unknown':
+        'Serverstatus unbekannt',
+    'This is out of date; the source has not been updated.':
+        'Das ist veraltet; die Quelle wurde nicht aktualisiert.',
+    'Updated {when}':
+        'Aktualisiert {when}',
+    'Waiting for the first update.':
+        'Warte auf die erste Aktualisierung.',
+    'Website':
+        'Website',
+    'available':
+        'verfügbar',
+    'just now':
+        'gerade eben',
+    'no data':
+        'keine Daten',
+    'unavailable':
+        'nicht verfügbar',
+    '{count} players online':
+        '{count} Spieler online',
+    '{n} days ago':
+        'vor {n} Tagen',
+    '{n} h ago':
+        'vor {n} Std.',
+    '{n} min ago':
+        'vor {n} Min.',
 }

@@ -20,7 +20,7 @@ import os
 import time
 
 from PySide6.QtCore import (QAbstractListModel, QByteArray, QModelIndex, QObject,
-                            QUrl, Property, Qt, Signal, Slot)
+                            QTimer, QUrl, Property, Qt, Signal, Slot)
 from PySide6.QtGui import QDesktopServices, QFontDatabase
 
 from .. import branding
@@ -28,6 +28,7 @@ from ..core import settings as core_settings
 from ..core import skin as core_skin
 from ..core.launch import LaunchService
 from ..core.news_service import NewsService, safe_url, SECTIONS
+from ..core.server import age_text
 from ..core.tasks import TaskManager
 from ..core.tweaks_service import TweaksService
 from ..i18n import tr
@@ -555,6 +556,167 @@ class SettingsBridge(QObject):
 
 # ── shell ────────────────────────────────────────────────────────────────────
 
+class ServerBridge(QObject):
+    """The footer chip: OctoBot's population and status, polled politely
+    (``core/server.py``). Off by switch in Settings (then nothing is fetched)."""
+    changed = Signal()
+
+    def __init__(self, feed, tasks, settings, offline: bool = False):
+        super().__init__()
+        self.feed, self.tasks, self.settings, self.offline = feed, tasks, settings, offline
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self._tick)
+        self._age = QTimer(self)                       # the "updated 8 min ago" text
+        self._age.setInterval(30000)
+        self._age.timeout.connect(self.changed.emit)
+        self._busy = False
+        self._started = False
+
+    # -- schedule -----------------------------------------------------------------
+    def start(self):
+        if self._started or not self.enabled or self.offline:
+            return
+        self._started = True
+        self._age.start()
+        self._schedule(0.5 if self.feed.wants_refresh_on_return() else None)
+
+    def stop(self):
+        self._started = False
+        self._timer.stop()
+        self._age.stop()
+
+    def _schedule(self, delay=None):
+        if not self._started:
+            return
+        if delay is None:
+            delay = self.feed.delay()
+        if delay is None:                              # minimised: nothing until it returns
+            self._timer.stop()
+            return
+        self._timer.start(int(delay * 1000))
+
+    def _tick(self):
+        if self._busy or not self._started:
+            return
+        self._busy = True
+
+        def done(changed):
+            self._busy = False
+            self.changed.emit()
+            self._schedule()
+        self.tasks.submit("server:poll", self.feed.fetch_once, on_done=done,
+                          on_error=lambda e: done(False))
+
+    def window_state(self, minimized: bool, active: bool):
+        was_min = self.feed.minimized
+        self.feed.minimized, self.feed.focused = minimized, active
+        if not self._started:
+            return
+        if minimized:
+            self._timer.stop()
+        elif was_min and self.feed.wants_refresh_on_return():
+            self._schedule(0.5)                        # back: one refresh now
+        elif was_min or not self._timer.isActive():
+            self._schedule()
+
+    # -- state for the view ---------------------------------------------------------------
+    @Property(bool, notify=changed)
+    def enabled(self):
+        return bool(self.settings.get("show_server_status"))
+
+    @enabled.setter
+    def enabled(self, v):
+        self.settings.set("show_server_status", bool(v))
+        if v:
+            self.start()
+        else:
+            self.stop()
+        self.changed.emit()
+
+    def _view(self):
+        return self.feed.view()
+
+    @Property(bool, notify=changed)
+    def hasData(self):
+        return self._view()["has_data"]
+
+    @Property(str, notify=changed)
+    def chipText(self):
+        n = self._view()["total"]
+        return f"{n:,}" if n is not None else "–"
+
+    @Property(str, notify=changed)
+    def dot(self):
+        """online | offline | degraded | unknown (dim). Only OctoBot's own,
+        recent sample colours it; old or missing data is dim, never red."""
+        v = self._view()
+        if not v["has_data"] or v["status_stale"]:
+            return "unknown"
+        return v["state"]
+
+    @Property(str, notify=changed)
+    def summary(self):
+        v = self._view()
+        if not v["has_data"]:
+            return tr("No server information yet")
+        word = {"online": tr("Server online"), "offline": tr("Server offline"),
+                "degraded": tr("Server partly available"), "unknown": tr("Server status unknown")}
+        head = word[v["state"]] if not v["status_stale"] else tr("Server status unknown")
+        if v["total"] is not None:
+            head += " · " + tr("{count} players online", count=f"{v['total']:,}")
+        return head
+
+    @Property("QVariantList", notify=changed)
+    def lines(self):
+        """Rows of the popover: [{label, value, tone}]."""
+        v = self._view()
+        if not v["has_data"]:
+            return [{"label": tr("Waiting for the first update."), "value": "", "tone": "dim"}]
+        rows = []
+        if v["total"] is not None:
+            rows.append({"label": tr("Players online"), "value": f"{v['total']:,}", "tone": "body"})
+        for r in v["realms"]:
+            if r["online"] is not None:
+                value = f"{r['online']:,}"
+            elif r["state"]:
+                value = tr("online") if r["state"] == "online" else tr("offline")
+            else:
+                value = tr("no data")
+            rows.append({"label": r["name"], "value": value,
+                         "tone": "dim" if r["online"] is None and not r["state"] else "body"})
+        if v["website"]:
+            rows.append({"label": tr("Website"),
+                         "value": tr("available") if v["website"] == "available" else tr("unavailable"),
+                         "tone": "body"})
+        if v["latency_ms"] is not None:
+            rows.append({"label": tr("Login response"), "value": f"{v['latency_ms']} ms", "tone": "dim"})
+        return rows
+
+    @Property(str, notify=changed)
+    def footnote(self):
+        v = self._view()
+        notes = []
+        if v["has_data"] and v.get("total_source"):
+            notes.append(tr("Player count: {source}", source=v["total_source"]))
+        if v["has_data"] and v["age"] is not None:
+            notes.append(tr("Updated {when}", when=age_text(v["age"])))
+        if v["has_data"] and v["stale"]:
+            notes.append(tr("This is out of date; the source has not been updated."))
+        elif v["has_data"] and v["status_stale"] and v.get("status_age") is not None:
+            notes.append(tr("Server status checked {when}; it may have changed.",
+                            when=age_text(v["status_age"])))
+        if v["unavailable"]:
+            notes.append(tr("Could not refresh just now; showing the last known values."))
+        notes.append(tr("Data from OctoBot. Server status is not checked by EqUpdater."))
+        return "\n".join(notes)
+
+    @Slot()
+    def refresh(self):
+        if self._started:
+            self._schedule(0.1)
+
+
 class AppBridge(QObject):
     tabChanged = Signal()
     statusChanged = Signal()
@@ -566,6 +728,7 @@ class AppBridge(QObject):
 
     def __init__(self, settings):
         super().__init__()
+        self.window_hooks = []
         self.s = settings
         self._tab = "news"
         self._visited = ["news"]
@@ -710,6 +873,8 @@ class AppBridge(QObject):
         if (minimized, active) != (self._minimized, self._active):
             self._minimized, self._active = minimized, active
             self.animationChanged.emit()
+            for hook in self.window_hooks:
+                hook(minimized, active)
 
     @Slot()
     def windowShown(self):

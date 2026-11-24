@@ -921,4 +921,50 @@ STRINGS = {
         'Сначала выберите папку игры.',
     'Windows Defender is not used on this system.':
         'Windows Defender в этой системе не используется.',
+    'Could not refresh just now; showing the last known values.':
+        'Сейчас не удалось обновить; показаны последние известные значения.',
+    'Data from OctoBot. Server status is not checked by EqUpdater.':
+        'Данные OctoBot. EqUpdater сам состояние сервера не проверяет.',
+    'Login response':
+        'Ответ при входе',
+    'No server information yet':
+        'Данных о сервере пока нет',
+    'Player count: {source}':
+        'Число игроков: {source}',
+    'Players online':
+        'Игроков онлайн',
+    'Server offline':
+        'Сервер не в сети',
+    'Server online':
+        'Сервер в сети',
+    'Server partly available':
+        'Сервер доступен частично',
+    'Server status checked {when}; it may have changed.':
+        'Состояние сервера проверено {when}; оно могло измениться.',
+    'Server status unknown':
+        'Состояние сервера неизвестно',
+    'This is out of date; the source has not been updated.':
+        'Данные устарели: источник не обновлялся.',
+    'Updated {when}':
+        'Обновлено {when}',
+    'Waiting for the first update.':
+        'Ожидание первого обновления.',
+    'Website':
+        'Сайт',
+    'available':
+        'доступен',
+    'just now':
+        'только что',
+    'no data':
+        'нет данных',
+    'unavailable':
+        'недоступен',
+    '{count} players online':
+        'Игроков онлайн: {count}',
+    '{n} days ago':
+        '{n} дн. назад',
+    '{n} h ago':
+        '{n} ч назад',
+    '{n} min ago':
+        '{n} мин назад',
 }

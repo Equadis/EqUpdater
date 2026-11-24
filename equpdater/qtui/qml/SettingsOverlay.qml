@@ -165,6 +165,10 @@ Item {
                                checked: general.autoMods; onToggled: general.autoMods = !general.autoMods }
                 SkinCheckBox { text: app.t("Install recommended addons")
                                checked: general.autoAddons; onToggled: general.autoAddons = !general.autoAddons }
+                SkinCheckBox { text: app.t("Show server status in the footer")
+                               objectName: "serverStatusToggle"
+                               checked: server.enabled; onToggled: server.enabled = !server.enabled
+                               SkinToolTipArea { tip: app.t("Shows how many players are online and whether the login server answers, from OctoBot's public status files. Turn it off and EqUpdater makes no such requests.") } }
                 SkinCheckBox { text: app.t("Animated background")
                                checked: settings.animatedBackground
                                onToggled: settings.animatedBackground = !settings.animatedBackground }

@@ -922,4 +922,50 @@ STRINGS = {
         '请先选择游戏文件夹。',
     'Windows Defender is not used on this system.':
         '此系统不使用 Windows Defender。',
+    'Could not refresh just now; showing the last known values.':
+        '暂时无法刷新；显示的是最近一次已知的数值。',
+    'Data from OctoBot. Server status is not checked by EqUpdater.':
+        '数据来自 OctoBot。EqUpdater 不会自行检查服务器状态。',
+    'Login response':
+        '登录响应',
+    'No server information yet':
+        '暂无服务器信息',
+    'Player count: {source}':
+        '玩家数量：{source}',
+    'Players online':
+        '在线玩家',
+    'Server offline':
+        '服务器离线',
+    'Server online':
+        '服务器在线',
+    'Server partly available':
+        '服务器部分可用',
+    'Server status checked {when}; it may have changed.':
+        '服务器状态检查于{when}；之后可能已有变化。',
+    'Server status unknown':
+        '服务器状态未知',
+    'This is out of date; the source has not been updated.':
+        '这些数据已过时；数据源尚未更新。',
+    'Updated {when}':
+        '更新于{when}',
+    'Waiting for the first update.':
+        '正在等待首次更新。',
+    'Website':
+        '网站',
+    'available':
+        '可用',
+    'just now':
+        '刚刚',
+    'no data':
+        '无数据',
+    'unavailable':
+        '不可用',
+    '{count} players online':
+        '{count} 名玩家在线',
+    '{n} days ago':
+        '{n} 天前',
+    '{n} h ago':
+        '{n} 小时前',
+    '{n} min ago':
+        '{n} 分钟前',
 }

@@ -22,6 +22,7 @@ DEFAULTS = {
     "font_override": "",           # "", "arial", "friz", "opendyslexic"
     "game_launcher": None,           # Linux launch command / env, as in 2.x
     "news_seen": {},
+    "show_server_status": True,     # the footer chip (reads OctoBot's static status files)
     "imported_from_2x": False,
 }
 
@@ -59,6 +60,13 @@ class SettingsStore(_store.JsonStore):
             from .. import config as _cfg
             _cfg.update_config(lambda c: c.__setitem__(self.SHARED[key], value))
         super().set(key, value)
+
+
+def open_server_cache(directory: str | None = None):
+    """The last good OctoBot snapshot (so the footer chip is not empty at start)."""
+    d = directory or data_dir()
+    return _store.JsonStore(os.path.join(d, "cache", "server.json"),
+                            {"snapshot": None, "fetched_at": 0}, schema=1, delay=2.0)
 
 
 def open_settings(directory: str | None = None, legacy: dict | None = None):

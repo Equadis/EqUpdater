@@ -32,6 +32,7 @@ Window {
         function onDebugAction(name) {
             if (name === "settings") settingsView.open()
             else if (name === "menu") menu.open()
+            else if (name === "server") footerChip.toggle()
             else if (name.indexOf("diag:") === 0) diag.openView(name.substring(5))
             else app.tab = name
         }
@@ -172,6 +173,7 @@ Window {
                 anchors.verticalCenter: parent.verticalCenter
                 onClicked: app.updateAll()
             }
+            ServerChip { id: footerChip; anchors.verticalCenter: parent.verticalCenter }
             SkinText { kind: "text.dim"; text: "v" + app.version
                        anchors.verticalCenter: parent.verticalCenter }
             Repeater {

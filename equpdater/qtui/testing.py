@@ -108,3 +108,24 @@ def fake_addon_status(n: int, seed: int = 3) -> dict:
             available.append({"folder": folder, "description": desc, "git": git,
                               "toc": {"Title": folder, "Notes": desc}})
     return {"state": "done", "addons": addons, "available": available}
+
+
+def server_fixture_fetch(path):
+    """A ``ServerFeed`` fetch that serves ``{"live": ..., "status": ..., "fail": bool}``
+    from a JSON file (QA and tests): no network, honours If-None-Match."""
+    from ..core import server as srv
+
+    def fetch(url, etag="", timeout=8.0):
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        if data.get("fail"):
+            raise OSError("fixture says the network is down")
+        obj = {srv.LIVE_URL: data.get("live"), srv.STATUS_URL: data.get("status")}.get(url)
+        if obj is None:
+            return srv.Response(404)
+        body = json.dumps(obj).encode()
+        tag = '"%d"' % hash(body)
+        if etag == tag:
+            return srv.Response(304, b"", tag)
+        return srv.Response(200, body, tag)
+    return fetch

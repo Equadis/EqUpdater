@@ -912,6 +912,131 @@ class TestBatchProgressBar(Base):
         self.assertEqual(self.qml_errors(), [])
 
 
+class TestServerChip(Base):
+    def fixture(self, **over):
+        import datetime
+        now = datetime.datetime.now(datetime.timezone.utc)
+        iso = lambda m: (now - datetime.timedelta(minutes=m)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        data = {"live": {"all": {"timestamp": iso(2), "online": 1381, "source": "official census"}},
+                "status": {"schema": 1, "sample": {"timestamp": iso(4), "website": "available",
+                           "tcp": "reachable", "auth": "responsive", "latency_ms": 849,
+                           "realms": {"cthun": "online", "nzoth": "online", "yshaarj": "online"}}}}
+        data.update(over)
+        path = os.path.join(tempfile.mkdtemp(prefix="equ-srv-"), "server.json")
+        self.addCleanup(shutil.rmtree, os.path.dirname(path), True)
+        with open(path, "w") as f:
+            json.dump(data, f)
+        os.environ["EQU3_SERVER_FIXTURE"] = path
+        self.addCleanup(os.environ.pop, "EQU3_SERVER_FIXTURE", None)
+        return path
+
+    def chip(self):
+        return self.win.findChild(QObject, "serverChip")
+
+    def test_the_chip_shows_the_count_and_a_green_dot_from_octobots_own_sample(self):
+        self.fixture()
+        p = self.start()
+        p["server"].start()
+        pump(until=lambda: p["server"].hasData, limit=6000)
+        self.assertEqual(p["server"].chipText, "1,381")
+        self.assertEqual(p["server"].dot, "online")
+        self.assertTrue(self.chip().property("visible"))
+        pump(80)
+        text = self.win.findChild(QObject, "serverChipText")
+        self.assertEqual(text.property("text"), "1,381")
+        self.assertIn("Server online", p["server"].summary)
+        labels = [r["label"] for r in p["server"].lines]
+        self.assertEqual(labels[:4], ["Players online", "N'Zoth", "Y'Shaarj", "C'Thun"])
+        self.assertIn("Data from OctoBot", p["server"].footnote)
+        self.assertEqual(self.qml_errors(), [])
+
+    def test_the_popover_opens_in_every_skin_without_errors(self):
+        self.fixture()
+        p = self.start()
+        p["server"].start()
+        pump(until=lambda: p["server"].hasData, limit=6000)
+        for sid in p["manager"].skins:
+            p["settings_bridge"].setSkin(sid)
+            p["app"].debugAction.emit("server")
+            pump(150)
+            pop = self.win.findChild(QObject, "serverPopover")
+            self.assertIsNotNone(pop, sid)
+            p["app"].debugAction.emit("server")
+            pump(80)
+        self.assertEqual(self.qml_errors(), [])
+
+    def test_old_data_is_dim_not_red_and_says_so(self):
+        import datetime
+        old = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=8)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        self.fixture(status={"schema": 1, "sample": {"timestamp": old, "website": "available",
+                     "tcp": "unreachable", "auth": "unresponsive", "realms": {}}})
+        p = self.start()
+        p["server"].start()
+        pump(until=lambda: p["server"].hasData, limit=6000)
+        self.assertEqual(p["server"].dot, "unknown")              # stale: never a red "offline"
+        self.assertIn("unknown", p["server"].summary)
+        self.assertIn("may have changed", p["server"].footnote)
+
+    def test_a_failed_fetch_keeps_the_last_numbers_and_says_it_could_not_refresh(self):
+        path = self.fixture()
+        p = self.start()
+        p["server"].start()
+        pump(until=lambda: p["server"].hasData, limit=6000)
+        with open(path) as f:
+            data = json.load(f)
+        data["fail"] = True
+        with open(path, "w") as f:
+            json.dump(data, f)
+        p["server_feed"].fetch_once()
+        p["server"].changed.emit()
+        pump(60)
+        self.assertEqual(p["server"].chipText, "1,381")
+        self.assertEqual(p["server"].dot, "online")
+        self.assertIn("Could not refresh", p["server"].footnote)
+
+    def test_the_switch_hides_the_chip_and_stops_all_requests(self):
+        self.fixture()
+        p = self.start()
+        p["server"].start()
+        pump(until=lambda: p["server_feed"].requests > 0, limit=6000)
+        p["server"].enabled = False
+        pump(80)
+        self.assertFalse(self.chip().property("visible"))
+        n = p["server_feed"].requests
+        p["server"].refresh()
+        p["server"]._tick()
+        pump(200)
+        self.assertEqual(p["server_feed"].requests, n)
+        self.assertFalse(p["settings"].get("show_server_status"))
+
+    def test_offline_mode_and_a_disabled_setting_make_no_requests(self):
+        p = self.start(offline=True)                              # EQU3_OFFLINE, no fixture
+        p["server"].start()
+        pump(200)
+        self.assertEqual(p["server_feed"].requests, 0)
+
+    def test_minimising_pauses_and_returning_refreshes(self):
+        self.fixture()
+        p = self.start()
+        p["server"].start()
+        pump(until=lambda: p["server_feed"].requests >= 2, limit=6000)
+        p["app"].setWindowState(True, False)
+        self.assertTrue(p["server_feed"].minimized)
+        self.assertFalse(p["server"]._timer.isActive())
+        p["server_feed"].fetched_at -= 120                        # it has been a while
+        p["app"].setWindowState(False, True)
+        self.assertFalse(p["server_feed"].minimized)
+        self.assertTrue(p["server"]._timer.isActive())
+
+    def test_the_settings_switch_is_there(self):
+        self.fixture()
+        p = self.start()
+        self.win.findChild(QObject, "settingsOverlay").metaObject().invokeMethod(
+            self.win.findChild(QObject, "settingsOverlay"), "open")
+        pump(120)
+        self.assertIsNotNone(self.win.findChild(QObject, "serverStatusToggle"))
+
+
 class TestOffline(Base):
     def test_offline_shows_cache_and_an_error_not_an_empty_page(self):
         p = self.start()
