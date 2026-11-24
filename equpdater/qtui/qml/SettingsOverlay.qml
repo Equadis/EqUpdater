@@ -65,13 +65,16 @@ Item {
                     SkinSearchField {
                         id: dirField
                         objectName: "gameDirField"
-                        width: parent.width - 250
+                        width: parent.width - 310
                         text: general.gameDir
                         placeholder: "C:\\Games\\OctoWoW"
                     }
                     SkinButton { kind: "button.small"; text: app.t("Change")
                                  onClicked: root.folderError = general.changeGameDir(dirField.text) }
                     SkinButton { kind: "button.small"; text: app.t("Browse…"); onClicked: folderDialog.open() }
+                    SkinButton { kind: "button.small"; text: app.t("Find…")
+                                 onClicked: { root.close(); setup.open() }
+                                 SkinToolTipArea { tip: app.t("Looks for a game already on this computer, or extracts an archive you downloaded.") } }
                     SkinIconButton { kind: "icon.link"; tip: app.t("Open folder"); onClicked: general.openGameDir() }
                 }
                 SkinText { visible: root.folderError !== ""; kind: "text.error"; text: app.t(root.folderError) }

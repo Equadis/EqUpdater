@@ -848,4 +848,74 @@ STRINGS = {
     "When on, the recommended addons (marked ★ on the Addons tab) are installed wherever they are missing. Addons already in the client are never replaced.": "开启后，推荐插件（在插件标签页标有 ★）会在缺失时自动安装。客户端中已有的插件绝不会被替换。",
     "Scanning reads every file in the game folder and compares it with the client's manifest. Nothing is changed or downloaded.":
         "扫描会读取游戏文件夹中的每个文件，并与客户端清单进行比较。不会更改或下载任何内容。",
+    '7z and RAR archives cannot be opened here. Extract it with your archive program, then choose the folder.':
+        '此处无法打开 7z 和 RAR 压缩包。请用压缩软件解压，然后选择该文件夹。',
+    'A usual place for the game':
+        '游戏常见的存放位置',
+    'Choose an empty folder, or one that does not exist yet.':
+        '请选择一个空文件夹，或一个尚不存在的文件夹。',
+    "Complete: WoW.exe and the game's data are here":
+        '完整：WoW.exe 和游戏数据都在此处',
+    'Could not extract: {error}':
+        '无法解压：{error}',
+    'Extracted to {path}':
+        '已解压到 {path}',
+    'Extracting…':
+        '正在解压…',
+    'Found next to another game folder':
+        '在另一个游戏文件夹旁找到',
+    'Found {count} game folder(s).':
+        '找到 {count} 个游戏文件夹。',
+    'Looking for the game on this computer…':
+        '正在此电脑上查找游戏…',
+    "No game here: WoW.exe or the game's data are missing":
+        '此处没有游戏：缺少 WoW.exe 或游戏数据',
+    'No game was found. Choose the folder, or extract the archive you downloaded.':
+        '未找到游戏。请选择文件夹，或解压你下载的压缩包。',
+    'Stopped. Nothing was kept.':
+        '已停止。未保留任何内容。',
+    'That folder does not hold the game.':
+        '该文件夹中没有游戏。',
+    'That is not a ZIP or TAR archive.':
+        '这不是 ZIP 或 TAR 压缩包。',
+    'The WoW.exe in that archive is not a game program.':
+        '该压缩包中的 WoW.exe 不是游戏程序。',
+    'The archive cannot be read: {error}':
+        '无法读取压缩包：{error}',
+    'The archive expands far more than it should.':
+        '该压缩包解压后的体积远超正常范围。',
+    'The archive holds a file name that cannot be used: {name}':
+        '压缩包中含有无法使用的文件名：{name}',
+    'The archive holds a link: {name}':
+        '压缩包中含有链接：{name}',
+    'The archive holds a path that would leave the folder: {name}':
+        '压缩包中含有会跳出目标文件夹的路径：{name}',
+    'The archive holds something that is not a file: {name}':
+        '压缩包中含有不是文件的内容：{name}',
+    'The archive holds too many files to be a game.':
+        '压缩包中的文件太多，不像是游戏。',
+    'The folder EqUpdater 2 uses':
+        'EqUpdater 2 使用的文件夹',
+    'The folder OctoLauncher uses':
+        'OctoLauncher 使用的文件夹',
+    'The game is running from that folder. Close it first.':
+        '游戏正从该文件夹运行。请先关闭游戏。',
+    'There is no WoW.exe in that archive, so it is not the game.':
+        '该压缩包中没有 WoW.exe，所以它不是游戏。',
+    'There is not enough free space: {need} MB needed, {have} MB free.':
+        '可用空间不足：需要 {need} MB，仅剩 {have} MB。',
+    'Unfinished download: some files are still being fetched':
+        '下载未完成：部分文件仍在下载',
+    'Using {path}':
+        '正在使用 {path}',
+    'WoW.exe is there but is not a game program (too small or damaged)':
+        'WoW.exe 存在，但不是游戏程序（过小或已损坏）',
+    'WoW.exe not found':
+        '未找到 WoW.exe',
+    '{count} game data archives in Data':
+        'Data 中有 {count} 个游戏数据包',
+    '{count} unfinished download files':
+        '{count} 个未完成的下载文件',
+    '{files} files, {mb} MB. Choose an empty folder to put them in.':
+        '{files} 个文件，{mb} MB。请选择一个空文件夹来存放。',
 }

@@ -31,6 +31,7 @@ from ..hashing import files_hash, folder_hash
 from ..planner import CAUSE_LOOKUP, Component, plan, skipped_notably, updatable
 from ..states import Action, Plan, Status
 from . import atomic
+from .launch_funcs import remove_wdb
 from .logsink import log
 from .net import ALLOWED_DOWNLOAD_HOSTS, secure_urlopen
 from .tweaks import *            # noqa: F401,F403  (constants and functions)

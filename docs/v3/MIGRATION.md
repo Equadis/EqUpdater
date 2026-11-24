@@ -17,8 +17,8 @@
 
 3.0 files live in `<app data>/v3/`: `settings.json`, `cache/news.json`, `skins/` (player skins). Each store has `_schema`; older files are walked forward by migration functions after a `.vN.bak` copy; a corrupt file is kept as `.corrupt-<time>` and defaults are used (`core/store.py`, tested).
 
-## Game installs (Phase 4 — not built)
-Detection/clone/setup for EqUpdater, OctoLauncher (`octolauncher.py`, `gamepaths.py`, `clientscan.py` reused), existing ZIP and existing torrent copies; local-archive extraction with path-traversal guard; verification against the manifest without downloading client files. See `ARIA2_AUDIT.md` for what leaves with the downloader.
+## Game installs (Phase 4: built, see `INSTALLATION.md`)
+`core/install.py`: finds an existing game (2.x config, OctoLauncher settings, usual places), describes it read-only (complete / unfinished torrent / none), extracts a local ZIP or TAR safely (traversal, links, space, never overwrites, staged), and guards (2.x running, game running). `core/setup_service.py` + `SetupOverlay.qml` are the first-run "Find your game" panel and Settings → Find…. The installer/AppImage and qmlcachegen packaging are the next step.
 
 ## Risks tracked
 * Running 2.x and 3.0 at once both touching `dlls.txt`/addons: Phase 3 keeps the 2.x single-instance and client-lock guards.

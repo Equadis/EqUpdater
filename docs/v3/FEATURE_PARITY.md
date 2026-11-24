@@ -132,3 +132,8 @@ Known flaky test (pre-existing, order/timing dependent): `test_custom_mods…tes
 **Modules:** `core/custom_service.py` (`CustomSourceService`), `CustomBridge`, `CustomOverlay.qml`; real `_update_all_preview` / `_ask_essential_mods` in `OpsHost` (they were placeholders).
 **Tests:** `TestCustomSourceService` (13 with the overlay test), `TestUpdateAllAndFirstRun` (4), `TestUpdateAllButton` (1). **Suite: 1,043, all pass.**
 **Still missing:** Exclude from Defender, Linux "Game launcher...", first-run language prompt, per-item progress, pfUI lua atomic writes, Auto Loot in-place patch hardening, spinner while Update All runs.
+
+## Phase 4 slice report: game install detection and local archives (2026-11-24)
+**Built:** find existing games (EqUpdater 2.x, OctoLauncher, usual places), read-only description of each (complete / unfinished torrent / none), "Use this folder" through the lifted game-folder change, safe extraction of a downloaded ZIP/TAR with progress and cancel, running-2.x and running-game guards, first-run panel (asked once). **Not carried over:** the base-client downloader (by design). **Found and fixed:** `remove_wdb` was not imported by the lifted game-folder change, so switching to a folder with Clear WDB on would have crashed.
+**Tests:** `tests/test_v3_install.py` (27: inspection, finding, extraction attacks and failures, guards, service) + `TestSetupOverlay` (3).
+**Remaining:** Windows installer and AppImage for the beta, qmlcachegen, shortcut handling for 2.x.

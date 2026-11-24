@@ -847,4 +847,74 @@ STRINGS = {
     "When on, the recommended addons (marked ★ on the Addons tab) are installed wherever they are missing. Addons already in the client are never replaced.": "Если включено, рекомендуемые аддоны (отмечены ★ на вкладке «Аддоны») устанавливаются там, где их нет. Уже установленные аддоны никогда не заменяются.",
     "Scanning reads every file in the game folder and compares it with the client's manifest. Nothing is changed or downloaded.":
         "Проверка читает каждый файл в папке игры и сравнивает его с манифестом клиента. Ничего не изменяется и не загружается.",
+    '7z and RAR archives cannot be opened here. Extract it with your archive program, then choose the folder.':
+        'Архивы 7z и RAR здесь открыть нельзя. Распакуйте его своим архиватором и выберите папку.',
+    'A usual place for the game':
+        'Обычное место для игры',
+    'Choose an empty folder, or one that does not exist yet.':
+        'Выберите пустую папку или ещё не существующую.',
+    "Complete: WoW.exe and the game's data are here":
+        'Полная: WoW.exe и данные игры на месте',
+    'Could not extract: {error}':
+        'Не удалось распаковать: {error}',
+    'Extracted to {path}':
+        'Распаковано в {path}',
+    'Extracting…':
+        'Распаковка…',
+    'Found next to another game folder':
+        'Найдена рядом с другой папкой игры',
+    'Found {count} game folder(s).':
+        'Найдено папок с игрой: {count}.',
+    'Looking for the game on this computer…':
+        'Поиск игры на этом компьютере…',
+    "No game here: WoW.exe or the game's data are missing":
+        'Игры здесь нет: отсутствует WoW.exe или данные игры',
+    'No game was found. Choose the folder, or extract the archive you downloaded.':
+        'Игра не найдена. Выберите папку или распакуйте скачанный архив.',
+    'Stopped. Nothing was kept.':
+        'Остановлено. Ничего не сохранено.',
+    'That folder does not hold the game.':
+        'В этой папке нет игры.',
+    'That is not a ZIP or TAR archive.':
+        'Это не архив ZIP или TAR.',
+    'The WoW.exe in that archive is not a game program.':
+        'WoW.exe в этом архиве не является программой игры.',
+    'The archive cannot be read: {error}':
+        'Не удаётся прочитать архив: {error}',
+    'The archive expands far more than it should.':
+        'Архив распаковывается в объём, намного превышающий норму.',
+    'The archive holds a file name that cannot be used: {name}':
+        'В архиве есть недопустимое имя файла: {name}',
+    'The archive holds a link: {name}':
+        'В архиве есть ссылка: {name}',
+    'The archive holds a path that would leave the folder: {name}':
+        'В архиве есть путь, выходящий за пределы папки: {name}',
+    'The archive holds something that is not a file: {name}':
+        'В архиве есть объект, не являющийся файлом: {name}',
+    'The archive holds too many files to be a game.':
+        'В архиве слишком много файлов для игры.',
+    'The folder EqUpdater 2 uses':
+        'Папка, которую использует EqUpdater 2',
+    'The folder OctoLauncher uses':
+        'Папка, которую использует OctoLauncher',
+    'The game is running from that folder. Close it first.':
+        'Игра запущена из этой папки. Сначала закройте её.',
+    'There is no WoW.exe in that archive, so it is not the game.':
+        'В этом архиве нет WoW.exe, значит, это не игра.',
+    'There is not enough free space: {need} MB needed, {have} MB free.':
+        'Недостаточно свободного места: нужно {need} МБ, свободно {have} МБ.',
+    'Unfinished download: some files are still being fetched':
+        'Незавершённая загрузка: часть файлов ещё скачивается',
+    'Using {path}':
+        'Используется {path}',
+    'WoW.exe is there but is not a game program (too small or damaged)':
+        'WoW.exe есть, но это не программа игры (слишком мал или повреждён)',
+    'WoW.exe not found':
+        'WoW.exe не найден',
+    '{count} game data archives in Data':
+        'Архивов данных игры в Data: {count}',
+    '{count} unfinished download files':
+        'Незавершённых файлов загрузки: {count}',
+    '{files} files, {mb} MB. Choose an empty folder to put them in.':
+        'Файлов: {files}, {mb} МБ. Выберите пустую папку для них.',
 }

@@ -44,6 +44,7 @@ from ..core.mpq_service import MpqService                    # noqa: E402
 from ..core.settings_service import GeneralService          # noqa: E402
 from ..core.diagnostics_service import DiagnosticsService  # noqa: E402
 from ..core.custom_service import CustomSourceService      # noqa: E402
+from ..core.setup_service import SetupService                # noqa: E402
 from .. import i18n                                          # noqa: E402
 
 QML_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "qml")
@@ -188,6 +189,8 @@ def build(argv=None):
     general_service = GeneralService(host, settings, tasks)
     general_bridge = ops_bridge.GeneralBridge(general_service, app_bridge, skin_bridge)
     tweaks_bridge.on_applied = lambda: host._offer_language_restart()
+    setup_service = SetupService(host, tasks, general_service.change_game_dir)
+    setup_bridge = ops_bridge.SetupBridge(setup_service, app_bridge)
     custom_service = CustomSourceService(host, tasks)
     custom_bridge = ops_bridge.CustomBridge(custom_service, host)
     diag_service = DiagnosticsService(host, tasks)
@@ -207,18 +210,26 @@ def build(argv=None):
     for name, obj in (("app", app_bridge), ("skin", skin_bridge),
                       ("settings", settings_bridge), ("news", news_bridge),
                       ("tweaks", tweaks_bridge), ("launch", launch_bridge),
-                      ("mods", mods_bridge), ("addons", addons_bridge), ("mpq", mpq_bridge), ("general", general_bridge), ("diag", diag_bridge), ("customSrc", custom_bridge),
+                      ("mods", mods_bridge), ("addons", addons_bridge), ("mpq", mpq_bridge), ("general", general_bridge), ("diag", diag_bridge), ("setup", setup_bridge), ("customSrc", custom_bridge),
                       ("dialog", dialog_bridge)):
         ctx.setContextProperty(name, obj)
     marks["objects_ready_ms"] = round((time.perf_counter() - _T0) * 1000)
 
-    parts = dict(custom=custom_bridge, custom_service=custom_service, diag=diag_bridge, diag_service=diag_service, general=general_bridge, general_service=general_service, mpq=mpq_bridge, mpq_service=mpq_service, addons=addons_bridge, addons_service=addons_service,
+    parts = dict(setup=setup_bridge, setup_service=setup_service, custom=custom_bridge, custom_service=custom_service, diag=diag_bridge, diag_service=diag_service, general=general_bridge, general_service=general_service, mpq=mpq_bridge, mpq_service=mpq_service, addons=addons_bridge, addons_service=addons_service,
                  mods=mods_bridge, mods_service=mods_service, host=host,
                  dialog=dialog_bridge, tweaks=tweaks_bridge, settings=settings, tasks=tasks, news=news_bridge,
                  launch=launch_bridge, app=app_bridge, skin=skin_bridge,
                  settings_bridge=settings_bridge, marks=marks, fetcher=fetcher,
                  dispatcher=dispatcher, manager=manager, cache=news_cache)
     return app, engine, parts
+
+
+def first_run_setup(p):
+    """No game yet and never asked: open "find your game" (it never downloads)."""
+    gd = p["settings"].get("game_dir") or ""
+    if (not os.path.isfile(os.path.join(gd, "WoW.exe")) and not p["settings"].get("setup_seen")
+            and not os.environ.get("EQU3_NO_SETUP")):
+        p["setup"].open()
 
 
 def restart_app():
@@ -263,6 +274,7 @@ def run(argv=None) -> int:
         # one-time, version-gated migrations (the 1.3 re-patch for installs that
         # predate it), off the UI thread and after the first frame
         p["tasks"].submit("startup:migrations", p["host"]._new_version_installed)
+        first_run_setup(p)
         if os.environ.get("EQU3_OPEN"):             # QA/docs: show a panel
             QTimer.singleShot(800, lambda: p["app"].debugAction.emit(os.environ["EQU3_OPEN"]))
         out = os.environ.get("EQU3_MARKS")

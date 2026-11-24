@@ -17,6 +17,8 @@ from ..core.addons_service import AddonsService
 from ..core.mods_service import ModsService
 from ..core.diagnostics_service import DiagnosticsService, scan_lines
 from ..core.custom_service import CustomSourceService
+from ..core import install as I
+from ..core.setup_service import SetupService
 from ..core.mpq_service import MpqService
 from ..core.settings_service import GeneralService
 from ..core.ops_host import OpsHost
@@ -776,6 +778,99 @@ class CustomBridge(QObject):
         q = self.service.remove_text(mod_id)
         if q and self.host.dialogs.ask_yes_no(*q):
             self.service.remove(mod_id)
+
+
+class SetupBridge(QObject):
+    """"Find or add your game": folders already on this computer, or a ZIP/TAR
+    the player downloaded. Never downloads the game."""
+    changed = Signal()
+    openChanged = Signal()
+
+    def __init__(self, service: SetupService, app_bridge):
+        super().__init__()
+        self.service, self.app = service, app_bridge
+        self._open, self._archive = False, ""
+        service.on_change = self.changed.emit
+
+    @Property(bool, notify=openChanged)
+    def isOpen(self):
+        return self._open
+
+    @Property("QVariantList", notify=changed)
+    def candidates(self):
+        return [{**c, "sourceText": tr(I.SOURCE_NAMES.get(c["source"], c["source"])),
+                 "stateText": tr(I.STATE_NAMES.get(c["state"], c["state"])),
+                 "evidenceText": "; ".join(c["evidence"])}
+                for c in self.service.candidates]
+
+    @Property(str, notify=changed)
+    def statusText(self):
+        return self.service.status[0]
+
+    @Property(str, notify=changed)
+    def statusTone(self):
+        return self.service.status[1]
+
+    @Property(bool, notify=changed)
+    def scanning(self):
+        return self.service.scanning
+
+    @Property(bool, notify=changed)
+    def extracting(self):
+        return self.service.extracting
+
+    @Property(float, notify=changed)
+    def progress(self):
+        return self.service.progress
+
+    @Property(str, notify=changed)
+    def archive(self):
+        return self._archive
+
+    @Property(bool, notify=changed)
+    def archiveOk(self):
+        return bool(self._archive and self.service.plan)
+
+    @Slot()
+    def open(self):
+        self._open = True
+        self.openChanged.emit()
+        self.service.scan()
+
+    @Slot()
+    def close(self):
+        if self.service.extracting:
+            return
+        self.service.host.settings.set("setup_seen", True)
+        self._open = False
+        self.openChanged.emit()
+
+    @Slot()
+    def rescan(self):
+        self.service.scan()
+
+    @Slot(str)
+    def use(self, path):
+        if not self.service.use(path):
+            self.close()
+
+    @Slot(str)
+    def pickArchive(self, path):
+        self._archive = path
+        self.service.inspect_archive(path)
+        self.changed.emit()
+
+    @Slot(str)
+    def extractTo(self, dest):
+        if self._archive and dest:
+            self.service.extract(self._archive, dest, self._extracted)
+
+    def _extracted(self, path):
+        self.use(path)
+
+    @Slot()
+    def cancel(self):
+        self.service.cancel()
 
 
 def make_host(settings, dialogs_bridge: DialogBridge, app_bridge, dispatcher):

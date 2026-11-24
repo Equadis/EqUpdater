@@ -196,5 +196,6 @@ Window {
     SettingsOverlay { id: settingsView; anchors.fill: parent }
     DiagnosticsOverlay { anchors.fill: parent; z: 90 }
     CustomOverlay { anchors.fill: parent; z: 90 }
+    SetupOverlay { anchors.fill: parent; z: 90 }
     DialogHost { anchors.fill: parent; z: 100 }
 }

@@ -847,4 +847,74 @@ STRINGS = {
     "When on, the recommended addons (marked ★ on the Addons tab) are installed wherever they are missing. Addons already in the client are never replaced.": "Wenn aktiv, werden die empfohlenen Addons (im Addons-Tab mit ★ markiert) überall installiert, wo sie fehlen. Bereits vorhandene Addons werden nie ersetzt.",
     "Scanning reads every file in the game folder and compares it with the client's manifest. Nothing is changed or downloaded.":
         "Beim Prüfen wird jede Datei im Spielordner gelesen und mit dem Manifest des Clients verglichen. Nichts wird geändert oder heruntergeladen.",
+    '7z and RAR archives cannot be opened here. Extract it with your archive program, then choose the folder.':
+        '7z- und RAR-Archive können hier nicht geöffnet werden. Entpacke es mit deinem Archivprogramm und wähle dann den Ordner.',
+    'A usual place for the game':
+        'Ein üblicher Ort für das Spiel',
+    'Choose an empty folder, or one that does not exist yet.':
+        'Wähle einen leeren Ordner oder einen, den es noch nicht gibt.',
+    "Complete: WoW.exe and the game's data are here":
+        'Vollständig: WoW.exe und die Spieldaten sind vorhanden',
+    'Could not extract: {error}':
+        'Entpacken nicht möglich: {error}',
+    'Extracted to {path}':
+        'Entpackt nach {path}',
+    'Extracting…':
+        'Wird entpackt…',
+    'Found next to another game folder':
+        'Neben einem anderen Spielordner gefunden',
+    'Found {count} game folder(s).':
+        '{count} Spielordner gefunden.',
+    'Looking for the game on this computer…':
+        'Suche das Spiel auf diesem Computer…',
+    "No game here: WoW.exe or the game's data are missing":
+        'Kein Spiel hier: WoW.exe oder die Spieldaten fehlen',
+    'No game was found. Choose the folder, or extract the archive you downloaded.':
+        'Es wurde kein Spiel gefunden. Wähle den Ordner oder entpacke das heruntergeladene Archiv.',
+    'Stopped. Nothing was kept.':
+        'Angehalten. Nichts wurde behalten.',
+    'That folder does not hold the game.':
+        'Dieser Ordner enthält das Spiel nicht.',
+    'That is not a ZIP or TAR archive.':
+        'Das ist kein ZIP- oder TAR-Archiv.',
+    'The WoW.exe in that archive is not a game program.':
+        'Die WoW.exe in diesem Archiv ist kein Spielprogramm.',
+    'The archive cannot be read: {error}':
+        'Das Archiv kann nicht gelesen werden: {error}',
+    'The archive expands far more than it should.':
+        'Das Archiv wird viel größer entpackt, als es sollte.',
+    'The archive holds a file name that cannot be used: {name}':
+        'Das Archiv enthält einen unbrauchbaren Dateinamen: {name}',
+    'The archive holds a link: {name}':
+        'Das Archiv enthält einen Link: {name}',
+    'The archive holds a path that would leave the folder: {name}':
+        'Das Archiv enthält einen Pfad, der den Ordner verlassen würde: {name}',
+    'The archive holds something that is not a file: {name}':
+        'Das Archiv enthält etwas, das keine Datei ist: {name}',
+    'The archive holds too many files to be a game.':
+        'Das Archiv enthält zu viele Dateien für ein Spiel.',
+    'The folder EqUpdater 2 uses':
+        'Der Ordner, den EqUpdater 2 verwendet',
+    'The folder OctoLauncher uses':
+        'Der Ordner, den OctoLauncher verwendet',
+    'The game is running from that folder. Close it first.':
+        'Das Spiel läuft aus diesem Ordner. Schließe es zuerst.',
+    'There is no WoW.exe in that archive, so it is not the game.':
+        'In diesem Archiv gibt es keine WoW.exe, also ist es nicht das Spiel.',
+    'There is not enough free space: {need} MB needed, {have} MB free.':
+        'Nicht genug freier Speicherplatz: {need} MB nötig, {have} MB frei.',
+    'Unfinished download: some files are still being fetched':
+        'Unfertiger Download: einige Dateien werden noch geladen',
+    'Using {path}':
+        'Verwende {path}',
+    'WoW.exe is there but is not a game program (too small or damaged)':
+        'WoW.exe ist vorhanden, aber kein Spielprogramm (zu klein oder beschädigt)',
+    'WoW.exe not found':
+        'WoW.exe nicht gefunden',
+    '{count} game data archives in Data':
+        '{count} Spieldaten-Archive in Data',
+    '{count} unfinished download files':
+        '{count} unfertige Download-Dateien',
+    '{files} files, {mb} MB. Choose an empty folder to put them in.':
+        '{files} Dateien, {mb} MB. Wähle einen leeren Ordner dafür.',
 }

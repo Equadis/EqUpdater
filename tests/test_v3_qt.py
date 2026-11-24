@@ -789,6 +789,55 @@ class TestUpdateAllButton(Base):
         self.assertEqual(self.qml_errors(), [])
 
 
+class TestSetupOverlay(Base):
+    def test_opens_in_every_skin_lists_a_found_game_and_uses_it(self):
+        from tests.test_v3_install import make_game
+        game = make_game(tempfile.mkdtemp(prefix="equ-game-"))
+        self.addCleanup(shutil.rmtree, game, True)
+        p = self.start()
+        from equpdater.core import install as I
+        p["setup_service"]._find = lambda: [I.inspect_folder(game, "octolauncher")]
+        for sid in p["manager"].skins:
+            p["settings_bridge"].setSkin(sid)
+            p["setup"].open()
+            pump(150)
+            p["setup"].close()
+        p["setup"].open()
+        pump(until=lambda: p["setup"].candidates, limit=4000)
+        row = p["setup"].candidates[0]
+        self.assertTrue(row["usable"])
+        self.assertIn("OctoLauncher", row["sourceText"])
+        p["setup"].use(row["path"])
+        pump(100)
+        self.assertFalse(p["setup"].isOpen)
+        self.assertEqual(os.path.normcase(p["general"].gameDir), os.path.normcase(os.path.normpath(game)))
+        self.assertEqual(self.qml_errors(), [])
+
+    def test_extracting_an_archive_makes_it_the_game_folder(self):
+        from tests.test_v3_install import EXE, zip_of
+        d = tempfile.mkdtemp(prefix="equ-arc-")
+        self.addCleanup(shutil.rmtree, d, True)
+        arc = zip_of(os.path.join(d, "g.zip"), {"WoW.exe": EXE, **{f"Data/p{i}.mpq": b"x" for i in range(3)}})
+        p = self.start()
+        p["setup"].open()
+        p["setup"].pickArchive(arc)
+        self.assertTrue(p["setup"].archiveOk)
+        p["setup"].extractTo(os.path.join(d, "OctoWoW"))
+        pump(until=lambda: not p["setup"].isOpen, limit=8000)
+        self.assertTrue(os.path.isfile(os.path.join(d, "OctoWoW", "WoW.exe")))
+
+    def test_the_first_run_panel_opens_only_when_there_is_no_game(self):
+        os.environ.pop("EQU3_NO_SETUP", None)
+        self.addCleanup(os.environ.__setitem__, "EQU3_NO_SETUP", "1")
+        p = self.start()
+        __import__("equpdater.qtui.main", fromlist=["x"]).first_run_setup(p)
+        self.assertTrue(p["setup"].isOpen)
+        p["setup"].close()
+        __import__("equpdater.qtui.main", fromlist=["x"]).first_run_setup(p)                     # asked once: closing it is the answer
+        self.assertFalse(p["setup"].isOpen)
+        self.assertTrue(p["settings"].get("setup_seen"))
+
+
 class TestOffline(Base):
     def test_offline_shows_cache_and_an_error_not_an_empty_page(self):
         p = self.start()
