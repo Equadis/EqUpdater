@@ -327,6 +327,10 @@ from .core.addons import (  # noqa: E402,F401
     strip_wow_colors,
     writable_addons_path)
 
+from .core.mods_ops import ModsOps  # noqa: E402
+
+from .core.addons_ops import AddonsOps  # noqa: E402
+
 # Secure networking lives in core/net.py (shared with the Qt front end);
 # re-exported so every existing call site and test keeps its name.
 from .core.net import (  # noqa: E402,F401
@@ -1970,7 +1974,7 @@ class SlimScrollbar(tk.Canvas):
         if self.command:
             self.command("moveto", first)
 
-class EqUpdaterApp(tk.Tk):
+class EqUpdaterApp(AddonsOps, ModsOps, tk.Tk):
     def __init__(self):
         # Give EqUpdater its own Windows taskbar identity before Tk creates
         # the native window. This prevents Windows from grouping it under an
@@ -4829,144 +4833,9 @@ class EqUpdaterApp(tk.Tk):
                 "icons":        self._mod_icon_state(mod, state),
             }
 
-    def _load_mods_state(self, max_age: float = _MOD_VERSION_CACHE_TTL):
-        state = []
-        for mod in MODS_REGISTRY:
-            try:
-                v = fetch_mod_latest_version_cached(mod, max_age=max_age)
-            except Exception as e:
-                _note_lookup(mod["id"], "failed", tr(str(e)))
-                v = None
-            if v:
-                state.append({"id": mod["id"], "latest_version": v})
-        self._mods_state = state
-        client = load_config().get("out_dir") or ""
-        try:
-            self._identify_unversioned_mods(client)
-        except Exception as e:
-            log(f"Could not identify installed mod versions: {e}")
-        self._log_mod_diagnostics()
-        self.after(0, self._render_mod_rows)
-        self.after(0, self._refresh_mods_badge)
 
-    def _identify_unversioned_mods(self, client_dir: str, force: bool = False,
-                                   only: str | None = None) -> list:
-        """Name the release of mods whose files are here but whose version is
-        not -- adopted or discovered ones, OctoLauncher's included -- by exact
-        file match only (identify_installed_release). Records the version
-        when one matches; otherwise leaves "unknown", which is the truth.
 
-        Compared with: the latest release, and the version OctoLauncher
-        wrote down when it is another one. A comparison's answer is kept per
-        release and fingerprint, so files are downloaded to compare once,
-        not on every start. Returns the names identified."""
-        if not client_dir or not os.path.isdir(client_dir):
-            return []
-        cfg = load_config()
-        mods_cfg = cfg.get("mods", {})
-        cache = cfg.get("mod_identify_cache", {})
-        hints = None
-        found, seen = {}, {}
-        for mod in MODS_REGISTRY:
-            mid = mod["id"]
-            st = mods_cfg.get(mid) or {}
-            files = st.get("installed_files") or []
-            if only is not None and mid != only:
-                continue
-            if (st.get("installed_version") or not files or st.get("error")
-                    or not (st.get("managed") or st.get("discovered"))):
-                continue
-            if not all(os.path.exists(os.path.join(client_dir, f))
-                       for f in files):
-                continue
-            fp = files_hash(client_dir, files)
-            src = mod["source"]
-            candidates = []
-            if src["kind"] in RELEASE_KINDS:
-                rel = _fetch_release_cached(mod)
-                if rel:
-                    candidates.append((_release_version(mod, rel), rel))
-                if hints is None:
-                    hints = octolauncher.version_hints(client_dir, MODS_REGISTRY)
-                hint = hints.get(mid)
-                if (hint and src.get("version_from") != "asset"
-                        and all(hint != v for v, _ in candidates)):
-                    candidates.append((hint, None))
-            elif src.get("pinned_version"):
-                candidates.append((src["pinned_version"], None))
-            for ver, rel in candidates:
-                key = f"{ver}|{fp}"
-                known = (cache.get(mid) or {}).get(key)
-                if known is not None and not force:
-                    match = known
-                else:
-                    if rel is None and src["kind"] in RELEASE_KINDS:
-                        rel = release_by_tag(src, ver)
-                        if rel is None:
-                            continue        # not answerable now; ask again later
-                    match = identify_installed_release(mod, files, client_dir, rel)
-                    seen.setdefault(mid, {})[key] = match
-                if match:
-                    found[mid] = (ver, fp)
-                    break
 
-        if not found and not seen:
-            return []
-
-        def _merge(c):
-            mods = c.setdefault("mods", {})
-            for mid, (ver, fp) in found.items():
-                rec = mods.get(mid)
-                if not rec or rec.get("installed_version"):
-                    continue
-                rec["installed_version"] = ver
-                rec["version_evidence"] = "files match the published release"
-                # The files are that release, byte for byte: the strongest
-                # baseline there is for telling later edits apart.
-                rec["content_hash"] = fp
-                rec["hash_baseline"] = "release"
-            ident = c.setdefault("mod_identify_cache", {})
-            for mid, answers in seen.items():
-                kept = dict(ident.get(mid) or {})
-                kept.update(answers)
-                ident[mid] = dict(list(kept.items())[-6:])
-        self._cfg = update_config(_merge)
-        names = []
-        for mid, (ver, _fp) in found.items():
-            mod = next(m for m in MODS_REGISTRY if m["id"] == mid)
-            names.append(mod["name"])
-            log(f"{mod['name']}: the installed files are release {ver}, "
-                f"byte for byte - version recorded.")
-        return names
-
-    def _log_mod_diagnostics(self):
-        """Say, once per check, why a mod that is here cannot be updated
-        automatically: no answer from its source, or no known version."""
-        mods_cfg = load_config().get("mods", {})
-        lines = []
-        for mod in MODS_REGISTRY:
-            st = mods_cfg.get(mod["id"]) or {}
-            if not st.get("installed_files"):
-                continue
-            look = MOD_LOOKUPS.get(mod["id"]) or {}
-            if (look.get("outcome") in ("failed", "no-asset")
-                    or not st.get("installed_version")):
-                lines.append("  " + mod_lookup_line(mod, st))
-        if lines:
-            log("\nMods that cannot be checked or updated automatically:")
-            for line in lines:
-                log(line)
-
-    def _mod_version_text(self, state: dict, live: dict | None) -> str:
-        """The version beside a mod's name: what is installed, "unknown"
-        when files are here and their release is not known, and the latest
-        release only for a mod that is not installed. The latest release is
-        never shown as if it were the installed one."""
-        if state.get("installed_version"):
-            return state["installed_version"]
-        if state.get("installed_files"):
-            return tr("unknown")
-        return (live or {}).get("latest_version") or tr("unknown")
 
     def _show_mod_problem(self, label, state: dict):
         """The line under a mod row: an install that failed (red; PLAY waits
@@ -4985,30 +4854,7 @@ class EqUpdaterApp(tk.Tk):
             return
         label.pack(fill="x", pady=(0, self._px(4)))
 
-    def _mod_plans(self) -> dict:
-        """Every mod's decision, keyed by id.
 
-        The rows, the badge, Apply and Update All all read this. Before the
-        planner existed each computed its own answer and they drifted: a row
-        could offer an update the worker then skipped, and Update All could
-        sweep a mod no row had ever offered."""
-        client = self._game_path.get().strip()
-        mods_cfg = load_config().get("mods", {})
-        out = {}
-        for mod in MODS_REGISTRY:
-            state = mods_cfg.get(mod["id"], {})
-            live = next((m for m in self._mods_state
-                         if m["id"] == mod["id"]), None)
-            out[mod["id"]] = mod_plan(mod, state, live, client)
-        return out
-
-    def _count_mod_updates(self) -> int:
-        """The badge: mods that can be safely updated, and nothing else.
-
-        A local-newer, modified or unmanaged mod is not a pending task and
-        counting it as one is how a badge trains people to click Update All
-        without reading."""
-        return sum(1 for p in self._mod_plans().values() if p.will_update)
 
     def _refresh_mods_badge(self):
         try:
@@ -5297,90 +5143,8 @@ class EqUpdaterApp(tk.Tk):
         elif mode == "retry":
             self._mod_recheck(mod_id)
 
-    def _mod_recheck(self, mod_id: str, force: bool = True):
-        """Ask the mod's source again, now, past the cache -- and compare the
-        installed files with what it publishes. Changes nothing on disk."""
-        mod = next((m for m in MODS_REGISTRY if m["id"] == mod_id), None)
-        if not mod:
-            return
-        client = self._game_path.get().strip()
-        self._log_line(f"\nChecking {mod['name']} again...\n", "acct")
 
-        def work():
-            try:
-                v = fetch_mod_latest_version_cached(mod, force=force)
-            except Exception as e:
-                _note_lookup(mod_id, "failed", tr(str(e)))
-                v = None
-            try:
-                self._identify_unversioned_mods(client, force=force, only=mod_id)
-            except Exception as e:
-                log(f"  Could not compare {mod['name']}: {e}")
-            st = load_config().get("mods", {}).get(mod_id)
-            log("  " + mod_lookup_line(mod, st))
 
-            def done():
-                self._mods_state = [m for m in self._mods_state
-                                    if m["id"] != mod_id]
-                if v:
-                    self._mods_state.append({"id": mod_id, "latest_version": v})
-                self._render_mod_rows()
-                self._refresh_mods_badge()
-            self.after(0, done)
-        threading.Thread(target=work, daemon=True).start()
-
-    def _adopt_mod(self, mod_id: str):
-        """Hand a discovered DLL over to EqUpdater, with consent.
-
-        Adoption records ownership and a fingerprint of the files *as they
-        are* -- it does not install anything. The user keeps the exact build
-        they had; EqUpdater simply gains permission to offer them updates to
-        it from here on, and can tell if those files change afterwards."""
-        from tkinter import messagebox
-        mod = next((m for m in MODS_REGISTRY if m["id"] == mod_id), None)
-        if not mod:
-            return
-        if not messagebox.askyesno(
-                tr("Manage {name} with {app}?", name=mod["name"],
-                   app=branding.APP_NAME),
-                tr("{name} is already installed and {app} did not install "
-                   "it.\n\n"
-                   "Managing it means {app} may offer updates for it from the "
-                   "configured source. Your current files are not changed "
-                   "now, and a newer local build will still never be "
-                   "replaced automatically.\n\n"
-                   "Manage it?", name=mod["name"], app=branding.APP_NAME)):
-            return
-        self._record_mod_adoption(mod)
-        self._log_line(f"\n{mod['name']} is now managed by "
-                       f"{branding.APP_NAME}.\n", "acct")
-        self._render_mod_rows()
-        self._refresh_mods_badge()
-        # Which release is it? Only an exact match with a published release
-        # can say; until one does, the row reads "version unknown".
-        self._mod_recheck(mod_id, force=False)
-
-    def _record_mod_adoption(self, mod: dict):
-        """Write down that EqUpdater looks after this mod's files as they are
-        now. Installs nothing; the caller has the player's consent."""
-        mod_id = mod["id"]
-        client = self._game_path.get().strip()
-        files = mod_found_files(mod, client)
-
-        def _merge(c):
-            mods = c.setdefault("mods", {})
-            rec = dict(mods.get(mod_id) or {})
-            rec.update(new_mod_record(
-                managed=True, adopted=True,
-                installed_version=rec.get("installed_version"),
-                installed_files=files,
-                content_hash=files_hash(client, files),
-                enabled=True))
-            rec["ignore_updates"] = bool(
-                (mods.get(mod_id) or {}).get("ignore_updates", False))
-            rec.pop("released", None)
-            mods[mod_id] = rec
-        self._cfg = update_config(_merge)
 
     # ── bringing in what another tool installed ──────────────────────────────
 
@@ -5487,62 +5251,6 @@ class EqUpdaterApp(tk.Tk):
         else:
             lbl.pack_forget()
 
-    def _identify_adopted_addons(self, client_dir: str):
-        """Find the commit of managed addons that have none: from their own
-        clone when its files still match it, otherwise by comparing them
-        with the source's latest commit. Only an exact match records a sha.
-        An answer is kept per commit and fingerprint, so an addon is
-        downloaded to compare once, not on every check."""
-        if not client_dir:
-            return
-        cfg = load_config()
-        cache = cfg.get("addon_identify_cache", {})
-        found, seen = {}, {}
-        root = addons_path(client_dir)
-        for folder, saved in list((cfg.get("addons") or {}).items()):
-            dirp = os.path.join(root, folder)
-            git = saved.get("git")
-            if (not addon_is_managed(saved) or saved.get("sha") or not git
-                    or not os.path.isdir(dirp)):
-                continue
-            fp = folder_hash(dirp)
-            clone = gitlocal.read_clone(dirp)
-            if (clone and clone.sha and same_repo(clone.remote, git)
-                    and gitlocal.clone_is_clean(dirp)):
-                found[folder] = (clone.sha, clone.branch, fp)
-                continue
-            remote = addon_remote_sha(git, saved.get("branch"), saved.get("ref"))
-            if not remote:
-                continue
-            key = f"{remote}|{fp}"
-            if (cache.get(folder) or {}).get(key) is False:
-                continue
-            match = self._addon_is_commit(client_dir, folder, git, remote, fp)
-            if match is None:
-                continue                    # no answer; ask again later
-            seen.setdefault(folder, {})[key] = match
-            if match:
-                found[folder] = (remote, saved.get("branch"), fp)
-
-        def _merge(c):
-            addons = c.setdefault("addons", {})
-            for folder, (sha, branch, fp) in found.items():
-                rec = addons.get(folder)
-                if not rec or rec.get("sha"):
-                    continue
-                rec["sha"] = sha
-                rec["branch"] = rec.get("branch") or branch
-                rec["content_hash"] = fp
-                rec["hash_baseline"] = "commit"
-            ident = c.setdefault("addon_identify_cache", {})
-            for folder, answers in seen.items():
-                kept = dict(ident.get(folder) or {})
-                kept.update(answers)
-                ident[folder] = dict(list(kept.items())[-4:])
-        if found or seen:
-            update_config(_merge)
-        for folder, (sha, _b, _f) in found.items():
-            log(f"{folder}: the installed files are commit {sha[:10]} - recorded.")
 
     def _addon_is_commit(self, client_dir: str, folder: str, git: str,
                          sha: str, fp: str) -> bool | None:
@@ -5562,19 +5270,6 @@ class EqUpdaterApp(tk.Tk):
         finally:
             shutil.rmtree(scratch, ignore_errors=True)
 
-    def _update_mod(self, mod_id: str):
-        """Download and install the newest release of a single mod (the
-        per-row "update" label). Runs through the normal apply worker so
-        errors/versions are recorded exactly like a manual Apply."""
-        out = self._game_path.get().strip()
-        if not out:
-            return
-        mod = next(m for m in MODS_REGISTRY if m["id"] == mod_id)
-        self._log_line(f"\nUpdating {mod['name']}...\n", "acct")
-        self._set_btn_busy(tr("Installing…"))
-        self._status_var.set(tr("Downloading mods…"))
-        threading.Thread(target=self._apply_mods_worker,
-                         args=(out, mod_id), daemon=True).start()
 
     def _apply_mods(self):
         out = self._game_path.get().strip()
@@ -5586,122 +5281,7 @@ class EqUpdaterApp(tk.Tk):
         threading.Thread(target=self._apply_mods_worker,
                          args=(out,), daemon=True).start()
 
-    def _maybe_install_default_addons(self):
-        """Auto-install the recommended addons the first time this game
-        folder is ready – the same one-shot mechanism as the default mods:
-        the absence of the "addons" key in config means "never initialized
-        for this folder", and a game-folder change wipes it to re-arm.
-        Runs after the default mods finished (chained from the mods apply
-        completion) or directly when mods were already initialized."""
-        if self._default_addons_install_started:
-            return
-        if load_config().get("addons") is not None:
-            return  # already initialized for this folder
 
-        out = self._game_path.get().strip()
-        if not out or not os.path.exists(os.path.join(out, "WoW.exe")):
-            return  # game isn't actually installed here yet
-
-        self._default_addons_install_started = True
-
-        # Mark this folder as initialized even if every install fails, so
-        # the batch doesn't re-fire on the next verify.
-        update_config(lambda c: c.setdefault("addons", {}))
-
-        # "Install recommended addons" (Settings → General): when
-        # off, skip the batch install but still verify so the ADDONS tab lists
-        # them as available for manual install.
-        if not load_config().get("auto_install_addons", False):
-            self._addons_verify()
-            return
-
-        ap = addons_path(out)
-        recs = [{"folder": name, "status": "available", "git": url,
-                 "branch": None, "ref": None, "toc": {},
-                 "description": None, "error": None}
-                for name, url in RECOMMENDED_ADDONS.items()
-                if not os.path.isdir(os.path.join(ap, name))]
-        if not recs:
-            # Nothing to install (e.g. switched to a folder that already has
-            # the addons) — still run a verify so the ADDONS tab badge shows
-            # any available updates without the user opening the tab.
-            self._addons_verify()
-            return
-        self._log_line("\nInstalling recommended addons...\n", "acct")
-        self._addon_apply(recs)
-
-    def _maybe_install_essential_mods(self):
-        """Auto-install every mod flagged essential the first time this game
-        folder is ready to use – i.e. on a brand-new install, or right after
-        the game folder was changed to a new location. Both cases wipe the
-        "mods" key from config, which is what this checks for, so once this
-        has run (successfully or not – failures are recorded per-mod) it
-        won't fire again until the folder changes.
-
-        Reuses the normal apply worker so failures land in config exactly
-        like a manual Apply would (per-mod "error" field, mod left disabled,
-        installed_version cached the same way).
-
-        **Discovery happens first, and it is the part that changed.** The
-        inherited version installed its own preferred build of every
-        essential mod the moment a game folder became usable -- including
-        over a client that already had them, possibly at newer versions,
-        possibly customised. A first run against somebody's existing install
-        is not a fresh install and must not be treated as one.
-
-        So anything already on disk is *recorded as found* rather than
-        replaced: unmanaged, visible on the MODS page, and offered for
-        adoption. Only the genuinely absent ones are installed."""
-        if self._default_mods_install_started:
-            return
-
-        cfg = load_config()
-        if cfg.get("mods"):
-            return  # already initialized for this folder
-
-        out = self._game_path.get().strip()
-        if not out or not os.path.exists(os.path.join(out, "WoW.exe")):
-            return  # game isn't actually installed here yet
-
-        self._default_mods_install_started = True
-
-        discovered = self._discover_existing_mods(out)
-
-        # **DLLs go into the client only with consent.** The inherited
-        # default installed the whole essential set -- VanillaFixes always,
-        # even with the option off -- the moment a folder became usable.
-        # Every one of these is code the game loads, so the first run asks,
-        # once, and "Install essential mods" (Settings → General) remembers
-        # the answer. VanillaFixes is asked about with the rest: it is the
-        # loader that injects them, which makes it the one that matters most.
-        mods_on = cfg.get("mods", {})
-        missing = [m for m in MODS_REGISTRY
-                   if m.get("essential", False) and m["id"] not in discovered
-                   and not any(mods_on.get(t, {}).get("enabled")
-                               for t in mod_twins(m["id"]))]
-        auto_mods = bool(cfg.get("auto_install_mods", False))
-        if missing and not auto_mods and not cfg.get("essential_mods_asked"):
-            auto_mods = self._ask_essential_mods(missing)
-        wanted = [m["id"] for m in missing] if auto_mods else []
-        for mid in wanted:
-            self._mod_pending_state.setdefault(mid, {})["enabled"] = True
-
-        if discovered:
-            self._log_line(
-                "\nFound %d mod(s) already installed here: %s.\n"
-                "Left untouched – open the MODS tab to have %s manage "
-                "them.\n" % (len(discovered), ", ".join(sorted(discovered)),
-                             branding.APP_NAME), "acct")
-
-        if not wanted:
-            self._refresh_mods_badge()
-            return
-
-        self._log_line("\nInstalling essential mods...\n", "acct")
-        self._set_btn_busy(tr("Installing…"))
-        self._status_var.set(tr("Downloading mods…"))
-        threading.Thread(target=self._apply_mods_worker,
-                         args=(out,), daemon=True).start()
 
     def _ask_essential_mods(self, mods: list) -> bool:
         """The one-time first-run question. Records that it was asked, and
@@ -5725,383 +5305,81 @@ class EqUpdaterApp(tk.Tk):
         self._auto_mods_var.set(bool(yes))
         return bool(yes)
 
-    def _discover_existing_mods(self, client_dir: str) -> set:
-        """Record every registry mod whose files are already in the client.
 
-        Recorded as unmanaged with a fingerprint of the files as found, so
-        the MODS page can show what is there, name it, and offer to manage
-        it -- and so that if the user later adopts it, EqUpdater can tell
-        whether the files changed in between.
 
-        No version is claimed. The files were not installed by this updater
-        and their release cannot be inferred from a DLL on disk; the row says
-        "version not tracked" rather than guessing, because a guessed version
-        is what a comparison would then act on."""
-        found = {}
+    def _mods_finished(self, fresh_mods):
+        """Everything the Tk window does when an Apply run ends: repaint the
+        rows in place, the Apply button, badge, chained steps. The logic-only
+        part is in core.mods_ops; a Qt host implements its own."""
+        if self._mod_icons_stale(fresh_mods):
+            self._rebuild_mod_rows()
         for mod in MODS_REGISTRY:
-            if not mod_files_on_disk(mod, client_dir):
+            mid         = mod["id"]
+            state       = fresh_mods.get(mid, {})
+            refs        = self._mod_row_vars.get(mid, {})
+            if not refs:
                 continue
-            files = mod_found_files(mod, client_dir)
-            rec = new_mod_record(
-                managed=False, enabled=True,
-                installed_files=files,
-                content_hash=files_hash(client_dir, files),
-                source_url=mod.get("repo_url"))
-            rec["discovered"] = True
-            found[mod["id"]] = rec
+            has_error   = bool(state.get("error"))
+            installed   = mod_has_files(state)
 
-        if found:
-            def _merge(c):
-                mods = c.setdefault("mods", {})
-                for mid, rec in found.items():
-                    mods.setdefault(mid, rec)
-            self._cfg = update_config(_merge)
-        return set(found)
+            if mid not in self._mod_pending_state:
+                refs["enabled"].set(state.get("enabled", False))
+                refs["ignore"].set(state.get("ignore_updates", False))
 
-    def _apply_mods_worker(self, client_dir: str, only_mod_id: str | None = None,
-                           force: bool = False):
-        """Install, update and remove mods according to the plan.
+            live = next((m for m in self._mods_state if m["id"] == mid), {})
+            if "ver_label" in refs:
+                refs["ver_label"].configure(
+                    text=f"  {self._mod_version_text(state, live)}")
 
-        `force` is the only way a downgrade or a replacement of modified
-        files can ever happen, and nothing sets it except an explicit user
-        action that said so in a dialog first. Update All and every ordinary
-        Apply leave it false."""
-        # Work on a detached copy of the "mods" section; it's merged back into
-        # the live config atomically at the end (update_config).
-        mods_cfg = load_config().get("mods", {})
+            if "name_label" in refs:
+                refs["name_label"].configure(
+                    fg=C_ERR if has_error else (C_MOD_HL if installed else C_TEXT))
 
-        # Registry order is install order (VanillaFixes first).
-        ordered = MODS_REGISTRY
+            if "desc_label" in refs:
+                refs["desc_label"].configure(
+                    fg=C_TEXT if state.get("enabled", False) else C_TEXT_DIM)
 
-        pending = self._mod_pending_state
-        # Arm the one-time "DXVK first launch" notice if DXVK gets (re)installed
-        # this run — the new d3d9.dll invalidates the shader cache.
-        set_dxvk_notice = False
+            if "error_label" in refs:
+                self._show_mod_problem(refs["error_label"], state)
 
-        for mod in ordered:
-            mid   = mod["id"]
-            if only_mod_id is not None and mid != only_mod_id:
-                continue
-            state = mods_cfg.get(mid, {})
+            if "update_label" in refs:
+                self._style_mod_action_label(refs["update_label"],
+                                             mod, state, live)
 
-            # Read enabled/ignore from pending UI changes first, fall back to
-            # saved config. No registry-default fallback here: a mod is only
-            # ever "enabled" because the user (or the one-time default-mods
-            # seed in _maybe_install_essential_mods) explicitly said so.
-            enabled    = pending.get(mid, {}).get("enabled",        state.get("enabled", False))
-            ignore_upd = pending.get(mid, {}).get("ignore_updates", state.get("ignore_updates", False))
+        self._apply_btn.configure(text="Apply", bg=C_PANEL_BDR, fg=C_TEXT)
+        self._refresh_apply_btn_visibility()
+        self._refresh_mods_badge()
+        # Fresh setup chain: once the default mods finished installing,
+        # the recommended addons follow (no-op if already initialized).
+        self._maybe_install_default_addons()
+        # Update all: the mods half is done; the addons half follows.
+        if self._update_all_chain:
+            self.after(0, self._chain_addon_update_all)
 
-            # A targeted single-mod update/retry always means "install this
-            # mod". Without this, retrying a failed install is a no-op: the
-            # error handler recorded enabled=False, so needs_install stays
-            # False and the mod is skipped (only its error gets cleared).
-            if only_mod_id is not None and mid == only_mod_id:
-                enabled = True
+        # Any mod in an error state (download blocked, API limit, AV
+        # deleted the archive, …) — bring the MODS tab up so the error
+        # is visible. PLAY stays disabled via _refresh_ready_state.
+        if any(bool(s.get("error")) for s in fresh_mods.values()):
+            self._switch_tab("MODS")
+        self._refresh_ready_state()
 
-            installed_ver = state.get("installed_version")
-            # Adopted mods can have real files but no known release version.
-            # Version knowledge governs updates, never presence/removal.
-            tracked = state.get("installed_files") or []
-            on_disk = [rel for rel in tracked
-                       if os.path.exists(os.path.join(client_dir, rel))]
-            is_installed = bool(tracked) and len(on_disk) == len(tracked)
-            owned = bool(state.get("managed", bool(installed_ver)))
-            explicit = force or only_mod_id == mid
 
-            needs_install   = enabled and not is_installed
-            needs_uninstall = not enabled and owned and bool(on_disk)
+    # ── dialog hooks used by the lifted logic (core/mods_ops, addons_ops) ──
+    def _ask_yes_no(self, title, body, **kw):
+        from tkinter import messagebox
+        return messagebox.askyesno(title, body, parent=self, **kw)
 
-            # Some files are gone and some are not. Putting the set back
-            # writes over the rest -- fine for EqUpdater's own install of a
-            # known version, not for an adopted copy nobody has identified.
-            # That waits for the row's reinstall, which asks first.
-            if (needs_install and on_disk and not explicit
-                    and not (installed_ver and state.get("installed_by"))):
-                needs_install = False
-                log("")
-                log(f"{mod['name']}: some files are missing and the installed "
-                    f"version is unknown - not reinstalled automatically.")
+    def _ask_ok_cancel(self, title, body, **kw):
+        from tkinter import messagebox
+        return messagebox.askokcancel(title, body, parent=self, **kw)
 
-            # **Never install over files nobody gave us.** A discovered mod is
-            # recorded unmanaged, enabled, and with no version -- which reads
-            # as "wanted and not installed" above, so any Apply (the first-run
-            # install included) would have written EqUpdater's build over the
-            # user's own DLL. Adoption is the way in, not this. A record that
-            # carries an error was ours when the install failed, so a retry
-            # may still finish the job.
-            if (needs_install and not force and not owned
-                    and not state.get("error")
-                    and mod_files_on_disk(mod, client_dir)):
-                needs_install = False
-                if mid in pending:
-                    log("")
-                    log(f"{mod['name']}: already here and not managed by "
-                        f"{branding.APP_NAME}, so it was left alone. Click "
-                        f"\"not managed\" on its row to manage it.")
+    def _show_info(self, title, body, **kw):
+        from tkinter import messagebox
+        return messagebox.showinfo(title, body, parent=self, **kw)
 
-            needs_version_lookup = needs_install or (enabled and is_installed and not ignore_upd)
-            latest_ver  = None
-            mod_release = None
-            if needs_version_lookup:
-                try:
-                    if mod["source"]["kind"] in RELEASE_KINDS:
-                        mod_release = _fetch_release_cached(mod)
-                        latest_ver  = _release_version(mod, mod_release) if mod_release else None
-                    else:
-                        latest_ver = fetch_mod_latest_version_cached(mod)
-                except Exception:
-                    pass
-
-            # **The decision, and the only place it is made.** Whether an
-            # installed mod gets replaced is the planner's answer, not this
-            # worker's opinion -- so the row, the badge, Update All and this
-            # loop cannot disagree, and the safety invariants hold here
-            # because they hold in one function that is tested directly.
-            #
-            # The old line here was `latest_ver != installed_ver`, which is
-            # how V90 became V89.
-            mod_state = dict(state)
-            mod_state.update({"enabled": enabled, "ignore_updates": ignore_upd})
-            decision = mod_plan(
-                mod, mod_state,
-                {"latest_version": latest_ver} if latest_ver else None,
-                client_dir)
-
-            needs_update = enabled and is_installed and (
-                decision.will_update or (force and latest_ver is not None))
-
-            # Asked to replace, with nothing to replace with: say so, and
-            # keep what is here. Never a silent no-op.
-            if force and enabled and is_installed and latest_ver is None:
-                look = MOD_LOOKUPS.get(mid) or {}
-                reason = look.get("reason") or tr("the source did not answer")
-                log("")
-                log(f"{mod['name']}: not replaced - could not check the latest "
-                    f"release ({reason}).")
-                mods_cfg.setdefault(mid, dict(state))["update_error"] = reason
-
-            # Anything that looked like it wanted updating and deliberately
-            # was not gets said out loud. A silent skip is indistinguishable
-            # from a bug, and from the outside it looks exactly like the
-            # updater not working.
-            if (enabled and is_installed and not needs_update
-                    and not needs_uninstall and decision.skipped
-                    and decision.action not in (Action.SKIP_UP_TO_DATE,
-                                                Action.SKIP_NOT_INSTALLED,
-                                                Action.SKIP_DISABLED)):
-                log("")
-                log(decision.log_line())
-
-            if not (needs_install or needs_uninstall or needs_update):
-                if mid in pending:
-                    mods_cfg.setdefault(mid, {}).update({
-                        "enabled":        enabled,
-                        "ignore_updates": ignore_upd,
-                    })
-                # A previously failed mod that the user leaves disabled on a
-                # later Apply counts as dismissed — clear the error so it
-                # stops blocking the PLAY button.
-                if not enabled and state.get("error"):
-                    mods_cfg.setdefault(mid, {})["error"] = None
-                # An installed, enabled, up-to-date mod still has to be listed
-                # in dlls.txt to load, and nothing else re-checks that. The
-                # three paths that write the file are install, update and
-                # uninstall, so once it drifts out of step with the config --
-                # a restore from one of the installer's backups, an interrupted
-                # run, a mod installed before DLL_LOAD_ORDER existed -- the mods
-                # list reports the mod as enabled forever while VanillaFixes
-                # never injects it. That is a silent failure with nothing to
-                # find: the UI and the config both say yes, and only the file
-                # says no.
-                if enabled and is_installed and mod.get("register_dll"):
-                    if ensure_dll(client_dir, mod["register_dll"]):
-                        log("")
-                        log(f"{mod['name']} was enabled but missing "
-                            f"from dlls.txt - re-registered "
-                            f"{mod['register_dll']}.")
-                continue
-
-            status = (tr("Installing {name}…", name=mod["name"]) if needs_install
-                      else tr("Updating {name}…", name=mod["name"]) if needs_update
-                      else tr("Removing {name}…", name=mod["name"]))
-            self.after(0, lambda t=status: self._status_var.set(t))
-
-            # Files that are here and about to be written over are copied
-            # aside first, so a download or install that fails part-way
-            # leaves the mod as it was instead of half gone.
-            stash, touched, keep_stash = None, False, False
-            try:
-                if (needs_install or needs_update) and on_disk:
-                    stash = _stash_mod_files(client_dir, on_disk)
-                touched = True
-                if needs_install:
-                    log(f"\nInstalling {mod['name']} {latest_ver}...")
-                    written = install_mod(mod, client_dir, release=mod_release)
-                    if not written:
-                        raise RuntimeError(N_("the download did not contain "
-                                              "the mod's files"))
-                    if mod.get("register_dll"):
-                        add_dll(client_dir, mod["register_dll"])
-                    resolved_ver = mod.pop("_resolved_version", None) or latest_ver or "unknown"
-                    # A full provenance record, fingerprint included: without
-                    # one a first install could never be told apart from one
-                    # the user has since edited.
-                    mods_cfg[mid] = new_mod_record(
-                        managed=True, enabled=True,
-                        installed_version=resolved_ver,
-                        installed_files=written,
-                        content_hash=files_hash(client_dir, written),
-                        source_url=mod.get("repo_url"))
-                    mods_cfg[mid]["ignore_updates"] = ignore_upd
-                    if mid == "dxvk":
-                        set_dxvk_notice = True
-                    log(f"  \u2713 {mod['name']} installed.")
-
-                elif needs_uninstall:
-                    log(f"\nUninstalling {mod['name']}...")
-                    uninstall_mod(mod, client_dir)
-                    if mod.get("register_dll"):
-                        remove_dll(client_dir, mod["register_dll"])
-                    # The record stays, saying we no longer own anything
-                    # here. Dropping the key would make the mod look
-                    # never-seen -- and a never-seen mod whose files are
-                    # still on disk is exactly the unmanaged case, which
-                    # would then be offered for adoption seconds after the
-                    # user asked for it to be removed.
-                    mods_cfg[mid] = new_mod_record(managed=False, enabled=False)
-                    mods_cfg[mid]["ignore_updates"] = ignore_upd
-                    log(f"  \u2713 {mod['name']} uninstalled.")
-
-                elif needs_update:
-                    log(f"\nUpdating {mod['name']} "
-                        f"{installed_ver or tr('unknown')} \u2192 {latest_ver}...")
-                    uninstall_mod(mod, client_dir)
-                    written = install_mod(mod, client_dir, release=mod_release)
-                    if not written:
-                        raise RuntimeError(N_("the download did not contain "
-                                              "the mod's files"))
-                    if mod.get("register_dll"):
-                        add_dll(client_dir, mod["register_dll"])
-                    mods_cfg[mid] = new_mod_record(
-                        managed=True, enabled=True,
-                        installed_version=latest_ver,
-                        installed_files=written,
-                        content_hash=files_hash(client_dir, written),
-                        source_url=mod.get("repo_url"))
-                    mods_cfg[mid]["ignore_updates"] = ignore_upd
-                    if mid == "dxvk":
-                        set_dxvk_notice = True
-                    log(f"  \u2713 {mod['name']} updated.")
-
-            except Exception as e:
-                err = describe_install_error(e)
-                log(f"  \u2717 {mod['name']}: {err}")
-                kept = bool(on_disk) and not needs_uninstall and (
-                    not touched or (stash is not None and
-                                    _restore_mod_files(client_dir, stash,
-                                                       on_disk)))
-                if kept:
-                    # The mod is as it was: same files, same record, and the
-                    # failure noted beside it -- the mod still works, so this
-                    # does not hold PLAY back.
-                    rec = dict(state)
-                    rec.update(enabled=enabled, ignore_updates=ignore_upd,
-                               update_error=err)
-                    mods_cfg[mid] = rec
-                    log(f"  Your previous {mod['name']} files were kept.")
-                elif on_disk:
-                    # Could not put them back. The record keeps naming the
-                    # files, so they are not lost from view, and the error
-                    # holds PLAY until it is dealt with. The copy stays where
-                    # the log says it is.
-                    rec = dict(state)
-                    rec["error"] = err
-                    mods_cfg[mid] = rec
-                    keep_stash = True
-                else:
-                    mods_cfg[mid] = new_mod_record(managed=False, enabled=False)
-                    mods_cfg[mid]["ignore_updates"] = ignore_upd
-                    mods_cfg[mid]["error"] = err
-            finally:
-                if stash is not None and not keep_stash:
-                    shutil.rmtree(stash, ignore_errors=True)
-
-        # Merge just the "mods" key into the current on-disk config (which
-        # other threads may have written to during this long install), rather
-        # than saving our stale whole-config snapshot.
-        sorted_mods = dict(sorted(mods_cfg.items(),
-                                  key=lambda kv: kv[0].lower()))
-        def _merge(c):
-            c["mods"] = sorted_mods
-            if set_dxvk_notice:
-                c["dxvk_notice_pending"] = True
-        fresh_cfg  = update_config(_merge)
-        fresh_mods = fresh_cfg.get("mods", {})
-        # Keep pending checkbox toggles on a targeted single-mod update —
-        # they were never applied and would be lost otherwise.
-        if only_mod_id is None:
-            self._mod_pending_state = {}
-
-        # Whatever the scope of this run, every enabled mod must be in
-        # dlls.txt when it ends. See reconcile_dlls_txt for the case that
-        # made this a separate step.
-        for name in reconcile_dlls_txt(client_dir, fresh_mods):
-            log(f"{name} was enabled but missing from dlls.txt - re-registered.")
-
-        def _do_inplace_update():
-            if self._mod_icons_stale(fresh_mods):
-                self._rebuild_mod_rows()
-            for mod in MODS_REGISTRY:
-                mid         = mod["id"]
-                state       = fresh_mods.get(mid, {})
-                refs        = self._mod_row_vars.get(mid, {})
-                if not refs:
-                    continue
-                has_error   = bool(state.get("error"))
-                installed   = mod_has_files(state)
-
-                if mid not in self._mod_pending_state:
-                    refs["enabled"].set(state.get("enabled", False))
-                    refs["ignore"].set(state.get("ignore_updates", False))
-
-                live = next((m for m in self._mods_state if m["id"] == mid), {})
-                if "ver_label" in refs:
-                    refs["ver_label"].configure(
-                        text=f"  {self._mod_version_text(state, live)}")
-
-                if "name_label" in refs:
-                    refs["name_label"].configure(
-                        fg=C_ERR if has_error else (C_MOD_HL if installed else C_TEXT))
-
-                if "desc_label" in refs:
-                    refs["desc_label"].configure(
-                        fg=C_TEXT if state.get("enabled", False) else C_TEXT_DIM)
-
-                if "error_label" in refs:
-                    self._show_mod_problem(refs["error_label"], state)
-
-                if "update_label" in refs:
-                    self._style_mod_action_label(refs["update_label"],
-                                                 mod, state, live)
-
-            self._apply_btn.configure(text="Apply", bg=C_PANEL_BDR, fg=C_TEXT)
-            self._refresh_apply_btn_visibility()
-            self._refresh_mods_badge()
-            # Fresh setup chain: once the default mods finished installing,
-            # the recommended addons follow (no-op if already initialized).
-            self._maybe_install_default_addons()
-            # Update all: the mods half is done; the addons half follows.
-            if self._update_all_chain:
-                self.after(0, self._chain_addon_update_all)
-
-            # Any mod in an error state (download blocked, API limit, AV
-            # deleted the archive, …) — bring the MODS tab up so the error
-            # is visible. PLAY stays disabled via _refresh_ready_state.
-            if any(bool(s.get("error")) for s in fresh_mods.values()):
-                self._switch_tab("MODS")
-            self._refresh_ready_state()
-
-        self.after(0, _do_inplace_update)
+    def _show_error(self, title, body, **kw):
+        from tkinter import messagebox
+        return messagebox.showerror(title, body, parent=self, **kw)
 
     # ── addons panel ─────────────────────────────────────────────────────────
 
@@ -6857,435 +6135,10 @@ class EqUpdaterApp(tk.Tk):
             self._log_line(f"Moved {entry} aside to {aside}\n", "ok")
         return False
 
-    def _addons_verify(self, force=False, remote_checks=True):
-        """Scan Interface/AddOns, match against the catalog, and check every
-        tracked addon's remote commit sha (config-cached). With
-        remote_checks=False the scan is guaranteed network-free: shas come
-        from the cache only (used for post-install/update refreshes)."""
-        if self._addons_busy:
-            return
-        # A recent verify result is already rendered — plain tab switches
-        # within the TTL don't need a rescan or a rebuild at all.
-        if (not force and self._addons_status["state"] == "done"
-                and (time.time() - self._addons_verified_ts)
-                < ADDONS_VERIFY_TTL):
-            return
-        client = self._game_path.get().strip()
-        if client and self._addon_dir_conflict_prompt(client):
-            return
-        self._addons_busy = True
-        had_content = bool(self._addons_status["addons"]
-                           or self._addons_status["available"])
-        self._addons_status = {**self._addons_status, "state": "verifying"}
-        if had_content:
-            # Keep showing the existing list while checking in background.
-            self._refresh_addons_footer()
-        else:
-            self._render_addons()
 
-        def worker():
-            try:
-                catalog = fetch_addons_catalog(force=force)
-            except Exception:
-                # offline — fall back to whatever the config still holds
-                catalog = (load_config().get("addons_catalog_cache", {})
-                           .get("catalog") or [])
 
-            # The catalogue writes some OctoWoW Git sources under another
-            # name for the same forge; read them as the canonical URL so
-            # they validate, and are saved, as octowow.st/git.
-            available = [{"folder": a.get("name"), "status": "available",
-                          "git": canonical_repo_url(a.get("git")),
-                          "branch": a.get("branch"),
-                          "ref": a.get("ref"), "toc": a.get("toc") or {},
-                          "description": a.get("description"), "error": None}
-                         for a in catalog
-                         if a.get("name") and a["name"] not in BLOCKED_ADDONS]
 
-            # Curated recommendations: apply git-URL overrides on top of the
-            # catalog, and synthesize entries for recommended addons the
-            # catalog doesn't carry (or has renamed). Overridden forks may
-            # use a different default branch, so branch/ref are reset.
-            by_name = {a["folder"]: a for a in available}
-            for name, override in CURATED_ADDONS.items():
-                rec = by_name.get(name)
-                if rec is None:
-                    available.append(
-                        {"folder": name, "status": "available",
-                         "git": override, "branch": None, "ref": None,
-                         "toc": {}, "description": None, "error": None})
-                elif not _same_git_repo(rec.get("git"), override):
-                    rec.update(git=override, branch=None, ref=None)
 
-            addons = {}
-            records = load_config().get("addons", {})
-            ap = addons_path(client) if client else ""
-            if ap and os.path.isdir(ap):
-                for name in sorted(os.listdir(ap)):
-                    if name == lootgate.FOLDER:
-                        continue        # part of the Auto Loot setting
-                    if name.startswith(("Blizzard_", "Turtle_")):
-                        continue
-                    dirp = os.path.join(ap, name)
-                    if not os.path.isdir(dirp):
-                        continue
-                    rec = {"folder": name, "status": "unknown", "git": None,
-                           "branch": None, "ref": None, "toc": {},
-                           "description": None, "error": None}
-                    toc_path = os.path.join(dirp, f"{name}.toc")
-                    if not os.path.exists(toc_path):
-                        rec.update(status="invalid",
-                                   error=N_("Missing .toc file"))
-                        addons[name] = rec
-                        continue
-                    rec["toc"] = read_toc_file(toc_path)
-                    avail = next((a for a in available
-                                  if a["folder"] == name), None)
-                    if avail:
-                        rec["description"] = avail["description"]
-                    saved = records.get(name)
-                    override = CURATED_ADDONS.get(name)
-
-                    # What the catalogue currently recommends for this folder
-                    # name. A *suggestion*, and never more than that until
-                    # the user says so: a folder called Questie matching a
-                    # Questie entry is a coincidence of naming, not a claim
-                    # of ownership over whatever is in it.
-                    suggested = override or (avail or {}).get("git")
-                    rec["suggested_git"] = suggested
-                    rec["managed"] = addon_is_managed(saved)
-                    if not rec["managed"]:
-                        # A clone knows where it came from, which outranks
-                        # what the catalogue would recommend for the name --
-                        # and works for an addon the catalogue has never heard
-                        # of. OctoLauncher's addons are all clones.
-                        clone = gitlocal.read_clone(dirp)
-                        if clone and is_allowed_git_url(
-                                canonical_repo_url(clone.remote).removesuffix(".git")):
-                            rec["suggested_git"] = canonical_repo_url(
-                                clone.remote).removesuffix(".git")
-                        rec["catalog_git"] = suggested
-                        rec["catalog_ref"] = (avail or {}).get("ref")
-                        rec["catalog_branch"] = (avail or {}).get("branch")
-
-                    if not rec["managed"]:
-                        # **Found, not owned.** The inherited updater matched
-                        # this folder against the catalogue and offered to
-                        # "update" it -- which meant deleting somebody's
-                        # manually installed addon and putting a different
-                        # copy there. It is shown, its .toc is read, a
-                        # possible source is offered, and nothing is touched.
-                        rec.update(git=canonical_repo_url(saved.get("git"))
-                                   if saved else None,
-                                   status="unmanaged")
-                        addons[name] = rec
-                        continue
-
-                    # Managed: everything below asks about the source the
-                    # files actually came from, never about the catalogue's
-                    # current preference. Asking a different fork for "the
-                    # latest commit" and comparing it with ours is not a
-                    # question with a meaningful answer.
-                    rec.update(git=canonical_repo_url(saved.get("git")),
-                               branch=saved.get("branch"),
-                               ref=saved.get("ref"),
-                               custom=saved.get("custom_source",
-                                                saved.get("custom", False)))
-
-                    lookup_failed = False
-                    if remote_checks:
-                        remote = addon_remote_sha(
-                            rec["git"], rec["branch"], rec["ref"],
-                            force=force)
-                    else:
-                        remote = addon_cached_sha(
-                            rec["git"], rec["branch"], rec["ref"])
-                        if remote is None:
-                            # No cached answer and no network wanted: treat
-                            # it as current rather than guessing, and do not
-                            # record a failure the user would have to clear.
-                            remote = saved.get("sha")
-                    if remote is None:
-                        lookup_failed = True
-
-                    # Which came first. A different sha is an observation;
-                    # this is the question. Skipped when the answer cannot
-                    # change anything -- same sha, or nothing to compare.
-                    anc = None
-                    if (remote and saved.get("sha")
-                            and remote != saved.get("sha") and remote_checks):
-                        anc = addon_ancestry(rec["git"], saved["sha"], remote,
-                                             force=force)
-                    elif remote and remote == saved.get("sha"):
-                        anc = Ancestry.IDENTICAL
-
-                    comp = addon_component(
-                        name, saved, installed=True, remote_sha=remote,
-                        configured_source=suggested,
-                        current_hash=(folder_hash(dirp)
-                                      if saved.get("content_hash") else None),
-                        ancestry_result=anc, lookup_failed=lookup_failed,
-                        installed_version=rec["toc"].get("Version"))
-                    decision = plan(comp)
-                    rec["plan"] = decision
-                    rec["status"] = ADDON_STATUS_NAMES.get(
-                        decision.status, "unverifiable")
-                    rec["reason"] = decision.reason
-                    rec["remote_sha"] = remote
-                    rec["installed_sha"] = saved.get("sha")
-                    if decision.status is Status.UNVERIFIABLE and lookup_failed:
-                        # Not an addon error: nothing is wrong with the files,
-                        # which stay as they are, nor with the record. The
-                        # next look asks again.
-                        rec["check_failed"] = (
-                            addon_lookup_reason(rec["git"], rec["branch"],
-                                                rec["ref"])
-                            or N_("the source did not answer"))
-                        log(f"Addon source check failed: {name} from "
-                            f"{rec['git']}: {rec['check_failed']}")
-                    addons[name] = rec
-
-            # Overlay install failures from this session: the rescan drops
-            # them (a failed install leaves no folder on disk), so re-attach
-            # errors to the matching available row — or synthesize one for a
-            # failed custom addon. Errors for now-installed folders are stale
-            # and dropped.
-            for folder in [f for f in self._addon_errors if f in addons]:
-                self._addon_errors.pop(folder, None)
-            by_name = {a["folder"]: a for a in available}
-            for folder, info in self._addon_errors.items():
-                rec = by_name.get(folder)
-                if rec is None:
-                    rec = {"folder": folder, "status": "available",
-                           "git": info.get("git"), "branch": None,
-                           "ref": None, "toc": {}, "description": None,
-                           "error": None}
-                    available.append(rec)
-                rec["error"] = info["error"]
-
-            def done():
-                changed = (addons != self._addons_status["addons"]
-                           or available != self._addons_status["available"])
-                self._addons_status = {"state": "done", "addons": addons,
-                                       "available": available}
-                self._addons_verified_ts = time.time()
-                self._addons_busy = False
-                self._refresh_addons_badge()
-                if changed:
-                    self._render_addons(keep_scroll=True)
-                else:
-                    self._refresh_addons_footer()
-                self._refresh_manage_all()
-                self.after(500, self._offer_manage_found)
-                self._identify_addons_once()
-            self.after(0, done)
-        threading.Thread(target=worker, daemon=True).start()
-
-    def _addon_apply(self, recs, force: bool = False):
-        """Install/update the given addon records sequentially.
-
-        **The last line of defence, and it belongs here.** Every addon
-        install in the application funnels through this one method, so this
-        is the one place that can guarantee invariant 2 no matter which
-        caller got confused: a folder that exists on disk and is not managed
-        by EqUpdater is not written over.
-
-        The guard is redundant with the planner, deliberately. The planner
-        decides correctly and every caller consults it -- but "every caller"
-        is a claim about code that will be edited by people who have not read
-        this docstring, and the cost of it being false once is somebody's
-        addon. `force` is the explicit path (see _addon_force_replace) and is
-        never set by a sweep."""
-        client = self._game_path.get().strip()
-        if not client or self._addons_busy or not recs:
-            return
-
-        if not force:
-            managed = load_config().get("addons", {})
-            safe, refused = [], []
-            for rec in recs:
-                folder = rec.get("folder")
-                on_disk = bool(client) and os.path.isdir(
-                    os.path.join(addons_path(client), folder or ""))
-                if on_disk and not addon_is_managed(managed.get(folder)):
-                    refused.append(folder)
-                else:
-                    safe.append(rec)
-            for folder in refused:
-                log("")
-                log(f"{folder}:")
-                log(f"  Installed on disk, and not managed by "
-                    f"{branding.APP_NAME}.")
-                log("  Skipping: refusing to overwrite an addon this "
-                    "updater did not install.")
-            recs = safe
-            if not recs:
-                self._addons_verify(remote_checks=False)
-                return
-
-        self._addons_busy = True
-        self._addons_installing = True
-        before = {}          # folder -> (status, was it listed as installed)
-        for rec in recs:
-            before[rec["folder"]] = (
-                rec.get("status"),
-                rec["folder"] in self._addons_status["addons"])
-            rec["status"] = "downloading"
-            self._addons_status["addons"].setdefault(rec["folder"], rec)
-        self._render_addons(keep_scroll=True)
-        # PLAY is inactive while addons download/install, same as for mods.
-        self._set_btn_busy(tr("Installing…"))
-        self._status_var.set(tr("Downloading addons…"))
-
-        failures = []        # (folder, update?, template, values)
-
-        def worker():
-            for rec in recs:
-                self.after(0, lambda n=rec["folder"]: self._status_var.set(
-                    tr("Installing {name}…", name=n)))
-                updating = before[rec["folder"]][1] or os.path.isdir(
-                    os.path.join(addons_path(client), rec["folder"]))
-                try:
-                    rec["git"] = addon_install_source(rec.get("git"))
-                    sha = addon_remote_sha(rec["git"], rec.get("branch"),
-                                           rec.get("ref"), raise_errors=True)
-                    if not sha:
-                        raise RuntimeError(N_("Could not resolve remote commit"))
-                    install_addon_files(client, rec["folder"], rec["git"], sha)
-                    if rec["folder"] == "pfUI":
-                        patch_pfui_default_profile(client)
-                    # Provenance, written the moment the files land: we
-                    # installed this, from this repository, at this commit,
-                    # and this is the fingerprint of what arrived. The
-                    # fingerprint is what lets a later run tell "the user
-                    # edited this" from "the user did not", which the commit
-                    # sha alone never could.
-                    record = new_addon_record(
-                        managed=True, git=rec["git"],
-                        branch=rec.get("branch"), ref=rec.get("ref"),
-                        sha=sha,
-                        content_hash=folder_hash(
-                            os.path.join(addons_path(client), rec["folder"])),
-                        custom_source=bool(rec.get("custom")))
-                    old_rec = load_config().get("addons", {}).get(
-                        rec["folder"]) or {}
-                    record["ignore_updates"] = bool(
-                        old_rec.get("ignore_updates", False))
-                    update_config(lambda c, f=rec["folder"], r=record:
-                                  c.setdefault("addons", {}).__setitem__(f, r))
-                    self._addon_errors.pop(rec["folder"], None)
-                    rec.update(status="upToDate", error=None)
-                    log(f"  ✓ Addon {rec['folder']} installed.")
-                except Exception as e:
-                    _cat, template, values = addon_failure(e, rec.get("git"))
-                    op = "update" if updating else "install"
-                    log(f"  ✗ Addon {rec['folder']} ({op} failed): "
-                        f"{template.format(**values)}", "err")
-                    log("    " + " <- ".join(
-                        f"{type(x).__name__}: {x}" for x in _error_chain(e)),
-                        "dim")
-                    failures.append((rec["folder"], updating, template,
-                                     values))
-                    rec["error"] = None
-                    if not updating:
-                        # Shown under the catalogue row until it installs.
-                        self._addon_errors[rec["folder"]] = {
-                            "error": tr(template, **values),
-                            "git": rec.get("git")}
-
-            def done():
-                self._addons_busy = False
-                self._addons_installing = False
-                self._addons_verified_ts = 0.0   # make the re-verify run
-                self._refresh_ready_state()      # PLAY active again
-                # No row is left reading "downloading…": a failed one is put
-                # back the way it was before it was asked for.
-                for folder, *_ in failures:
-                    status, listed = before.get(folder, (None, False))
-                    rec = next((r for r in recs if r["folder"] == folder), None)
-                    if rec is not None:
-                        rec["status"] = status or "available"
-                    if not listed:
-                        self._addons_status["addons"].pop(folder, None)
-                if failures:
-                    self._status_error(
-                        tr("Some addons failed – see the message for details"),
-                        lambda f=list(failures), n=len(recs):
-                            self._report_addon_failures(f, n))
-                # Cache-only refresh: the install itself already resolved and
-                # cached the shas — no further API requests are needed.
-                self._addons_verify(remote_checks=False)
-                if not self._addons_busy:        # the verify did not start
-                    self._render_addons(keep_scroll=True)
-                if failures:
-                    self._report_addon_failures(failures, len(recs))
-            self.after(0, done)
-        threading.Thread(target=worker, daemon=True).start()
-
-    def _report_addon_failures(self, failures, total: int):
-        """One dialog for whatever failed: the addon and the reason when one
-        did, a single summary when several did. Offers the log, which has
-        the detail."""
-        from tkinter import messagebox
-        if len(failures) == 1:
-            folder, updating, template, values = failures[0]
-            title = (tr("Failed to update {name}", name=folder) if updating
-                     else tr("Failed to install {name}", name=folder))
-            body = tr(template, **values)
-            if updating:
-                body += "\n\n" + tr("The installed copy was left as it was.")
-        else:
-            title = tr("Addons: {n} of {total} failed", n=len(failures),
-                       total=total)
-            lines = []
-            for folder, updating, template, values in failures[:12]:
-                lines.append("• " + (tr("{name} (update)", name=folder)
-                                     if updating else folder)
-                             + ": " + tr(template, **values))
-            if len(failures) > 12:
-                lines.append(tr("…and {n} more", n=len(failures) - 12))
-            body = "\n".join(lines)
-            if total > len(failures):
-                body += "\n\n" + tr("The other {n} finished.",
-                                       n=total - len(failures))
-        body += "\n\n" + tr("Open the log for details?")
-        self._last_addon_failure = (title, body)
-        if messagebox.askyesno(title, body, icon="error", parent=self):
-            self._show_logs()
-
-    def _addon_update_all(self):
-        """Every addon that can be *proved* to have a newer commit on the
-        source it was installed from. Nothing else.
-
-        The old version swept `status == "outOfDate"`, which covered four
-        unrelated situations -- a newer remote, a manually installed addon, a
-        locally edited one, and a catalogue preferring a different fork -- and
-        replaced all four."""
-        recs = [r for r in self._addons_status["addons"].values()
-                if r["status"] == "updateAvailable"]
-        self._addon_apply(recs)
-
-    def _addon_remove(self, folder: str):
-        from tkinter import messagebox
-        if not messagebox.askyesno(
-                tr("Remove addon"),
-                tr("Delete {folder} and all of its files?", folder=folder)):
-            return
-        client = self._game_path.get().strip()
-        if not client or self._addons_busy:
-            return
-        try:
-            dirp = os.path.join(writable_addons_path(client), folder)
-            if os.path.isdir(dirp):
-                shutil.rmtree(dirp)
-            update_config(lambda c: c.get("addons", {}).pop(folder, None))
-            self._log_line(f"Removed addon {folder}\n", "dim")
-        except Exception as e:
-            self._log_line(f"Failed to remove addon {folder}: {e}\n", "err")
-        self._addons_status["addons"].pop(folder, None)
-        self._addon_errors.pop(folder, None)
-        self._refresh_addons_badge()
-        self._render_addons(keep_scroll=True)
 
     # ── custom mods ──────────────────────────────────────────────────────────
 
@@ -8304,154 +7157,10 @@ class EqUpdaterApp(tk.Tk):
             if tip:
                 self._set_tooltip(lbl, tip)
 
-    def _addon_adopt(self, rec):
-        """Hand a manually installed addon over to EqUpdater, with consent.
 
-        **This installs nothing.** It records that the user wants EqUpdater
-        to look after the folder, pins the source it should track, and
-        fingerprints the files exactly as they are. The addon on disk is
-        untouched; what changes is that EqUpdater may now offer updates for
-        it, and can tell afterwards whether those files changed.
 
-        No commit sha is claimed unless the files prove one: a clean clone
-        of that source, or an exact match with its latest commit. Whatever
-        else is in the folder did not necessarily come from the repository
-        the catalogue suggests, and inventing a sha would let the next run
-        "update" a fork into a different fork. With no sha the planner answers
-        "unable to verify", and Replace is the way out."""
-        from tkinter import messagebox
-        folder = rec["folder"]
-        git = rec.get("suggested_git") or rec.get("git")
-        if not git:
-            return
-        if not messagebox.askyesno(
-                tr("Manage {name} with {app}?", name=folder,
-                   app=branding.APP_NAME),
-                tr("{name} is installed and {app} did not install it.\n\n"
-                   "Managing it means {app} will track:\n    {source}\n\n"
-                   "Your current files are not changed now. {app} will tell "
-                   "you when that source has a newer version, and will never "
-                   "replace files you have edited without asking.\n\n"
-                   "Manage it?", name=folder, app=branding.APP_NAME,
-                   source=git)):
-            return
-        self._record_addon_adoption(rec)
-        self._log_line("\n%s is now managed by %s, tracking %s.\n"
-                       "Its files were not changed.\n"
-                       % (folder, branding.APP_NAME, git), "acct")
-        client = self._game_path.get().strip()
 
-        def work():
-            try:
-                self._identify_adopted_addons(client)
-            except Exception as e:
-                log(f"Could not identify {folder}: {e}")
-            self.after(0, self._after_identify)
-        threading.Thread(target=work, daemon=True).start()
 
-    def _record_addon_adoption(self, rec: dict):
-        """Write down that EqUpdater looks after this folder, tracking the
-        source it came from. Installs nothing; the caller has the player's
-        consent. A source other than the catalogue's stays the player's: the
-        addon keeps updating from where it came from, and is not offered as
-        "installed from a different source" for the next fork along."""
-        folder = rec["folder"]
-        git = rec.get("suggested_git") or rec.get("git")
-        client = self._game_path.get().strip()
-        catalog = rec.get("catalog_git")
-        same = bool(catalog) and same_repo(catalog, git)
-        record = new_addon_record(
-            managed=True, adopted=True, git=git,
-            branch=rec.get("catalog_branch") if same else None,
-            ref=rec.get("catalog_ref") if same else None,
-            custom_source=bool(catalog) and not same,
-            content_hash=folder_hash(
-                os.path.join(addons_path(client), folder)) if client else None)
-        update_config(lambda c, f=folder, r=record:
-                      c.setdefault("addons", {}).__setitem__(f, r))
-
-    def _identify_addons_once(self):
-        """Once a session: find the commit of addons adopted before this
-        could, and of any since. Records written by an older version get
-        theirs here, with no click needed."""
-        if getattr(self, "_addons_identify_started", False):
-            return
-        client = self._game_path.get().strip()
-        pending = [f for f, r in (load_config().get("addons") or {}).items()
-                   if addon_is_managed(r) and not r.get("sha") and r.get("git")]
-        if not client or not pending:
-            return
-        self._addons_identify_started = True
-
-        def work():
-            before = {f: r.get("sha") for f, r in
-                      (load_config().get("addons") or {}).items()}
-            try:
-                self._identify_adopted_addons(client)
-            except Exception as e:
-                log(f"Could not identify adopted addons: {e}")
-            after = {f: r.get("sha") for f, r in
-                     (load_config().get("addons") or {}).items()}
-            if before != after:
-                self.after(0, self._after_identify)
-        threading.Thread(target=work, daemon=True).start()
-
-    def _addon_release(self, folder: str):
-        """Stop managing an addon. The files stay exactly where they are.
-
-        Releasing ownership is not uninstalling: the row moves to INSTALLED
-        MANUALLY and every automatic flow stops considering it. This is the
-        escape hatch for somebody who wants to look after one addon by hand
-        without turning the whole updater off."""
-        rec = (load_config().get("addons", {}) or {}).get(folder)
-        if not rec:
-            return
-
-        def _merge(c):
-            r = c.setdefault("addons", {}).setdefault(folder, {})
-            r["managed"] = False
-            r["installed_by"] = None
-            r["released"] = True        # "Manage all" leaves this one out
-        update_config(_merge)
-        self._log_line("\n%s is no longer managed by %s; its files are "
-                       "untouched.\n" % (folder, branding.APP_NAME), "acct")
-        self._addons_verified_ts = 0.0
-        self._addons_verify(force=False)
-
-    def _addon_switch_source(self, folder: str, new_git: str):
-        """Point a managed addon at a different repository, deliberately.
-
-        Recorded as a *custom* source, which means the catalogue will not
-        quietly point it somewhere else again later. The installed sha is
-        dropped: it belongs to the old repository's history and comparing it
-        against the new one's commits would be meaningless. The addon then
-        reads "unable to verify" until it is installed from the new source
-        once -- which is accurate, and better than a confident wrong answer."""
-        from tkinter import messagebox
-        current = (load_config().get("addons", {}) or {}).get(folder, {})
-        if not messagebox.askyesno(
-                tr("Switch source for {name}?", name=folder),
-                tr("{name} is currently tracked from:\n    {current}\n\n"
-                   "Switch to:\n    {new}\n\n"
-                   "This does not change any files now. The next update for "
-                   "this addon will come from the new repository, which may "
-                   "be a different project with different content.\n\n"
-                   "Switch?", name=folder,
-                   current=current.get("git") or tr("(none)"), new=new_git)):
-            return
-
-        def _merge(c):
-            r = c.setdefault("addons", {}).setdefault(folder, {})
-            r["git"] = new_git
-            r["branch"] = None
-            r["ref"] = None
-            r["sha"] = None
-            r["custom_source"] = True
-            r["managed"] = True
-        update_config(_merge)
-        self._log_line("\n%s now tracks %s.\n" % (folder, new_git), "acct")
-        self._addons_verified_ts = 0.0
-        self._addons_verify(force=True)
 
     def _refresh_addons_badge(self):
         """Addons that can be safely updated. An unmanaged, modified or
@@ -8811,9 +7520,6 @@ class EqUpdaterApp(tk.Tk):
         except (tk.TclError, RuntimeError):
             self._updall_spin = 0
 
-    def _all_plans(self) -> list:
-        """Everything EqUpdater has an opinion about, mods and addons."""
-        return list(self._mod_plans().values()) + self._addon_plans()
 
     def _update_all_preview(self, plans) -> bool:
         """Show what the update will and will not do; True to go ahead.
@@ -8856,54 +7562,7 @@ class EqUpdaterApp(tk.Tk):
             return False
         return messagebox.askokcancel(tr("Update all"), "\n".join(lines))
 
-    def _update_all(self):
-        """Update everything EqUpdater manages and can prove is behind.
 
-        It does **not** mean "make this installation match the catalogue".
-        Mods run through the normal Apply worker, which asks the planner per
-        mod; when it finishes, `_update_all_chain` hands over to the addons.
-        Both halves consult the same decisions the preview just showed, so
-        what runs is what was agreed to."""
-        if self._update_all_running or self._btn_mode == "busy" \
-                or self._addons_busy or getattr(self, "_running", False):
-            return                          # a second click while it runs
-        out = self._game_path.get().strip()
-        if not out or self._update_all_count() <= 0:
-            return
-
-        plans = self._all_plans()
-        if not self._update_all_preview(plans):
-            self._refresh_update_all_btn()
-            return
-
-        mods = self._mod_updates_count
-        addons = self._addon_updates_count
-        self._log_line("\nUpdating everything: %d mod(s), %d addon(s)...\n"
-                       % (mods, addons), "acct")
-        # Every hold-back, in the log, with its reason. A skip nobody is told
-        # about is indistinguishable from the updater not working.
-        for p in skipped_notably(plans):
-            self._log_line("  \u2022 %s \u2014 %s\n"
-                           % (p.component_id, p.reason), "")
-
-        self._update_all_running = True
-        if mods > 0:
-            self._update_all_chain = addons > 0
-            self._set_btn_busy(tr("Installing\u2026"))
-            self._status_var.set(tr("Downloading mods\u2026"))
-            threading.Thread(target=self._apply_mods_worker,
-                             args=(out,), daemon=True).start()
-        else:
-            self._addon_update_all()
-        self._refresh_update_all_btn()
-
-    def _chain_addon_update_all(self):
-        """The addons half of an update-all, once the mods are done. The
-        chain flag stays up until the addons are busy, so the spinner does not
-        blink out in between."""
-        self._addon_update_all()
-        self._update_all_chain = False
-        self._refresh_update_all_btn()
 
     def _layout_footer(self):
         """Place the footer from the current font's line height, so a larger
@@ -10126,129 +8785,9 @@ class EqUpdaterApp(tk.Tk):
 
     # ── button helpers ───────────────────────────────────────────────────────────
 
-    def _addon_plans(self) -> list:
-        """The addons' decisions, taken from the last verify.
-
-        Addon state is expensive to establish -- a commit lookup and possibly
-        an ancestry call per addon -- so the verify records each decision on
-        the row and this reads them back rather than asking again."""
-        out = []
-        for rec in self._addons_status["addons"].values():
-            p = rec.get("plan")
-            if p is not None:
-                out.append(p)
-        return out
 
 
-    def _addon_force_replace(self, rec):
-        """Overwrite a managed addon with the latest from its source, after
-        saying plainly what will be lost.
 
-        This is the way out of "modified locally", "local version newer" and
-        "different revision" - the three states that hold an update back. It
-        exists precisely so those states can be strict: a user who genuinely
-        wants the remote copy has one button, and everybody else is not
-        silently given it.
-
-        The folder is copied into the backups directory first, and where it
-        went is printed in the log, because "replace my changes" is only a
-        reasonable thing to agree to if the changes are recoverable."""
-        from tkinter import messagebox
-        folder = rec["folder"]
-        client = self._game_path.get().strip()
-        if not client or not rec.get("git"):
-            return
-
-        why = {
-            "modified": tr("Your local changes to this addon will be lost."),
-            "localNewer": tr("The installed copy is NEWER than the source's. "
-                             "Replacing it is a downgrade."),
-            "diverged": tr("The installed copy came from different history – another branch or fork. Its contents may differ substantially."),
-            "unverifiable": tr("The source has a different version, but "
-                               "whether it is newer or older than yours "
-                               "could not be checked."),
-        }.get(rec.get("status"),
-              tr("The installed copy will be replaced."))
-
-        if not messagebox.askokcancel(
-                tr("Replace {name}?", name=folder),
-                why + "\n\n"
-                + tr("A copy of the current folder is saved to {backups} "
-                     "first.\n\nReplace it with the latest from:\n    {source}",
-                     backups=BACKUP_DIR, source=rec["git"])):
-            return
-
-        dest = backup_component(
-            os.path.join(addons_path(client), folder), "addons")
-        if dest:
-            self._log_line("\nBacked up %s to %s\n" % (folder, dest), "acct")
-        self._log_line("Replacing %s at your request "
-                       "(%s).\n" % (folder, rec.get("reason") or "forced"),
-                       "acct")
-        # The one caller that passes force: the user has read what will be
-        # lost, agreed to it, and the backup is already taken.
-        self._addon_apply([rec], force=True)
-
-    def _mod_force_replace(self, mod_id: str):
-        """The same escape hatch for a DLL mod.
-
-        The V90 -> V89 case is the reason it is worded the way it is: this is
-        the *only* path that can install an older release over a newer one,
-        and it says so before it does."""
-        from tkinter import messagebox
-        mod = next((m for m in MODS_REGISTRY if m["id"] == mod_id), None)
-        client = self._game_path.get().strip()
-        if not mod or not client:
-            return
-
-        state = load_config().get("mods", {}).get(mod_id, {})
-        live = next((m for m in self._mods_state if m["id"] == mod_id), None)
-        decision = mod_plan(mod, state, live, client)
-        if (decision.status is Status.UNVERIFIABLE
-                and decision.detail.get("cause") == CAUSE_LOOKUP) \
-                or not decision.remote:
-            # Nothing to install: the source has not said what its release
-            # is. Replacing files with "whatever downloads" is not a repair.
-            look = MOD_LOOKUPS.get(mod_id) or {}
-            messagebox.showinfo(
-                tr("Replace {name}?", name=mod["name"]),
-                tr("Could not check the latest release: {reason}.",
-                   reason=look.get("reason") or tr("the source did not answer"))
-                + "\n\n" + tr("Nothing is changed. Click to check again."))
-            return
-        remote = decision.remote
-
-        note = ""
-        if decision.status is Status.LOCAL_NEWER:
-            note = "\n\n" + tr("This is a DOWNGRADE: {local} is installed and "
-                               "{remote} is what the source offers.",
-                               local=decision.local, remote=decision.remote)
-        elif decision.status is Status.MODIFIED:
-            note = "\n\n" + tr("The files here differ from the ones EqUpdater "
-                               "installed.")
-        elif not decision.local:
-            note = "\n\n" + tr("EqUpdater cannot tell which version is "
-                               "installed now. If yours is newer, or a custom "
-                               "build, this replaces it with an older one.")
-
-        if not messagebox.askokcancel(
-                tr("Replace {name}?", name=mod["name"]),
-                tr("Install {version} over the copy already here.",
-                   version=remote) + note + "\n\n"
-                + tr("The current files are backed up to {backups} first.",
-                     backups=BACKUP_DIR) + " "
-                + tr("If the download fails, they stay as they are.")):
-            return
-
-        for rel in (state.get("installed_files")
-                    or mod.get("installed_files") or []):
-            backup_component(os.path.join(client, rel), "mods")
-
-        self._log_line("\nReplacing %s at your request.\n" % mod["name"],
-                       "acct")
-        self._set_btn_busy(tr("Installing\u2026"))
-        threading.Thread(target=self._apply_mods_worker,
-                         args=(client, mod_id, True), daemon=True).start()
 
     def _set_btn_play(self):
         self._btn_mode = "play"

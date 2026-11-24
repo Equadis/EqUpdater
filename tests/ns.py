@@ -12,6 +12,7 @@ so tests that reload the package keep working.
     with patch_all(app, "secure_urlopen", return_value=resp) as opener: ...
 """
 
+import sys
 import types
 from unittest import mock
 
@@ -28,10 +29,20 @@ def _namespaces(target, name):
             seen.add(id(d))
             spaces.append(d)
     add(vars(target))
+    def core_globals(g):
+        return g is not None and str(g.get("__name__", "")).startswith("equpdater.core")
     for value in list(vars(target).values()):
         g = getattr(value, "__globals__", None)
-        if g is not None and str(g.get("__name__", "")).startswith("equpdater.core"):
+        if core_globals(g):
             add(g)
+        if isinstance(value, type):            # mixins lifted out of the Tk class
+            for base in value.__mro__:
+                if str(getattr(base, "__module__", "")).startswith("equpdater.core"):
+                    for fn in vars(base).values():
+                        fg = getattr(fn, "__globals__", None)
+                        if core_globals(fg):   # the class's OWN module copy
+                            add(fg)
+                            break
     return spaces
 
 

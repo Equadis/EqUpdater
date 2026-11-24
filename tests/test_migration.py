@@ -78,11 +78,9 @@ class Base(unittest.TestCase):
             fn(self.cfg)
             return self.cfg
         for name, patch in (
-                ("load_config", mock.patch.object(
-                    app, "load_config",
+                ("load_config", patch_all(app, "load_config",
                     side_effect=lambda *a: copy.deepcopy(self.cfg))),
-                ("update_config", mock.patch.object(
-                    app, "update_config", side_effect=update)),
+                ("update_config", patch_all(app, "update_config", side_effect=update)),
                 ("log", patch_all(app, "log"))):
             setattr(self, name, patch.start())
             self.addCleanup(patch.stop)
