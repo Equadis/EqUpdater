@@ -13,6 +13,8 @@ import subprocess
 from .. import branding, gamepaths, lootgate, platforms
 from ..config import ensure_dir, load_config, update_config
 from ..i18n import N_
+from . import atomic
+from . import oplock
 from .logsink import log
 
 APP_DATA_DIR = branding.app_data_dir()
@@ -221,8 +223,8 @@ def write_config_wtf(client_dir: str, tweaks: dict | None = None):
     try:
         cfg_dir = gamepaths.game_path(client_dir, "WTF")
         ensure_dir(cfg_dir)
-        with open(gamepaths.game_path(client_dir, "WTF", "Config.wtf"), "w",
-                  encoding="utf-8") as f:
+        with atomic.replacing(gamepaths.game_path(client_dir, "WTF", "Config.wtf"),
+                              "w", encoding="utf-8") as f:
             for k, v in vars_.items():
                 f.write(f'SET {k} "{v}"\n')
         log("Config.wtf written.", "ok")
@@ -288,7 +290,7 @@ def update_config_wtf(client_dir: str, tweaks: dict):
         if key not in updated_keys:
             new_lines.append("SET " + key + ' "' + val + '"\n')
 
-    with open(cfg_path, "w", encoding="utf-8") as f:
+    with atomic.replacing(cfg_path, "w", encoding="utf-8") as f:
         f.writelines(new_lines)
 
     log(f"  Config.wtf updated: farClip={far_clip}, CameraDistanceMax={cam_dist}, "
@@ -557,6 +559,7 @@ def base_problem(base: bytes) -> str | None:
     return None
 
 
+@oplock.guarded(0, "patching WoW.exe")
 def patch_exe(out_dir: str, tweaks: dict | None = None, log_fn=None):
     """Write WoW.exe = pristine base + the tweak patches.
 

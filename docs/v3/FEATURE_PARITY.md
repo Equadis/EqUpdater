@@ -60,3 +60,31 @@ Skin engine + 5 skins · OctoBot server chip · conditional/dedup/backoff networ
 Lift tool: `tools/lift.py` moves named top-level definitions verbatim and leaves a re-export (no logic change); `pyflakes` and the full suite check it. Tests that patched `app.<name>` for moved code now patch the namespace the function really reads (`func.__globals__`).
 
 Known flaky test (pre-existing, order/timing dependent): `test_custom_mods…test_installs_only_the_chosen_dll_into_mods` once saw a background Tk app's forum requests while it had `secure_urlopen` patched; passes alone and on re-run.
+
+
+## Phase 3 slice report: Mods (2026-11-24)
+**Migrated (backend):** the whole mods backend to `core/mods.py` (80 names: registry, release lookups, install/uninstall/stash/restore, dlls.txt, custom mods, planner glue); shared error text to `core/errors.py`; the addons backend to `core/addons.py` (59 names: catalogue, ownership, git lookups/ancestry, archive install, failure classes, pfUI patch). Logic-only operations lifted verbatim as mixins: `core/mods_ops.py` (apply worker, state load, identification, recheck, adopt, update, force-replace, essential-mods flow), `core/addons_ops.py` (verify, apply, remove, adopt, release, switch source, update-all, defaults, failure report), `core/mods_rows.py` (sections, install/uninstall/release, manage-all, toggles, twin and resolution-fix confirmations). `core/ops_host.py` is the Tk-free host. Dialog calls go through hooks (`_ask_yes_no` ...) and the end of an Apply run through `_mods_finished`.
+
+**Migrated (UI):** Mods page in QML: sections MANAGED / INSTALLED LOCALLY / AVAILABLE with counts and collapse, Manage all, and per row: version, description, the error or update-failed line, the action word with tooltip (update to X, reinstall, not managed -> adopt, version unknown -> recover, can't check -> retry; local newer / modified / can't verify are information only), right-click "install anyway", Ignore updates, install, uninstall (with confirmation), stop managing, open repository. Modal question dialog, keyed incremental model (one mod changes: one row repaints, scroll position kept), skinned tooltips; checked in Bubbles and Minimal Dark.
+
+**Remaining in Mods:** custom git mod dialog (`_open_custom_mod_dialog`, `_remove_custom_mod`, about 500 lines of Tk) and its confirmations; Update All button, preview dialog and the mods-then-addons chain; first-run essential-mods question and default-addons chain wired into the Qt shell; per-mod progress (status line only so far); `_migrate_1_3` and the migration offer on first launch.
+
+**Addons page:** not started in QML. The backend and operations are lifted and covered by the existing suite; the service, model, page and the 10/50/100/250 benchmark come next.
+
+**Known limitations:** `_mod_icons_stale` is a no-op in the Qt host (rows are rebuilt by key); `_status_var` is a thin shim; dialogs use a nested event loop (modal, like Tk).
+
+**Tests added:** `test_v3_core.TestModsService` (7), `test_v3_qt.TestModsPage` (5), `test_v3_safety` (10), earlier slices too. **Suite: 962 tests, all pass.** `tests/ns.py` (namespace-aware patching) replaced about 120 `app.<name>` patches; `tests/__init__.py` blocks the network and fails any test that leaves a worker thread running.
+
+**Regressions found and fixed during the lift:** tests patching `app.secure_urlopen` and similar silently stopped intercepting moved code (they would have reached the network) - fixed with `patch_all`; a Tk app started by tests made real requests (client manifest, both forums, news.json) - now blocked by `EQUPDATER_OFFLINE`; the earlier "flaky" custom-mods test was exactly that traffic.
+
+**Commits:** mods lift `72d6c17`, mixins `7a8b802`, Mods page `788c475`, safety and lock in the commit after it (`git log`).
+
+### Tweaks gaps still open (tracked; do not drop)
+1. EqUpdater language restart offer after changing the Language tweak -> Settings slice (language). **Open.**
+2. One-time 1.3 re-patch (`_migrate_1_3`; runs only in the Tk app; matters for upgraded 2.x installs) -> game-launch lifecycle / first-run slice. **Open.**
+3. Auto Loot enforcement at Play (`enforce_autoloot` is still in `app.py`; needs the Play pre-launch pipeline: dlls.txt reconcile, Auto Loot gate, diagnostics attempt, WDB clear) -> launch lifecycle slice. **Open.**
+
+## Shared records and concurrent use (Phase 3)
+* Mods, addons and tweaks records stay in 2.x's `config.json` (schema v2), read and written through `config.update_config` (process-local lock, read-modify-write, temp + fsync + `os.replace`). 3.0-only data (skin, animation, cache, launch default) is in `v3/` and never read by 2.x, so version-specific settings stay isolated.
+* Tests and benchmarks run with `EQU3_DATA_DIR`/`LOCALAPPDATA` redirected, a throwaway `HOME` and the network blocked (`EQUPDATER_OFFLINE`); asserted in `test_v3_qt.TestTweaksPage`.
+* A per-game-folder OS lock (`core/oplock.py`, SAFETY.md) serialises installs and patches among 3.0 processes. The released 2.1.4 does not take it, so do not run 2.1.4 and 3.0 on the same folder at the same time (to be stated in the beta notes).

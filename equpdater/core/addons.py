@@ -40,6 +40,7 @@ from .errors import (DDOS_CHECK, DdosCheckError, _api_json,
                      _describe_net_error, _error_chain, _refuse_challenge,
                      describe_install_error)
 from .mods import _same_source, _write_whole
+from . import oplock
 from .tweaks import client_exe_locked
 
 APP_NAME = branding.APP_NAME
@@ -792,6 +793,7 @@ def _rmtree_force(path):
         shutil.rmtree(path, onerror=handler)
 
 
+@oplock.guarded(0, "installing an addon")
 def install_addon_files(client_dir: str, folder: str, git_url: str, sha: str):
     """Download the repo archive at `sha` and unpack it into
     Interface/AddOns/<folder>, atomically replacing any existing copy.

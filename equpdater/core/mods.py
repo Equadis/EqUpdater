@@ -34,6 +34,8 @@ from ..gitcompare import (GIT_HOSTS, Ancestry, ancestry, canonical_repo_url,
 from ..hashing import files_hash, folder_hash
 from ..planner import CAUSE_LOOKUP, Component, plan, skipped_notably, updatable
 from ..states import Action, Plan, Status
+from . import atomic
+from . import oplock
 from .logsink import log
 from .net import ALLOWED_DOWNLOAD_HOSTS, secure_urlopen
 from .errors import _api_json, _describe_net_error, describe_install_error
@@ -381,7 +383,7 @@ dxvk.numCompilerThreads = 2
 
 def _write_dxvk_conf(client_dir: str):
     path = os.path.join(client_dir, "dxvk.conf")
-    with open(path, "w", encoding="utf-8") as f:
+    with atomic.replacing(path, "w", encoding="utf-8") as f:
         f.write(DXVK_CONF_CONTENT)
     log("  Wrote dxvk.conf")
 
@@ -728,6 +730,7 @@ def _write_whole(dest: str, data: bytes):
         raise
 
 
+@oplock.guarded(1, "installing a mod")
 def install_mod(mod: dict, client_dir: str, release: dict | None = None) -> list:
     src     = mod["source"]
     written = []
@@ -951,6 +954,7 @@ def install_mod(mod: dict, client_dir: str, release: dict | None = None) -> list
     return written
 
 
+@oplock.guarded(1, "removing a mod")
 def uninstall_mod(mod: dict, client_dir: str):
     cfg   = load_config()
     state = cfg.get("mods", {}).get(mod["id"], {})
@@ -1040,7 +1044,7 @@ def _invalidate_dll_cache(client_dir: str):
 
 def _write_dlls_txt(client_dir: str, lines: list):
     path = _dlls_txt_path(client_dir)
-    with open(path, "w") as f:
+    with atomic.replacing(path, "w") as f:
         f.write("\n".join(_sorted_dll_lines(lines)) + "\n")
     _invalidate_dll_cache(client_dir)
 
@@ -1264,7 +1268,7 @@ def _install_mod_zip(mod: dict, data: bytes, client_dir: str) -> list:
         for member, dest_rel in plan:
             full = os.path.join(client_dir, dest_rel)
             os.makedirs(os.path.dirname(full) or client_dir, exist_ok=True)
-            with zf.open(member) as src_f, open(full, "wb") as out:
+            with zf.open(member) as src_f, atomic.replacing(full, "wb") as out:
                 shutil.copyfileobj(src_f, out)
             written.append(dest_rel)
         log(f"  Installed {len(written)} files")
