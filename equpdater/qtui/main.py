@@ -62,7 +62,7 @@ class OfflineFetcher:
 def _register_bundled_fonts():
     """Friz Quadrata and OpenDyslexic ship in fonts/ (see fonts/README.txt)."""
     from PySide6.QtGui import QFontDatabase
-    d = os.path.join(branding.app_dir(), "fonts")
+    d = os.path.join(branding.resource_dir(), "fonts")
     try:
         for n in os.listdir(d):
             if n.lower().endswith((".ttf", ".otf")):
@@ -88,13 +88,13 @@ def build(argv=None):
 
     app = QGuiApplication.instance() or QGuiApplication(argv or sys.argv)
     app.setApplicationName("EqUpdater")
-    icon = os.path.join(branding.app_dir(), "icon.png")
+    icon = os.path.join(branding.resource_dir(), "icon.png")
     if os.path.exists(icon):
         app.setWindowIcon(QIcon(icon))
     dispatcher = bridge.Dispatcher()
     tasks = TaskManager(4, deliver=dispatcher.post)
 
-    manager = bridge.SkinManager(os.path.join(branding.app_dir(), "skins"),
+    manager = bridge.SkinManager(os.path.join(branding.resource_dir(), "skins"),
                                  core_settings.skins_dir() if not data
                                  else os.path.join(data, "skins"), settings)
     # EqUpdater's own text follows the saved Language tweak (set once, before

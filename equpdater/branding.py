@@ -93,6 +93,13 @@ def app_dir() -> str:
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+def resource_dir() -> str:
+    """Where bundled read-only files (skins, fonts, icon) are: PyInstaller's
+    data folder when frozen (``_internal`` beside the executable), else the
+    folder the application sits in."""
+    return getattr(sys, "_MEIPASS", None) or app_dir()
+
+
 def icon_candidates() -> list:
     """Where the runtime window icon assets might be, best first.
 

@@ -49,7 +49,26 @@ Nothing is copied from it except the game folder. Mods it installed are recognis
 
 Point at the folder (Find…, or Choose a folder…). If the torrent was never finished the folder is labelled unfinished. EqUpdater does not resume or repair the download; Verify game files (Settings → Troubleshooting) reads the folder against the client manifest and reports, read-only.
 
+## The 3.0 beta package (Windows)
+
+`python tools/build_v3.py --setup` builds, from the source tree:
+
+| Output | What |
+|---|---|
+| `dist/EqUpdater3/EqUpdater3.exe` (+ `_internal`) | the folder build, about 111 MB on disk (PySide6/Qt is 76 MB of it) |
+| `dist/EqUpdater3-v<version>-Windows-Installer.exe` | the one-file beta installer, about 60 MB |
+
+* It is a **separate product beside 2.x**: installs to `%LOCALAPPDATA%\Programs\EqUpdater3`, runs `EqUpdater3.exe`, adds its own Start-menu entry "EqUpdater 3 Beta" and offers a desktop one. **No 2.x shortcut, folder or setting is moved or written** (a test checks a 2.x `.lnk` is untouched).
+* **Refuses while EqUpdater 2 is running** (or the beta is), says why, changes nothing.
+* **Staged**: the new build is copied beside the old, which moves aside only once the copy is complete and comes back if the swap fails. A run that stopped half way is finished by the next. Entries in the package that would leave the folder are refused.
+* After installing it opens every page once, headless, so Qt compiles the interface's QML up front: the player's first launch is about a second quicker (2.0 s cold, 1.0 s warm to the first frame here).
+* What is left out of the package: Tk and Pillow (3.0 does not use them), every Qt area the interface never imports (multimedia, web, 3D, charts, other QML styles, translations, the software OpenGL fallback), 102 MB in all. `tests/test_v3_installer.py` fails if the QML or the Python ever imports something that was left out. Skins that animate with a **video** file would need QtMultimedia added back; no official skin does.
+* **Self-test**: `EqUpdater3.exe --self-test=<file> [--gui]` checks the package carries its skins, fonts, QML, icon and TLS bundle; with `--gui` it loads the real interface offscreen, opens every page and overlay in every skin and fails on any QML error. `build_v3.py` runs it on every build.
+* Data stays in `%LOCALAPPDATA%\EqUpdater` (2.x's `config.json`, read; 3.0's own `v3/`).
+* Not signed: Windows SmartScreen and some antivirus programs distrust new unsigned programs, as with 2.x.
+
 ## Not built yet
 
-* Windows installer and AppImage for the 3.0 beta, and precompiled QML (qmlcachegen) in the package.
-* Detecting 2.x's installer shortcuts and offering to keep or retire them.
+* Linux AppImage for 3.0 (`tools/build_v3.py` builds the folder on Linux, but the AppImage wrapper and a Linux test run are still to do).
+* Detecting 2.x's installer shortcuts and offering to keep or retire them (the beta never changes them).
+* Precompiled QML inside the package (Qt's `qmlcachegen` is for resource-based builds; the install-time warm-up gets most of the benefit).
