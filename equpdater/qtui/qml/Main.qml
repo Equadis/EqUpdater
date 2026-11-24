@@ -96,8 +96,10 @@ Window {
                 anchors.fill: parent
                 active: app.visited.indexOf(modelData.id) >= 0
                 visible: app.tab === modelData.id
-                source: modelData.id === "news" ? "pages/NewsPage.qml" : "pages/PlaceholderPage.qml"
-                onLoaded: if (modelData.id !== "news") item.pageName = app.t(modelData.label)
+                source: modelData.id === "news" ? "pages/NewsPage.qml"
+                      : modelData.id === "tweaks" ? "pages/TweaksPage.qml"
+                      : "pages/PlaceholderPage.qml"
+                onLoaded: if (item.pageName !== undefined) item.pageName = app.t(modelData.label)
             }
         }
     }

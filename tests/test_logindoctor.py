@@ -524,8 +524,9 @@ class TestWriteConfigWtf(unittest.TestCase):
         for windows in (False, True):
             with self.subTest(windows=windows), \
                     mock.patch.object(app.platforms, "WINDOWS", windows), \
-                    mock.patch.object(app, "_query_display_info",
-                                      side_effect=AttributeError("windll")):
+                    mock.patch.dict(app._get_display_info_safe.__globals__,
+                                    {"_query_display_info": mock.Mock(
+                                        side_effect=AttributeError("windll"))}):
                 tmp = tempfile.mkdtemp(prefix="equ-cfgwtf-")
                 self.addCleanup(shutil.rmtree, tmp, True)
                 app.write_config_wtf(tmp, dict(app.TWEAKS_DEFAULTS))

@@ -16,8 +16,6 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-from .. import platforms
-
 
 @dataclass
 class LaunchResult:
@@ -29,18 +27,29 @@ class LaunchResult:
 class LaunchService:
     def __init__(self, settings, spawn=None, prelaunch=()):
         self.settings = settings
-        self._spawn = spawn or platforms.spawn_detached
+        self._spawn_fn = spawn
         self.prelaunch = list(prelaunch)       # callables(client_dir, exe) -> None
+
+    @property
+    def _spawn(self):
+        from .. import platforms
+        return self._spawn_fn or platforms.spawn_detached
+
+    @_spawn.setter
+    def _spawn(self, fn):
+        self._spawn_fn = fn
 
     # -- state ----------------------------------------------------------
     def game_dir(self) -> str:
         return (self.settings.get("game_dir") or "").strip()
 
     def options(self) -> list:
+        from .. import platforms
         d = self.game_dir()
         return platforms.launch_options(d) if d and os.path.isdir(d) else []
 
     def target(self, options=None) -> str | None:
+        from .. import platforms
         opts = self.options() if options is None else options
         return platforms.resolve_launch_target(opts, self.settings.get("launch_default"))
 
@@ -58,6 +67,7 @@ class LaunchService:
 
     # -- launching ------------------------------------------------------
     def launch(self) -> LaunchResult:
+        from .. import platforms
         client = self.game_dir()
         label = self.target()
         if not label:

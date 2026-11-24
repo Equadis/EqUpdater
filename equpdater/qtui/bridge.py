@@ -29,6 +29,7 @@ from ..core import skin as core_skin
 from ..core.launch import LaunchService
 from ..core.news_service import NewsService, safe_url, SECTIONS
 from ..core.tasks import TaskManager
+from ..core.tweaks_service import TweaksService
 from ..i18n import tr
 
 APP_VERSION_V3 = "3.0.0-dev"
@@ -269,6 +270,110 @@ class LaunchBridge(QObject):
             self.app.setStatus(tr(res.message) if not res.ok else res.message,
                                not res.ok)
         self.tasks.submit("launch:start", self.service.launch, on_done=done)
+
+
+# ── tweaks ───────────────────────────────────────────────────────────────────
+
+_TW_ROLES = ["id", "label", "kind", "tip", "value", "min", "max", "step",
+             "default", "changed", "choices"]
+
+
+class TweaksModel(QAbstractListModel):
+    def __init__(self, service: TweaksService):
+        super().__init__()
+        self.service, self._rows = service, service.rows()
+
+    def roleNames(self):
+        return {Qt.ItemDataRole.UserRole + 1 + i: QByteArray(n.encode())
+                for i, n in enumerate(_TW_ROLES)}
+
+    def rowCount(self, parent=QModelIndex()):
+        return 0 if parent.isValid() else len(self._rows)
+
+    def data(self, index, role):
+        if not index.isValid():
+            return None
+        return self._rows[index.row()].get(_TW_ROLES[role - Qt.ItemDataRole.UserRole - 1])
+
+    def reload(self):
+        new = self.service.rows()
+        if [r["id"] for r in new] != [r["id"] for r in self._rows]:
+            self.beginResetModel()
+            self._rows = new
+            self.endResetModel()
+            return
+        for i, (old, cur) in enumerate(zip(self._rows, new)):
+            if old != cur:
+                self._rows[i] = cur
+                ix = self.index(i)
+                self.dataChanged.emit(ix, ix)
+
+
+class TweaksBridge(QObject):
+    changed = Signal()
+
+    def __init__(self, service: TweaksService, app_bridge):
+        super().__init__()
+        self.service, self.app = service, app_bridge
+        self.lm = TweaksModel(service)
+        self._opened = False
+
+    @Property(QObject, constant=True)
+    def model(self):
+        return self.lm
+
+    @Property(bool, notify=changed)
+    def dirty(self):
+        return self.service.dirty()
+
+    @Property(bool, notify=changed)
+    def busy(self):
+        return self.service.busy
+
+    @Property(bool, notify=changed)
+    def hasGame(self):
+        return self.service.has_game()
+
+    @Property(str, notify=changed)
+    def message(self):
+        return tr(self.service.message) if self.service.message else ""
+
+    @Property(bool, notify=changed)
+    def messageIsError(self):
+        return self.service.message_error
+
+    @Property(int, notify=changed)
+    def fovHint(self):
+        return self.service.fov_hint()
+
+    def _sync(self):
+        self.lm.reload()
+        self.changed.emit()
+
+    @Slot()
+    def open(self):
+        """First visit: read stored values on a worker."""
+        if not self._opened:
+            self._opened = True
+            self.service.refresh(self._sync)
+
+    @Slot(str, "QVariant", result="QVariant")
+    def setValue(self, tid, raw):
+        v = self.service.set_value(tid, raw)
+        self._sync()
+        return v
+
+    @Slot()
+    def apply(self):
+        if self.service.apply(self._sync):
+            self.app.setStatus(tr("Applying tweaks…"), False)
+            self._sync()
+
+    @Slot()
+    def resetToDefaults(self):
+        if self.service.reset(self._sync):
+            self.app.setStatus(tr("Applying tweaks…"), False)
+            self._sync()
 
 
 # ── skins ────────────────────────────────────────────────────────────────────

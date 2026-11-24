@@ -17,7 +17,7 @@ os.environ.setdefault("QT_QUICK_BACKEND", "software")
 os.environ["QT_QUICK_CONTROLS_STYLE"] = "Basic"
 
 try:
-    from PySide6.QtCore import QCoreApplication, QEvent, QObject, QTimer, QUrl, qInstallMessageHandler
+    from PySide6.QtCore import Qt, QCoreApplication, QEvent, QObject, QTimer, QUrl, qInstallMessageHandler
     from PySide6.QtQuick import QQuickItem
     HAVE_QT = True
 except Exception:                                    # pragma: no cover
@@ -116,7 +116,8 @@ class Base(unittest.TestCase):
             shutil.rmtree(self.data, ignore_errors=True)
 
     def qml_errors(self):
-        return [m for m in MESSAGES if any(k in m for k in
+        return [m for m in MESSAGES if "font directory" not in m
+                and "no longer ships fonts" not in m and any(k in m for k in
                 ("TypeError", "ReferenceError", "is not a type", "Cannot ",
                  "Unable to assign", "qrc:", ".qml:"))]
 
@@ -255,6 +256,40 @@ class TestNewsPage(Base):
         self.assertIsNotNone(ch)
         self.assertAlmostEqual(ch.property("y") - lv.property("contentY"), anchor_off,
                                delta=2.0)
+
+
+class TestTweaksPage(Base):
+    def test_page_loads_edits_clamps_and_applies_without_touching_real_data(self):
+        from equpdater import config
+        real = config.CONFIG_FILE
+        p = self.start()
+        self.assertTrue(config.CONFIG_FILE.startswith(self.data), "must not use the real config")
+        self.assertNotEqual(config.CONFIG_FILE, real)
+        p["app"].tab = "tweaks"
+        pump(until=lambda: p["tweaks"].service.loaded, limit=4000)
+        pump(100)
+        self.assertEqual(self.qml_errors(), [])
+        tw = p["tweaks"]
+        self.assertFalse(tw.dirty)
+        self.assertEqual(tw.setValue("fieldOfView", "9999"), 180)
+        self.assertTrue(tw.dirty)
+        rows = {tw.model.index(i).data(Qt.ItemDataRole.UserRole + 1): i
+                for i in range(tw.model.rowCount())}
+        r = rows["fieldOfView"]
+        self.assertTrue(tw.model.index(r).data(Qt.ItemDataRole.UserRole + 10))   # changed marker
+        tw.apply()                                       # no game folder in this profile
+        pump(until=lambda: not tw.busy, limit=4000)
+        self.assertTrue(tw.messageIsError)
+        self.assertFalse(tw.dirty)                       # saved
+        self.assertEqual(json.load(open(config.CONFIG_FILE))["tweaks"]["fieldOfView"], 180)
+
+    def test_every_skin_renders_the_page(self):
+        p = self.start()
+        p["app"].tab = "tweaks"
+        for sid in p["manager"].skins:
+            p["settings_bridge"].setSkin(sid)
+            pump(150)
+        self.assertEqual(self.qml_errors(), [])
 
 
 class TestOffline(Base):

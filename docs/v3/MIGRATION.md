@@ -1,6 +1,6 @@
 # Migration: 2.x → 3.0 (strategy and what is built)
 
-**Rule: 3.0 never writes 2.x's files, and 2.x keeps working beside it.** Migration is copy-forward.
+**Rule: 3.0's own data (settings, cache, skins) lives in `v3/` and 2.x's `config.json` is only *read* for it.** The *backend* modules lifted from 2.x (tweaks now; mods, addons, MPQ next) keep reading and writing their existing records in `config.json` through the same locked, atomic `config.update_config`, so 2.x and 3.0 stay consistent while both exist. Tests and benchmarks redirect that file (`EQU3_DATA_DIR`).
 
 | 2.x data (`<app data>/EqUpdater/`) | 3.0 | Status |
 |---|---|---|

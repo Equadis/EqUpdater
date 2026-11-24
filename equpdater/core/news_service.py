@@ -30,8 +30,11 @@ import time
 from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
-from .. import branding, news
 from ..i18n import N_, tr
+
+# Forum ids (news.ANNOUNCEMENTS_FORUM_ID / CHANGELOG_FORUM_ID, asserted equal in
+# tests): literals here so importing this module does not import urllib.
+ANNOUNCEMENTS_FORUM, CHANGELOG_FORUM = 2, 4
 
 #: A News post this recent is NEW! whenever the launcher was last opened.
 NEWS_NEW_DAYS = 3
@@ -111,22 +114,37 @@ class Fetcher:
 
     def __init__(self, opener=None, user_agent: str | None = None,
                  timeout: int = 8):
-        from .net import secure_urlopen
-        self._opener = opener or (lambda req, timeout: secure_urlopen(
-            req, timeout=timeout, allowed_hosts={"octowow.st"}))
-        self._ua = user_agent or branding.user_agent()
+        self._custom_opener = opener
+        self._ua = user_agent
         self._timeout = timeout
         self.requests = 0
 
+    # urllib, the forum parser and the TLS context are imported on the first
+    # request (a worker thread), not at start-up.
+    def _opener(self, req, timeout):
+        if self._custom_opener is not None:
+            return self._custom_opener(req, timeout)
+        from .net import secure_urlopen
+        return secure_urlopen(req, timeout=timeout, allowed_hosts={"octowow.st"})
+
+    @property
+    def _agent(self):
+        if self._ua is None:
+            from .. import branding
+            self._ua = branding.user_agent()
+        return self._ua
+
     def listing(self, forum_id: int, start: int = 0):
         self.requests += 1
+        from .. import news
         rows, nxt = news.fetch_forum_page(forum_id, start, opener=self._opener,
-                                          user_agent=self._ua,
+                                          user_agent=self._agent,
                                           timeout=self._timeout)
         return [dict(r.to_item(), kind=r.kind) for r in rows], nxt
 
     def first_post(self, entry: dict):
         self.requests += 1
+        from .. import news
         try:
             created = datetime.fromisoformat(entry["date"]) if entry.get("date") \
                 else None
@@ -136,21 +154,22 @@ class Fetcher:
                             entry.get("author"), created, entry.get("url", ""),
                             entry.get("kind", "normal"))
         post = news.fetch_first_post(row, opener=self._opener,
-                                     user_agent=self._ua, timeout=self._timeout)
+                                     user_agent=self._agent, timeout=self._timeout)
         return {"body": post.content, "links": [list(l) for l in post.links],
                 "author": post.author, "date": post.created_at}
 
     def feed(self):
         self.requests += 1
-        return news.fetch_news_feed(opener=self._opener, user_agent=self._ua,
+        from .. import news
+        return news.fetch_news_feed(opener=self._opener, user_agent=self._agent,
                                     timeout=self._timeout)
 
 
 SECTIONS = {
-    "announcements": {"forum": news.ANNOUNCEMENTS_FORUM_ID, "page": 10,
+    "announcements": {"forum": ANNOUNCEMENTS_FORUM, "page": 10,
                       "title": N_("Announcements"), "prefetch": 1,
                       "fallback_feed": True},
-    "changelog":     {"forum": news.CHANGELOG_FORUM_ID, "page": 8,
+    "changelog":     {"forum": CHANGELOG_FORUM, "page": 8,
                       "title": N_("Changelog"), "prefetch": 8,
                       "fallback_feed": False},
 }

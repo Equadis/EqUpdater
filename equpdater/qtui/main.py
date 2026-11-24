@@ -35,6 +35,7 @@ from ..core import settings as core_settings                 # noqa: E402
 from ..core.launch import LaunchService                      # noqa: E402
 from ..core.news_service import Fetcher                      # noqa: E402
 from ..core.tasks import TaskManager                         # noqa: E402
+from ..core.tweaks_service import TweaksService              # noqa: E402
 from . import bridge                                         # noqa: E402
 
 QML_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "qml")
@@ -54,6 +55,11 @@ def build(argv=None):
     beyond what the QML itself declares."""
     marks = {"process_to_main_ms": round((time.perf_counter() - _T0) * 1000)}
     data = os.environ.get("EQU3_DATA_DIR")
+    if data:
+        # a test/bench data dir also gets its own copy of the shared 2.x config
+        # file that the backend modules read and write (tweaks, mods, addons)
+        from .. import config as _legacy_config
+        _legacy_config.CONFIG_FILE = os.path.join(data, "config.json")
     settings = core_settings.open_settings(data)
     if os.environ.get("EQU3_SKIN"):
         settings.data["skin"] = os.environ["EQU3_SKIN"]
@@ -91,6 +97,7 @@ def build(argv=None):
         fetcher = Fetcher()
     news_bridge = bridge.NewsBridge(news_cache, tasks, fetcher, settings)
 
+    tweaks_bridge = bridge.TweaksBridge(TweaksService(settings, tasks), app_bridge)
     launch_service = LaunchService(settings)
     launch_bridge = bridge.LaunchBridge(launch_service, tasks, app_bridge)
 
@@ -105,11 +112,11 @@ def build(argv=None):
     ctx = engine.rootContext()
     for name, obj in (("app", app_bridge), ("skin", skin_bridge),
                       ("settings", settings_bridge), ("news", news_bridge),
-                      ("launch", launch_bridge)):
+                      ("tweaks", tweaks_bridge), ("launch", launch_bridge)):
         ctx.setContextProperty(name, obj)
     marks["objects_ready_ms"] = round((time.perf_counter() - _T0) * 1000)
 
-    parts = dict(settings=settings, tasks=tasks, news=news_bridge,
+    parts = dict(tweaks=tweaks_bridge, settings=settings, tasks=tasks, news=news_bridge,
                  launch=launch_bridge, app=app_bridge, skin=skin_bridge,
                  settings_bridge=settings_bridge, marks=marks, fetcher=fetcher,
                  dispatcher=dispatcher, manager=manager, cache=news_cache)

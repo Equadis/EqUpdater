@@ -12,3 +12,4 @@ SkinProgressBar 1.0 SkinProgressBar.qml
 SkinMenu 1.0 SkinMenu.qml
 Background 1.0 Background.qml
 VideoLayer 1.0 VideoLayer.qml
+SkinNumberField 1.0 SkinNumberField.qml

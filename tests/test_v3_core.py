@@ -297,6 +297,133 @@ class TestNews(unittest.TestCase):
         self.assertFalse(is_new("garbage", None, now))
 
 
+class TestTweaksService(unittest.TestCase):
+    def setUp(self):
+        from equpdater.core.tweaks_service import TweaksService
+        self.d = tempfile.mkdtemp()
+        self.calls, self.stored = [], {}
+        self.pump = Pump()
+        self.tasks = TaskManager(2, self.pump)
+        self.settings = {"game_dir": self.d}
+
+        class S(dict):
+            pass
+        s = S(self.settings)
+        s.get = lambda k, d=None: self.settings.get(k, d)
+        from equpdater.core import tweaks as T
+        self.T = T
+        self.svc = TweaksService(
+            s, self.tasks, load=lambda: dict(T.TWEAKS_DEFAULTS),
+            save=lambda v: self.stored.update(v) or self.calls.append("save"),
+            patch=lambda d, v: self.calls.append("patch"),
+            wtf=lambda d, v: self.calls.append("wtf"))
+        self.svc.refresh()
+        self.pump.drain(self.tasks)
+
+    def test_values_are_clamped_and_typed(self):
+        self.assertEqual(self.svc.set_value("nameplateRange", "9999"), 41)
+        self.assertEqual(self.svc.set_value("fieldOfView", "-5"), 90)
+        self.assertEqual(self.svc.set_value("farClip", "abc"), self.T.TWEAKS_DEFAULTS["farClip"])
+        self.assertEqual(self.svc.set_value("locale", "xx"), self.T.DEFAULT_LOCALE)
+        self.assertIs(self.svc.set_value("alwaysAutoLoot", 0), False)
+        self.assertIsNone(self.svc.set_value("nonsense", 1))
+        self.assertTrue(self.svc.dirty())
+
+    def test_apply_saves_then_patches_then_writes_config(self):
+        open(os.path.join(self.d, "WoW.exe"), "wb").write(b"MZ")
+        self.svc.set_value("soundChannels", 32)
+        self.svc.apply()
+        self.pump.drain(self.tasks)
+        self.assertEqual(self.calls, ["save", "patch", "wtf"])
+        self.assertEqual(self.stored["soundChannels"], 32)
+        self.assertFalse(self.svc.dirty())
+        self.assertFalse(self.svc.message_error)
+
+    def test_without_the_game_it_saves_and_says_so(self):
+        self.svc.set_value("soundChannels", 20)
+        self.svc.apply()
+        self.pump.drain(self.tasks)
+        self.assertEqual(self.calls, ["save"])
+        self.assertTrue(self.svc.message_error)
+
+    def test_a_failed_patch_reports_and_unblocks(self):
+        from equpdater.core.tweaks_service import TweaksService
+        open(os.path.join(self.d, "WoW.exe"), "wb").write(b"MZ")
+
+        def boom(d, v):
+            raise RuntimeError("Close World of Warcraft")
+        svc = TweaksService(type("S", (), {"get": lambda s, k, d=None: self.d if k == "game_dir" else d})(),
+                            self.tasks, load=lambda: dict(self.T.TWEAKS_DEFAULTS),
+                            save=lambda v: None, patch=boom, wtf=lambda d, v: None)
+        svc.apply()
+        self.pump.drain(self.tasks)
+        self.assertIn("Close World of Warcraft", svc.message)
+        self.assertFalse(svc.busy)
+
+    def test_reset_restores_defaults_and_applies(self):
+        open(os.path.join(self.d, "WoW.exe"), "wb").write(b"MZ")
+        self.svc.set_value("farClip", 5000)
+        self.svc.reset()
+        self.pump.drain(self.tasks)
+        self.assertEqual(self.svc.values, self.T.TWEAKS_DEFAULTS)
+        self.assertEqual(self.calls, ["save", "patch", "wtf"])
+
+    def test_one_apply_at_a_time(self):
+        gate = threading.Event()
+        self.svc._save = lambda v: gate.wait(2)
+        self.assertTrue(self.svc.apply())
+        self.assertFalse(self.svc.apply())
+        gate.set()
+        self.pump.drain(self.tasks)
+
+
+class TestPatchExeSafety(unittest.TestCase):
+    """The 0-byte WoW.exe found on a dev machine: a bad cached base must never
+    be written over the game."""
+
+    def setUp(self):
+        from unittest import mock
+        self.d = tempfile.mkdtemp()
+        self.exe = os.path.join(self.d, "WoW.exe")
+        with open(self.exe, "wb") as f:
+            f.write(b"MZ" + b"x" * 2_000_000)
+        from equpdater.core import tweaks
+        self.t = tweaks
+        p = mock.patch.object(tweaks, "client_exe_locked", lambda d: False)
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_an_empty_or_tiny_base_is_refused_and_the_game_is_untouched(self):
+        from unittest import mock
+        before = open(self.exe, "rb").read()
+        for bad in (b"", b"MZ" + b"y" * 1000, b"NOTEXE" * 400_000):
+            with mock.patch.object(self.t, "read_pristine_wow", lambda d, b=bad: b):
+                with self.assertRaises(RuntimeError) as cm:
+                    self.t.patch_exe(self.d, {}, lambda *a, **k: None)
+                self.assertIn("left as it is", str(cm.exception))
+            self.assertEqual(open(self.exe, "rb").read(), before)
+        self.assertEqual(os.listdir(self.d), ["WoW.exe"])      # no temp file left
+
+    def test_a_failure_while_building_leaves_the_game_and_no_temp_file(self):
+        from unittest import mock
+        before = open(self.exe, "rb").read()
+        with mock.patch.object(self.t, "read_pristine_wow",
+                               lambda d: b"MZ" + b"z" * 2_000_000),                 mock.patch.object(self.t, "build_tweaks",
+                                  lambda buf, tw=None: 1 / 0):
+            with self.assertRaises(ZeroDivisionError):
+                self.t.patch_exe(self.d, {}, lambda *a, **k: None)
+        self.assertEqual(open(self.exe, "rb").read(), before)
+        self.assertEqual(os.listdir(self.d), ["WoW.exe"])
+
+
+class TestForumIds(unittest.TestCase):
+    def test_literals_match_the_parser_module(self):
+        from equpdater import news
+        from equpdater.core import news_service as ns
+        self.assertEqual((ns.ANNOUNCEMENTS_FORUM, ns.CHANGELOG_FORUM),
+                         (news.ANNOUNCEMENTS_FORUM_ID, news.CHANGELOG_FORUM_ID))
+
+
 class TestBodyHtml(unittest.TestCase):
     def test_escapes_and_drops_unsafe_links(self):
         out = body_to_html("a <b> &\nhere", [[0, 1, "javascript:alert(1)"],

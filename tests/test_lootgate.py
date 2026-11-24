@@ -170,6 +170,9 @@ class TestCheckboxAndLaunch(unittest.TestCase):
         self.cfg = {"out_dir": self.dir}
         patchers = [
             mock.patch.object(app, "load_config", lambda *a, **k: self.cfg),
+            # load_tweaks_config moved to core/tweaks.py: patch what it reads
+            mock.patch.dict(app.load_tweaks_config.__globals__,
+                            {"load_config": lambda *a, **k: self.cfg}),
             mock.patch.object(app, "client_exe_locked", lambda d: False),
             mock.patch.object(app, "writable_addons_path",
                               lambda d: os.path.join(d, "Interface", "AddOns")),

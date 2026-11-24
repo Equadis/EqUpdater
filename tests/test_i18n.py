@@ -25,10 +25,12 @@ PLACEHOLDER = re.compile(r"\{(\w*)\}")
 def messages() -> set:
     """Every literal passed to tr() or N_() anywhere in the package."""
     found = set()
-    for name in os.listdir(PACKAGE):
-        if not name.endswith(".py"):
-            continue
-        with open(os.path.join(PACKAGE, name), encoding="utf-8") as f:
+    paths = []
+    for base, dirs, files in os.walk(PACKAGE):
+        dirs[:] = [d for d in dirs if d not in ("locales", "__pycache__", "qml")]
+        paths += [os.path.join(base, n) for n in files if n.endswith(".py")]
+    for path in paths:
+        with open(path, encoding="utf-8") as f:
             tree = ast.parse(f.read())
         for node in ast.walk(tree):
             if (isinstance(node, ast.Call)
