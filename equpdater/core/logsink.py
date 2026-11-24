@@ -6,8 +6,14 @@ or raises. Thread-safe (``list.append`` and the callable's own rules)."""
 
 from __future__ import annotations
 
+import collections
+import time
+
 _sink = None
 _buffer: list = []
+#: The session log: the last lines, always, whoever the sink is. The Settings
+#: page shows it (2.x's "Show Session Log").
+recent = collections.deque(maxlen=2000)
 
 
 def set_sink(fn) -> None:
@@ -20,6 +26,7 @@ def set_sink(fn) -> None:
 
 
 def log(msg: str, tag: str = "") -> None:
+    recent.append((time.strftime("%H:%M:%S"), msg, tag))
     if _sink is None:
         _buffer.append((msg, tag))
         del _buffer[:-500]

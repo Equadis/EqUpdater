@@ -20,8 +20,10 @@ except through ``after``.
 
 from __future__ import annotations
 
+import os
 import threading
 
+from .. import config as _config
 from ..config import load_config
 from .addons_ops import AddonsOps
 from .logsink import log
@@ -30,6 +32,10 @@ from .mods_rows import ModsRows
 from .mpq_ops import MPQ_PATCHES
 from .mpq_page_ops import MpqPageOps
 from .settings_ops import SettingsOps
+
+
+def CONFIG_FILE_PATH():
+    return _config.CONFIG_FILE
 
 
 class Var:
@@ -102,6 +108,7 @@ class OpsHost(SettingsOps, MpqPageOps, ModsRows, AddonsOps, ModsOps):
         self._mpq_available_rows: list = list(MPQ_PATCHES)
         self._mpq_updates_count = 0
         self._running = False
+        self._first_run = not os.path.exists(CONFIG_FILE_PATH())
         self._client_ready = False
         self._btn_mode = "play"
         self._status_var = Var("", lambda v: self.events("status", text=v))
@@ -165,6 +172,21 @@ class OpsHost(SettingsOps, MpqPageOps, ModsRows, AddonsOps, ModsOps):
         if self._update_all_chain:
             self.after(0, self._chain_addon_update_all)
         self._refresh_ready_state()
+
+    def _set_pending_reconcile(self, mode):
+        """2.x's pending client reconcile belongs to the base-client sync,
+        which 3.0 does not have; nothing to schedule."""
+
+    def _apply_tweaks_worker(self, client_dir: str, tweaks: dict):
+        """Patch WoW.exe and Config.wtf with ``tweaks`` (what the 1.3
+        migration needs); logs instead of raising, like the Tk original."""
+        from . import tweaks as T
+        try:
+            T.patch_exe(client_dir, tweaks, lambda m, tag="": self._log_line(m, tag))
+            T.update_config_wtf(client_dir, tweaks)
+            self._log_line("Tweaks applied.", "ok")
+        except Exception as exc:
+            self._log_line(f"Tweak patch failed: {exc}", "err")
 
     def _refresh_nav_badges(self):
         self.events("nav_badges")

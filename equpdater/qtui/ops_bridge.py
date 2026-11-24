@@ -13,6 +13,7 @@ from PySide6.QtCore import (QEventLoop, QObject, QTimer, Property, Signal, Slot)
 from ..core.addons_service import AddonsService
 from ..core.mods_service import ModsService
 from ..core.mpq_service import MpqService
+from ..core.settings_service import GeneralService
 from ..core.ops_host import OpsHost
 from ..i18n import tr
 from .models import KeyedListModel
@@ -381,6 +382,76 @@ class MpqBridge(QObject):
     @Slot(str)
     def openUrl(self, url):
         self.app.openUrl(url)
+
+
+class GeneralBridge(QObject):
+    """Settings page: game folder, launch/auto-install toggles, font, language,
+    session log. Skin and animation options stay on ``settings``."""
+    changed = Signal()
+    logChanged = Signal()
+
+    def __init__(self, service: GeneralService, app_bridge, skin_bridge):
+        super().__init__()
+        self.service, self.app, self.skin = service, app_bridge, skin_bridge
+
+    def _toggle(name, sig=changed):
+        def getter(self):
+            return self.service.get(name)
+
+        def setter(self, v):
+            self.service.set(name, v)
+            self.changed.emit()
+        return Property(bool, getter, setter, notify=sig)
+
+    clearWdb = _toggle("clearWdb")
+    closeOnLaunch = _toggle("closeOnLaunch")
+    autoMods = _toggle("autoMods")
+    autoAddons = _toggle("autoAddons")
+    del _toggle
+
+    @Property(str, notify=changed)
+    def gameDir(self):
+        return self.service.game_dir()
+
+    @Property(str, notify=changed)
+    def language(self):
+        return self.service.language_label()
+
+    @Property(str, notify=changed)
+    def fontOverride(self):
+        return self.service.font_override()
+
+    @Property("QVariantList", constant=True)
+    def fontChoices(self):
+        return self.service.font_choices()
+
+    @Property(str, notify=logChanged)
+    def sessionLog(self):
+        return self.service.session_log()
+
+    @Slot(str)
+    def setFontOverride(self, choice):
+        self.service.set_font_override(choice)
+        self.skin.refresh()
+        self.changed.emit()
+
+    @Slot(str, result=str)
+    def changeGameDir(self, path):
+        err = self.service.change_game_dir(path)
+        self.changed.emit()
+        return err
+
+    @Slot()
+    def openGameDir(self):
+        self.service.open_game_dir()
+
+    @Slot()
+    def refreshLog(self):
+        self.logChanged.emit()
+
+    @Slot()
+    def closed(self):
+        self.service.close()
 
 
 def make_host(settings, dialogs_bridge: DialogBridge, app_bridge, dispatcher):

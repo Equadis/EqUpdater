@@ -317,6 +317,7 @@ class TweaksBridge(QObject):
         self.service, self.app = service, app_bridge
         self.lm = TweaksModel(service)
         self._opened = False
+        self.on_applied = lambda: None      # e.g. offer the language restart
 
     @Property(QObject, constant=True)
     def model(self):
@@ -350,6 +351,13 @@ class TweaksBridge(QObject):
         self.lm.reload()
         self.changed.emit()
 
+    def _applied(self):
+        """An Apply/Reset finished: show it, and only now - with WoW.exe
+        written - offer the restart a new Language needs."""
+        self._sync()
+        if not self.service.busy:
+            self.on_applied()
+
     @Slot()
     def open(self):
         """First visit: read stored values on a worker."""
@@ -365,13 +373,13 @@ class TweaksBridge(QObject):
 
     @Slot()
     def apply(self):
-        if self.service.apply(self._sync):
+        if self.service.apply(self._applied):
             self.app.setStatus(tr("Applying tweaks…"), False)
             self._sync()
 
     @Slot()
     def resetToDefaults(self):
-        if self.service.reset(self._sync):
+        if self.service.reset(self._applied):
             self.app.setStatus(tr("Applying tweaks…"), False)
             self._sync()
 
@@ -387,9 +395,12 @@ class SkinBridge(QObject):
         self._fonts = set()
         self._register_fonts()
 
+    font_override = staticmethod(lambda: "")     # replaced by main (settings-backed)
+
     @Property("QVariantMap", notify=themeChanged)
     def theme(self):
-        return self.manager.current.theme
+        from ..core.settings_service import apply_font_override
+        return apply_font_override(self.manager.current.theme, self.font_override())
 
     @Property(str, notify=themeChanged)
     def id(self):

@@ -19,6 +19,7 @@ DEFAULTS = {
     "pause_when_unfocused": False,
     "game_dir": "",
     "launch_default": None,
+    "font_override": "",           # "", "arial", "friz", "opendyslexic"
     "game_launcher": None,           # Linux launch command / env, as in 2.x
     "news_seen": {},
     "imported_from_2x": False,
@@ -34,9 +35,31 @@ def skins_dir() -> str:
     return os.path.join(data_dir(), "skins")
 
 
+class SettingsStore(_store.JsonStore):
+    """``game_dir`` is a *shared* record: every lifted backend function reads
+    ``out_dir`` from the 2.x config, so that is where the game folder lives.
+    ``settings.json`` keeps a copy only as the fallback for a profile that
+    has no config yet. Reading and writing ``game_dir`` here goes to the
+    shared record, so 2.x and 3.0 can never disagree about it."""
+
+    def get(self, key, default=None):
+        if key == "game_dir":
+            from .. import config as _cfg
+            out = _cfg.load_config().get("out_dir")
+            if out:
+                return os.path.normpath(out)
+        return super().get(key, default)
+
+    def set(self, key, value):
+        if key == "game_dir" and value:
+            from .. import config as _cfg
+            _cfg.update_config(lambda c: c.__setitem__("out_dir", value))
+        super().set(key, value)
+
+
 def open_settings(directory: str | None = None, legacy: dict | None = None):
     d = directory or data_dir()
-    s = _store.JsonStore(os.path.join(d, "settings.json"), DEFAULTS, schema=1)
+    s = SettingsStore(os.path.join(d, "settings.json"), DEFAULTS, schema=1)
     if not s.get("imported_from_2x"):
         if legacy is None:
             try:
@@ -50,10 +73,16 @@ def open_settings(directory: str | None = None, legacy: dict | None = None):
 
 def import_legacy(s, legacy: dict) -> None:
     """Copy forward what 3.0 shares with 2.x. Never writes to 2.x's file."""
+    # (the base class: importing must not write the shared 2.x config back)
     if legacy.get("out_dir"):
-        s.set("game_dir", os.path.normpath(legacy["out_dir"]))
+        _store.JsonStore.set(s, "game_dir", os.path.normpath(legacy["out_dir"]))
     else:
-        s.set("game_dir", os.path.join(os.path.expanduser("~"), "Games", "OctoWoW"))
+        _store.JsonStore.set(s, "game_dir",
+                             os.path.join(os.path.expanduser("~"), "Games", "OctoWoW"))
+    acc = (legacy.get("accessibility") or {})
+    choice = acc.get("font_choice") or ("opendyslexic" if acc.get("dyslexic_font") else "")
+    if choice in ("friz", "opendyslexic"):           # 2.x's "arial" was its default
+        s.set("font_override", choice)
     if legacy.get("launch_default"):
         s.set("launch_default", legacy["launch_default"])
     if "animated_background" in legacy:

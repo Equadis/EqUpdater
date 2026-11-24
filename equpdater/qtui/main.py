@@ -41,6 +41,8 @@ from . import bridge, ops_bridge                             # noqa: E402
 from ..core.mods_service import ModsService                  # noqa: E402
 from ..core.addons_service import AddonsService              # noqa: E402
 from ..core.mpq_service import MpqService                    # noqa: E402
+from ..core.settings_service import GeneralService          # noqa: E402
+from .. import i18n                                          # noqa: E402
 
 QML_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "qml")
 
@@ -52,6 +54,18 @@ class OfflineFetcher:
         raise OSError("offline")
 
     first_post = feed = lambda self, *a, **k: (_ for _ in ()).throw(OSError("offline"))
+
+
+def _register_bundled_fonts():
+    """Friz Quadrata and OpenDyslexic ship in fonts/ (see fonts/README.txt)."""
+    from PySide6.QtGui import QFontDatabase
+    d = os.path.join(branding.app_dir(), "fonts")
+    try:
+        for n in os.listdir(d):
+            if n.lower().endswith((".ttf", ".otf")):
+                QFontDatabase.addApplicationFont(os.path.join(d, n))
+    except OSError:
+        pass
 
 
 def build(argv=None):
@@ -80,7 +94,16 @@ def build(argv=None):
     manager = bridge.SkinManager(os.path.join(branding.app_dir(), "skins"),
                                  core_settings.skins_dir() if not data
                                  else os.path.join(data, "skins"), settings)
+    # EqUpdater's own text follows the saved Language tweak (set once, before
+    # anything is drawn, as in 2.x); a change shows after a restart.
+    try:
+        from ..config import load_config as _lc
+        i18n.set_language((_lc().get("tweaks") or {}).get("locale", "enUS"))
+    except Exception:
+        pass
+    _register_bundled_fonts()
     skin_bridge = bridge.SkinBridge(manager)
+    skin_bridge.font_override = lambda: settings.get("font_override") or ""
     app_bridge = bridge.AppBridge(settings)
     settings_bridge = bridge.SettingsBridge(settings, manager, skin_bridge,
                                             app_bridge)
@@ -127,6 +150,14 @@ def build(argv=None):
         elif name == "mpq_badge":
             app_bridge.setMpqUpdates(kw["count"])
             mpq_bridge.badgeChanged.emit()
+        elif name == "restart":
+            restart_app()
+        elif name in ("nav_badges", "game_dir_changed"):
+            mods_service.rebuild()
+            addons_service.rebuild()
+            mpq_service.rebuild()
+            if name == "game_dir_changed":
+                launch_bridge.refresh()
         elif name == "busy":
             app_bridge.setBusy(kw["on"])
         elif name == "status_error":
@@ -137,6 +168,9 @@ def build(argv=None):
         import time as _t
         host._addons_status = fake_addon_status(int(os.environ["EQU3_FAKE_ADDONS"]))
         host._addons_verified_ts = _t.time() + 3600      # the TTL keeps verify from rescanning
+    general_service = GeneralService(host, settings, tasks)
+    general_bridge = ops_bridge.GeneralBridge(general_service, app_bridge, skin_bridge)
+    tweaks_bridge.on_applied = lambda: host._offer_language_restart()
     launch_service = LaunchService(settings)
     launch_bridge = bridge.LaunchBridge(launch_service, tasks, app_bridge)
 
@@ -152,18 +186,33 @@ def build(argv=None):
     for name, obj in (("app", app_bridge), ("skin", skin_bridge),
                       ("settings", settings_bridge), ("news", news_bridge),
                       ("tweaks", tweaks_bridge), ("launch", launch_bridge),
-                      ("mods", mods_bridge), ("addons", addons_bridge), ("mpq", mpq_bridge),
+                      ("mods", mods_bridge), ("addons", addons_bridge), ("mpq", mpq_bridge), ("general", general_bridge),
                       ("dialog", dialog_bridge)):
         ctx.setContextProperty(name, obj)
     marks["objects_ready_ms"] = round((time.perf_counter() - _T0) * 1000)
 
-    parts = dict(mpq=mpq_bridge, mpq_service=mpq_service, addons=addons_bridge, addons_service=addons_service,
+    parts = dict(general=general_bridge, general_service=general_service, mpq=mpq_bridge, mpq_service=mpq_service, addons=addons_bridge, addons_service=addons_service,
                  mods=mods_bridge, mods_service=mods_service, host=host,
                  dialog=dialog_bridge, tweaks=tweaks_bridge, settings=settings, tasks=tasks, news=news_bridge,
                  launch=launch_bridge, app=app_bridge, skin=skin_bridge,
                  settings_bridge=settings_bridge, marks=marks, fetcher=fetcher,
                  dispatcher=dispatcher, manager=manager, cache=news_cache)
     return app, engine, parts
+
+
+def restart_app():
+    """Start a fresh EqUpdater, then close this one (asked in the new language
+    by ``_offer_language_restart``; never forced)."""
+    import subprocess
+    cmd = ([sys.executable] if getattr(sys, "frozen", False)
+           else [sys.executable, "-m", "equpdater.qtui"])
+    try:
+        subprocess.Popen(cmd, cwd=os.path.expanduser("~"))
+    except OSError as exc:
+        from ..core.logsink import log
+        log(f"Could not restart: {exc}", "err")
+        return
+    QGuiApplication.instance().quit()
 
 
 def run(argv=None) -> int:
@@ -190,6 +239,9 @@ def run(argv=None) -> int:
         marks["epoch_interactive"] = time.time()    # for cross-process timing
         p["news"].start()
         p["launch"].refresh()
+        # one-time, version-gated migrations (the 1.3 re-patch for installs that
+        # predate it), off the UI thread and after the first frame
+        p["tasks"].submit("startup:migrations", p["host"]._new_version_installed)
         if os.environ.get("EQU3_OPEN"):             # QA/docs: show a panel
             QTimer.singleShot(800, lambda: p["app"].debugAction.emit(os.environ["EQU3_OPEN"]))
         out = os.environ.get("EQU3_MARKS")

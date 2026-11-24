@@ -1,16 +1,21 @@
 import QtQuick
+import QtQuick.Dialogs
 import QtQuick.Controls.Basic as C
 import EqUi
 
-// Settings (proof of concept): skin choice and the animation options.
-// Skins are only selected here: open the folder, pick one, restore the default.
+// Settings. Game folder, launch and auto-install options, font, language
+// (follows the Language tweak), skin and animation, session log. Skins are
+// only selected here: open the folder, pick one, restore the default.
 Item {
     id: root
+    objectName: "settingsOverlay"
     visible: false
-    function open() { visible = true; settings.rescanSkins() }
-    function close() { visible = false }
+    property bool showLog: false
+    property string folderError: ""
+    function open() { visible = true; showLog = false; settings.rescanSkins() }
+    function close() { if (visible) { visible = false; general.closed() } }
     focus: visible
-    Keys.onEscapePressed: close()
+    Keys.onEscapePressed: if (showLog) showLog = false; else close()
 
     Rectangle {
         anchors.fill: parent
@@ -20,63 +25,181 @@ Item {
     SkinPanel {
         id: box
         kind: "dialog"
-        width: Math.min(560, parent.width - 60)
-        height: Math.min(560, parent.height - 60)
+        width: Math.min(640, parent.width - 40)
+        height: Math.min(640, parent.height - 40)
         anchors.centerIn: parent
         TapHandler { }                                    // swallow clicks
-        Column {
-            anchors.fill: parent
-            spacing: 12
-            Item {
-                width: parent.width; height: 30
-                SkinText { kind: "panel.header"; text: app.t("SETTINGS")
-                           anchors.verticalCenter: parent.verticalCenter }
-                SkinButton { kind: "button.small"; text: app.t("Close")
-                             anchors { right: parent.right; verticalCenter: parent.verticalCenter }
-                             onClicked: root.close() }
+
+        Item {
+            id: head
+            anchors { left: parent.left; right: parent.right; top: parent.top }
+            height: 30
+            SkinText { kind: "panel.header"; text: root.showLog ? app.t("Show Session Log") : app.t("SETTINGS")
+                       anchors.verticalCenter: parent.verticalCenter }
+            SkinButton { kind: "button.small"; text: root.showLog ? app.t("Back") : app.t("Close")
+                         anchors { right: parent.right; verticalCenter: parent.verticalCenter }
+                         onClicked: root.showLog ? root.showLog = false : root.close() }
+        }
+
+        Flickable {
+            id: flick
+            visible: !root.showLog
+            anchors { left: parent.left; right: parent.right; top: head.bottom; bottom: parent.bottom
+                      topMargin: 8 }
+            contentWidth: width
+            contentHeight: col.implicitHeight
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+            C.ScrollBar.vertical: SkinScrollBar {}
+
+            Column {
+                id: col
+                width: flick.width - 14
+                spacing: 8
+
+                // ── GAME FOLDER ────────────────────────────────────────
+                SkinText { kind: "text.heading"; text: app.t("GAME FOLDER") }
+                Row {
+                    spacing: 8
+                    width: parent.width
+                    SkinSearchField {
+                        id: dirField
+                        objectName: "gameDirField"
+                        width: parent.width - 250
+                        text: general.gameDir
+                        placeholder: "C:\\Games\\OctoWoW"
+                    }
+                    SkinButton { kind: "button.small"; text: app.t("Change")
+                                 onClicked: root.folderError = general.changeGameDir(dirField.text) }
+                    SkinButton { kind: "button.small"; text: app.t("Browse…"); onClicked: folderDialog.open() }
+                    SkinIconButton { kind: "icon.link"; tip: app.t("Open folder"); onClicked: general.openGameDir() }
+                }
+                SkinText { visible: root.folderError !== ""; kind: "text.error"; text: app.t(root.folderError) }
+                FolderDialog {
+                    id: folderDialog
+                    onAccepted: {
+                        var p = selectedFolder.toString().replace(/^file:\/\/\//, "")
+                        dirField.text = p
+                        root.folderError = general.changeGameDir(p)
+                    }
+                }
+                Rectangle { width: parent.width; height: 1
+                            color: Style.pick(Style.theme.components["divider"].colors, "normal", "#444") }
+
+                // ── GENERAL ────────────────────────────────────────────
+                SkinText { kind: "text.heading"; text: app.t("GENERAL") }
+                SkinCheckBox { text: app.t("Clear WDB on game launch")
+                               checked: general.clearWdb; onToggled: general.clearWdb = !general.clearWdb
+                               SkinToolTipArea { tip: app.t("Deletes the game's WDB cache before each launch: the item and creature data it keeps is fetched again from the server.") } }
+                SkinCheckBox { text: app.t("Minimize {app} on game launch").replace("{app}", "EqUpdater")
+                               checked: general.closeOnLaunch; onToggled: general.closeOnLaunch = !general.closeOnLaunch }
+                SkinCheckBox { text: app.t("Install essential mods")
+                               checked: general.autoMods; onToggled: general.autoMods = !general.autoMods }
+                SkinCheckBox { text: app.t("Install recommended addons")
+                               checked: general.autoAddons; onToggled: general.autoAddons = !general.autoAddons }
+                SkinCheckBox { text: app.t("Animated background")
+                               checked: settings.animatedBackground
+                               onToggled: settings.animatedBackground = !settings.animatedBackground }
+                SkinCheckBox { text: app.t("Pause animation when the window is not focused")
+                               checked: settings.pauseWhenUnfocused
+                               onToggled: settings.pauseWhenUnfocused = !settings.pauseWhenUnfocused }
+                Rectangle { width: parent.width; height: 1
+                            color: Style.pick(Style.theme.components["divider"].colors, "normal", "#444") }
+
+                // ── LANGUAGE / FONT ────────────────────────────────────
+                SkinText { kind: "text.heading"; text: app.t("Language") }
+                SkinText { kind: "text.body"; text: general.language }
+                SkinText { kind: "text.dim"; width: parent.width; wrapMode: Text.Wrap
+                           text: app.t("Follows the game's Language (Tweaks). A change shows here after a restart, which you are offered.") }
+                SkinText { kind: "text.heading"; text: app.t("FONT") }
+                Row {
+                    spacing: 6
+                    Repeater {
+                        model: general.fontChoices
+                        SkinButton {
+                            kind: "button.small"
+                            enabled: !modelData.locked
+                            selected: general.fontOverride === modelData.id
+                            text: modelData.id === "" ? app.t("Skin default") : modelData.family
+                            onClicked: general.setFontOverride(modelData.id)
+                        }
+                    }
+                }
+                Rectangle { width: parent.width; height: 1
+                            color: Style.pick(Style.theme.components["divider"].colors, "normal", "#444") }
+
+                // ── SKIN ────────────────────────────────────────────────
+                SkinText { kind: "text.heading"; text: app.t("Skin") }
+                Column {
+                    width: parent.width
+                    spacing: 4
+                    Repeater {
+                        model: settings.skins
+                        SkinButton {
+                            width: parent.width
+                            selected: modelData.id === settings.currentSkin
+                            text: modelData.name + (modelData.author !== "" ? "  ·  " + modelData.author : "")
+                                  + (modelData.problems.length > 0 ? "   ⚠" : "")
+                            onClicked: settings.setSkin(modelData.id)
+                        }
+                    }
+                }
+                SkinText {
+                    visible: settings.skinProblems.length > 0
+                    width: parent.width
+                    kind: "text.dim"
+                    wrapMode: Text.Wrap
+                    text: settings.skinProblems.join("\n")
+                    maximumLineCount: 6
+                    elide: Text.ElideRight
+                }
+                Row {
+                    spacing: 10
+                    SkinButton { kind: "button.small"; text: app.t("Open skins folder")
+                                 onClicked: settings.openSkinsFolder() }
+                    SkinButton { kind: "button.small"; text: app.t("Restore default skin")
+                                 onClicked: settings.restoreDefaultSkin() }
+                }
+                Rectangle { width: parent.width; height: 1
+                            color: Style.pick(Style.theme.components["divider"].colors, "normal", "#444") }
+
+                // ── TROUBLESHOOTING ─────────────────────────────────────
+                SkinText { kind: "text.heading"; text: app.t("TROUBLESHOOTING") }
+                Row {
+                    spacing: 10
+                    SkinButton { kind: "button.small"; text: app.t("Show Session Log")
+                                 onClicked: { general.refreshLog(); root.showLog = true }
+                                 SkinToolTipArea { tip: app.t("Everything EqUpdater has done since it started: what it checked, what it changed and why anything failed.") } }
+                }
+                SkinText { kind: "text.dim"; width: parent.width; wrapMode: Text.Wrap
+                           text: app.t("Verify game files, Login Doctor, Game Diagnostics and the Defender exclusion arrive with the Diagnostics page.") }
             }
-            SkinText { kind: "text.heading"; text: app.t("Skin")
-                       font.pixelSize: Style.theme.fonts.body.size }
-            ListView {
-                id: skins
-                width: parent.width
-                height: Math.min(contentHeight, 190)
+        }
+
+        Item {
+            visible: root.showLog
+            anchors { left: parent.left; right: parent.right; top: head.bottom; bottom: parent.bottom; topMargin: 8 }
+            Flickable {
+                id: logFlick
+                anchors.fill: parent
                 clip: true
-                spacing: 4
-                model: settings.skins
+                contentWidth: width
+                contentHeight: logText.contentHeight + 8
+                boundsBehavior: Flickable.StopAtBounds
                 C.ScrollBar.vertical: SkinScrollBar {}
-                delegate: SkinButton {
-                    width: skins.width - 12
-                    selected: modelData.id === settings.currentSkin
-                    text: modelData.name + (modelData.author !== "" ? "  ·  " + modelData.author : "")
-                          + (modelData.problems.length > 0 ? "   ⚠" : "")
-                    onClicked: settings.setSkin(modelData.id)
+                TextEdit {
+                    id: logText
+                    objectName: "sessionLogText"
+                    width: logFlick.width - 14
+                    readOnly: true
+                    selectByMouse: true
+                    wrapMode: TextEdit.Wrap
+                    text: general.sessionLog
+                    color: Style.pick(Style.theme.components["text.dim"].textColors, "normal", "#aaa")
+                    font.family: "Consolas"
+                    font.pixelSize: Style.theme.fonts.dim.size
                 }
             }
-            SkinText {
-                visible: settings.skinProblems.length > 0
-                width: parent.width
-                kind: "text.dim"
-                wrapMode: Text.Wrap
-                text: settings.skinProblems.join("\n")
-                maximumLineCount: 6
-                elide: Text.ElideRight
-            }
-            Row {
-                spacing: 10
-                SkinButton { kind: "button.small"; text: app.t("Open skins folder")
-                             onClicked: settings.openSkinsFolder() }
-                SkinButton { kind: "button.small"; text: app.t("Restore default skin")
-                             onClicked: settings.restoreDefaultSkin() }
-            }
-            Rectangle { width: parent.width; height: 1
-                        color: Style.pick(Style.theme.components["divider"].colors, "normal", "#444") }
-            SkinCheckBox { text: app.t("Animated background")
-                           checked: settings.animatedBackground
-                           onToggled: settings.animatedBackground = !settings.animatedBackground }
-            SkinCheckBox { text: app.t("Pause animation when the window is not focused")
-                           checked: settings.pauseWhenUnfocused
-                           onToggled: settings.pauseWhenUnfocused = !settings.pauseWhenUnfocused }
         }
     }
 }

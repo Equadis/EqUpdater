@@ -496,6 +496,64 @@ class TestMpqPage(Base):
         self.assertEqual(p["mpq"].model.stats["resets"], before)
 
 
+class TestSettingsPage(Base):
+    def test_overlay_opens_in_every_skin_without_errors(self):
+        p = self.start()
+        names = lambda: [i.objectName() for i in walk(self.win.property("contentItem"))]
+        for sid in p["manager"].skins:
+            p["settings_bridge"].setSkin(sid)
+            p["app"].debugAction.emit("settings")
+            pump(300)
+        self.assertEqual(self.qml_errors(), [])
+        self.assertIn("settingsOverlay", names())
+
+    def test_font_override_changes_every_text_style_live_and_restores(self):
+        p = self.start()
+        base = p["skin"].theme["fonts"]["body"]["family"]
+        p["general"].setFontOverride("opendyslexic")
+        pump(100)
+        self.assertEqual(p["skin"].theme["fonts"]["body"]["family"], "OpenDyslexic")
+        self.assertEqual(p["skin"].theme["components"]["button"]["font"]["family"], "OpenDyslexic")
+        self.assertEqual(p["settings"].get("font_override"), "opendyslexic")
+        p["general"].setFontOverride("")
+        self.assertEqual(p["skin"].theme["fonts"]["body"]["family"], base)
+        self.assertEqual(self.qml_errors(), [])
+
+    def test_toggles_and_game_folder_through_the_bridge(self):
+        from equpdater import config
+        p = self.start()
+        g = p["general"]
+        g.clearWdb = True
+        self.assertTrue(config.load_config()["clear_wdb_on_launch"])
+        self.assertTrue(g.changeGameDir(os.path.join(self.data, "no-such-folder")))
+        other = tempfile.mkdtemp(prefix="equ-game-")
+        self.addCleanup(shutil.rmtree, other, True)
+        self.assertEqual(g.changeGameDir(other), "")
+        self.assertEqual(os.path.normcase(g.gameDir), os.path.normcase(os.path.normpath(other)))
+        pump(100)
+        self.assertEqual(self.qml_errors(), [])
+
+    def test_session_log_shows_what_happened(self):
+        from equpdater.core import logsink
+        p = self.start()
+        logsink.log("a thing the session did", "acct")
+        p["general"].refreshLog()
+        self.assertIn("a thing the session did", p["general"].sessionLog)
+
+    def test_changing_the_language_tweak_offers_a_restart_after_apply_and_declining_keeps_going(self):
+        from equpdater import i18n
+        self.addCleanup(i18n.set_language, "enUS")
+        p = self.start()
+        asked = []
+        p["dialog"].auto = lambda kind, title, body: asked.append((kind, title)) or False
+        p["tweaks"].setValue("locale", "deDE")
+        p["tweaks"].apply()
+        pump(until=lambda: not p["tweaks"].busy and asked, limit=5000)
+        self.assertEqual([k for k, _t in asked], ["yes_no"])
+        self.assertEqual(i18n.language(), "enUS")             # unchanged until a restart
+        self.assertTrue(asked[0][1])
+
+
 class TestOffline(Base):
     def test_offline_shows_cache_and_an_error_not_an_empty_page(self):
         p = self.start()

@@ -689,6 +689,169 @@ class TestMpqService(unittest.TestCase):
         self.assertTrue(self.svc.ignore_speech())
 
 
+class TestGeneralService(unittest.TestCase):
+    def setUp(self):
+        from equpdater import config, i18n
+        from equpdater.core.ops_host import OpsHost, AutoDialogs
+        from equpdater.core.settings_service import GeneralService
+        self.d = tempfile.mkdtemp()
+        self._cfg = config.CONFIG_FILE
+        config.CONFIG_FILE = os.path.join(self.d, "config.json")
+        self.addCleanup(setattr, config, "CONFIG_FILE", self._cfg)
+        self.addCleanup(i18n.set_language, "enUS")
+        self.game = os.path.join(self.d, "game")
+        os.makedirs(self.game)
+        self.store = {"game_dir": self.game}
+
+        class S:
+            def get(_s, k, d=None):
+                return self.store.get(k, d)
+
+            def set(_s, k, v):
+                self.store[k] = v
+        self.events, self.dialogs = [], AutoDialogs(yes=True)
+        self.host = OpsHost(S(), events=lambda n, **kw: self.events.append(n), dialogs=self.dialogs)
+        self.svc = GeneralService(self.host, S(), TaskManager(1))
+
+    def test_toggles_use_their_2x_keys(self):
+        from equpdater import config
+        for name, key in (("clearWdb", "clear_wdb_on_launch"), ("closeOnLaunch", "close_on_launch"),
+                          ("autoMods", "auto_install_mods"), ("autoAddons", "auto_install_addons")):
+            self.assertFalse(self.svc.get(name))
+            self.svc.set(name, True)
+            self.assertTrue(config.load_config()[key], name)
+        self.assertTrue(config.load_config()["essential_mods_asked"])     # a choice is an answer
+
+    def test_turning_an_auto_install_on_installs_what_is_missing_only_on_close(self):
+        from unittest import mock
+        with mock.patch.object(self.host, "_install_missing_essential_mods") as em,                 mock.patch.object(self.host, "_install_missing_recommended_addons") as ad:
+            self.svc.set("autoMods", True)
+            self.svc.set("autoAddons", True)
+            em.assert_not_called()
+            self.svc.close()
+            em.assert_called_once()
+            ad.assert_called_once()
+            self.svc.close()                       # once
+            em.assert_called_once()
+        with mock.patch.object(self.host, "_install_missing_essential_mods") as em:
+            self.svc.set("autoMods", True)
+            self.svc.set("autoMods", False)        # turned back off: cancelled
+            self.svc.close()
+            em.assert_not_called()
+
+    def test_game_folder_change_is_validated_then_resets_state(self):
+        other = os.path.join(self.d, "other")
+        os.makedirs(other)
+        self.assertTrue(self.svc.change_game_dir(""))
+        self.assertTrue(self.svc.change_game_dir(os.path.join(self.d, "nope")))
+        self.assertEqual(self.svc.change_game_dir(self.game), "")      # same folder: nothing
+        self.assertNotIn("game_dir_changed", self.events)
+        from equpdater import config
+        config.update_config(lambda c: c.update(mods={"dxvk": {"managed": True}}, out_dir=self.game))
+        self.assertEqual(self.svc.change_game_dir(other), "")
+        self.assertIn("game_dir_changed", self.events)
+        cfg = config.load_config()
+        self.assertEqual(os.path.normcase(cfg["out_dir"]), os.path.normcase(other))
+        self.assertNotIn("mods", cfg)                                  # records of the old folder
+
+    def test_font_override_replaces_every_font_and_leaves_the_skin_alone(self):
+        from equpdater.core import skin
+        from equpdater.core.settings_service import apply_font_override
+        theme = skin.builtin_skin().theme
+        out = apply_font_override(theme, "opendyslexic")
+        self.assertEqual({f["family"] for f in out["fonts"].values()}, {"OpenDyslexic"})
+        self.assertTrue(all(c["font"]["family"] == "OpenDyslexic"
+                            for c in out["components"].values() if c.get("font")))
+        self.assertNotEqual(theme["fonts"]["body"]["family"], "OpenDyslexic")
+        self.assertLess(out["fonts"]["body"]["size"], theme["fonts"]["body"]["size"])
+        self.assertIs(apply_font_override(theme, ""), theme)
+
+    def test_chinese_locks_the_font_choice_as_in_2x(self):
+        from equpdater import i18n
+        i18n.set_language("zhCN")
+        self.assertTrue(all(c["locked"] for c in self.svc.font_choices() if c["id"]))
+
+    def test_language_restart_is_offered_only_when_it_differs_and_never_forced(self):
+        from equpdater import config, i18n
+        config.update_config(lambda c: c.__setitem__("tweaks", {"locale": "deDE"}))
+        i18n.set_language("enUS")
+        self.dialogs.yes = False
+        self.host._offer_language_restart()
+        self.assertEqual([a[0] for a in self.dialogs.asked], ["yes_no"])
+        self.assertNotIn("restart", self.events)
+        self.dialogs.yes = True
+        self.host._offer_language_restart()
+        self.assertIn("restart", self.events)
+        self.dialogs.asked.clear()
+        config.update_config(lambda c: c.__setitem__("tweaks", {"locale": "enUS"}))
+        self.host._offer_language_restart()
+        self.assertEqual(self.dialogs.asked, [])                       # same language: no question
+        self.assertEqual(i18n.language(), "enUS")
+
+    def test_session_log_keeps_the_latest_lines(self):
+        from equpdater.core import logsink
+        logsink.log("hello session log", "ok")
+        self.assertIn("hello session log", self.svc.session_log())
+
+    def test_font_choice_and_game_folder_come_from_2x_when_imported(self):
+        from equpdater.core import settings as cs
+        d = tempfile.mkdtemp()
+        s = cs.open_settings(d, legacy={"out_dir": self.game,
+                                        "accessibility": {"font_choice": "opendyslexic"}})
+        self.assertEqual(s.get("font_override"), "opendyslexic")
+        s2 = cs.open_settings(tempfile.mkdtemp(), legacy={"accessibility": {"font_choice": "arial"}})
+        self.assertEqual(s2.get("font_override"), "")                  # 2.x's default is "the skin's"
+        from equpdater import config
+        self.assertFalse(os.path.exists(config.CONFIG_FILE))           # importing wrote nothing
+
+
+class TestVersionMigration(unittest.TestCase):
+    """The one-time 1.3 re-patch, now runnable by the Qt host (it was Tk-only)."""
+
+    def setUp(self):
+        from equpdater import config
+        from equpdater.core.ops_host import OpsHost, AutoDialogs
+        self.d = tempfile.mkdtemp()
+        self.game = os.path.join(self.d, "game")
+        os.makedirs(os.path.join(self.game, "WTF"))
+        with open(os.path.join(self.game, "WoW.exe"), "wb") as f:
+            f.write(b"MZ")
+        with open(os.path.join(self.game, "WTF", "Config.wtf"), "w") as f:
+            f.write('SET frillDensity "64"' + chr(10) + 'SET other "1"' + chr(10))
+        with open(os.path.join(self.game, "dlls.txt"), "w") as f:
+            f.write("VfPatcher.dll" + chr(10) + "nampower.dll" + chr(10))
+        self._cfg = config.CONFIG_FILE
+        config.CONFIG_FILE = os.path.join(self.d, "config.json")
+        self.addCleanup(setattr, config, "CONFIG_FILE", self._cfg)
+        config.save_config({"app_version": "1.2", "out_dir": self.game,
+                            "tweaks": {"frillDistance": 70}})
+        s = {"game_dir": self.game}
+        settings = type("S", (), {"get": lambda _x, k, d=None: s.get(k, d)})()
+        self.host = OpsHost(settings, dialogs=AutoDialogs())
+        self.patched = []
+        self.host._apply_tweaks_worker = lambda out, tw: self.patched.append((out, dict(tw)))
+
+    def test_an_install_older_than_1_3_is_migrated_once(self):
+        from equpdater import config
+        self.host._new_version_installed()
+        cfg = config.load_config()
+        self.assertEqual(cfg["tweaks"]["frillDistance"], 120)
+        self.assertEqual(self.patched[0][1]["frillDistance"], 120)         # WoW.exe re-patched
+        self.assertIn('SET frillDensity "128"', open(os.path.join(self.game, "WTF", "Config.wtf")).read())
+        self.assertNotIn("VfPatcher.dll", open(os.path.join(self.game, "dlls.txt")).read())
+        from equpdater import branding
+        self.assertEqual(cfg["app_version"], branding.APP_VERSION)
+        self.host._new_version_installed()                                 # already stamped: nothing
+        self.assertEqual(len(self.patched), 1)
+
+    def test_a_first_run_is_only_stamped(self):
+        from equpdater import config
+        self.host._first_run = True
+        self.host._new_version_installed()
+        self.assertEqual(self.patched, [])
+        self.assertEqual(config.load_config()["tweaks"]["frillDistance"], 70)
+
+
 class TestPatchExeSafety(unittest.TestCase):
     """The 0-byte WoW.exe found on a dev machine: a bad cached base must never
     be written over the game."""
