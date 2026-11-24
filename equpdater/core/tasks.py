@@ -83,7 +83,12 @@ class TaskManager:
             job.waiters.append((on_done, on_error))
             self._jobs[key] = job
             self.started_count += 1
-        job.future = self._pool.submit(self._run, job, fn, wants_cancel, timeout)
+        try:
+            job.future = self._pool.submit(self._run, job, fn, wants_cancel, timeout)
+        except RuntimeError:                  # shut down (window closing): nothing to run
+            with self._lock:
+                self._jobs.pop(key, None)
+            return False
         return True
 
     def running(self, key) -> bool:

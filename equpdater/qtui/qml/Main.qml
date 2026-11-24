@@ -28,6 +28,7 @@ Window {
 
     Connections {
         target: app
+        function onMinimizeRequested() { win.showMinimized() }
         function onDebugAction(name) {
             if (name === "settings") settingsView.open()
             else if (name === "menu") menu.open()

@@ -8,7 +8,10 @@ window had, without blocking painting or the workers.
 
 from __future__ import annotations
 
-from PySide6.QtCore import (QEventLoop, QObject, QTimer, Property, Signal, Slot)
+import threading
+
+from PySide6.QtCore import (QCoreApplication, QEventLoop, QObject, QThread, QTimer,
+                            Property, Signal, Slot)
 
 from ..core.addons_service import AddonsService
 from ..core.mods_service import ModsService
@@ -23,8 +26,10 @@ class DialogBridge(QObject):
     """One modal question at a time. ``ask`` returns when the player answers."""
     changed = Signal()
 
-    def __init__(self):
+    def __init__(self, dispatcher=None):
         super().__init__()
+        self.dispatcher = dispatcher
+        self._gui = QThread.currentThread()
         self._open = False
         self._title = self._body = ""
         self._kind = "yes_no"
@@ -48,9 +53,25 @@ class DialogBridge(QObject):
     def kind(self):
         return self._kind
 
-    def ask(self, kind: str, title: str, body: str) -> bool:
+    def ask(self, kind: str, title: str, body: str):
+        """Ask on the GUI thread (a worker thread posts the question there
+        and waits for the answer), blocking the caller until it is answered."""
+        if QThread.currentThread() is not self._gui and self.dispatcher is not None:
+            done, box = threading.Event(), []
+
+            def run():
+                try:
+                    box.append(self._ask_here(kind, title, body))
+                finally:
+                    done.set()
+            self.dispatcher.post(run)
+            done.wait()
+            return box[0] if box else False
+        return self._ask_here(kind, title, body)
+
+    def _ask_here(self, kind: str, title: str, body: str):
         if self.auto is not None:
-            return bool(self.auto(kind, title, body))
+            return self.auto(kind, title, body)
         self._kind, self._title, self._body, self._open = kind, title, body, True
         self.changed.emit()
         loop = self._loop = QEventLoop()
@@ -455,7 +476,10 @@ class GeneralBridge(QObject):
 
 
 def make_host(settings, dialogs_bridge: DialogBridge, app_bridge, dispatcher):
-    """The OpsHost wired to Qt: GUI-thread scheduling, events, dialogs."""
+    """The OpsHost wired to Qt: GUI-thread scheduling, events, dialogs.
+
+    Everything that touches a Qt object runs on the GUI thread: events and
+    status text raised from a worker are posted there, in order."""
     def schedule(ms, fn, *args):
         if fn is None:
             return
@@ -467,12 +491,23 @@ def make_host(settings, dialogs_bridge: DialogBridge, app_bridge, dispatcher):
 
     holder = {}
 
+    gui = QCoreApplication.instance().thread()
+
     def events(name, **kw):
         h = holder.get("handler")
-        if h:
+        if not h:
+            return
+        if QThread.currentThread() is gui:
             h(name, kw)
+        else:
+            dispatcher.post(lambda: h(name, kw))
 
     host = OpsHost(settings, schedule=schedule, events=events,
                    dialogs=QtDialogs(dialogs_bridge))
-    host._status_var.set = lambda v: app_bridge.setStatus(v, False)
+    def set_status(v):
+        if QThread.currentThread() is gui:
+            app_bridge.setStatus(v, False)
+        else:
+            dispatcher.post(lambda: app_bridge.setStatus(v, False))
+    host._status_var.set = set_status
     return host, holder

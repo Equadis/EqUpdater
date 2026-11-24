@@ -125,7 +125,7 @@ def build(argv=None):
     news_bridge = bridge.NewsBridge(news_cache, tasks, fetcher, settings)
 
     tweaks_bridge = bridge.TweaksBridge(TweaksService(settings, tasks), app_bridge)
-    dialog_bridge = ops_bridge.DialogBridge()
+    dialog_bridge = ops_bridge.DialogBridge(dispatcher)
     host, holder = ops_bridge.make_host(settings, dialog_bridge, app_bridge, dispatcher)
     mods_service = ModsService(host, tasks)
     mods_bridge = ops_bridge.ModsBridge(mods_service, host, app_bridge)
@@ -158,8 +158,16 @@ def build(argv=None):
             mpq_service.rebuild()
             if name == "game_dir_changed":
                 launch_bridge.refresh()
+        elif name == "btn":
+            launch_bridge.setMode(kw["mode"], kw.get("label", ""))
         elif name == "busy":
-            app_bridge.setBusy(kw["on"])
+            app_bridge.setBusy(kw["on"] and kw.get("label") != "PLAY")
+        elif name == "launch_menu":
+            launch_bridge.reload_options()
+        elif name == "show_page":
+            app_bridge.tab = kw["page"].lower()
+        elif name == "minimize":
+            app_bridge.minimizeRequested.emit()
         elif name == "status_error":
             app_bridge.setStatus(kw["text"], True)
     holder["handler"] = on_event
@@ -168,11 +176,14 @@ def build(argv=None):
         import time as _t
         host._addons_status = fake_addon_status(int(os.environ["EQU3_FAKE_ADDONS"]))
         host._addons_verified_ts = _t.time() + 3600      # the TTL keeps verify from rescanning
+    if data:
+        from .. import diagnostics as _dg
+        host._diag_store_obj = _dg.Store(os.path.join(data, "diagnostics"))
     general_service = GeneralService(host, settings, tasks)
     general_bridge = ops_bridge.GeneralBridge(general_service, app_bridge, skin_bridge)
     tweaks_bridge.on_applied = lambda: host._offer_language_restart()
     launch_service = LaunchService(settings)
-    launch_bridge = bridge.LaunchBridge(launch_service, tasks, app_bridge)
+    launch_bridge = bridge.LaunchBridge(launch_service, tasks, app_bridge, host)
 
     gd = settings.get("game_dir") or ""
     if gd and os.path.isdir(gd):

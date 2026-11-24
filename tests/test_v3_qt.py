@@ -554,6 +554,130 @@ class TestSettingsPage(Base):
         self.assertTrue(asked[0][1])
 
 
+class TestPlayPipeline(Base):
+    """PLAY runs the lifted 2.x launch pipeline on a worker; every question it
+    asks is answered on the GUI thread. The game itself is never started."""
+
+    def setup_game(self, files=("WoW.exe", "VanillaFixes.exe")):
+        game = tempfile.mkdtemp(prefix="equ-game-")
+        for n in files:
+            with open(os.path.join(game, n), "wb") as f:
+                f.write(fake_pe())
+        d = tempfile.mkdtemp(prefix="equ-q-")
+        with open(os.path.join(d, "settings.json"), "w") as f:
+            json.dump({"_schema": 1, "game_dir": game, "imported_from_2x": True}, f)
+        self.addCleanup(shutil.rmtree, game, True)
+        p = self.start(data_dir=d)
+        from equpdater import diagnostics
+        p["host"]._diag_begin = lambda c, dg: diagnostics.NullAttempt()
+        p["launch"].refresh()
+        pump(until=lambda: p["launch"].canPlay, limit=4000)
+        return p, game
+
+    def play(self, p, answers=True):
+        from unittest import mock
+        from equpdater import platforms
+        spawned, asked = [], []
+        p["dialog"].auto = lambda kind, t, b: asked.append((kind, t)) or answers
+        with mock.patch.object(platforms, "spawn_detached",
+                               lambda argv, **k: spawned.append(argv) or mock.Mock(pid=1)):
+            p["launch"].play()
+            pump(until=lambda: spawned or asked, limit=5000)
+            pump(200)
+        return spawned, asked
+
+    def test_ready_state_and_status(self):
+        p, _g = self.setup_game()
+        self.assertEqual(p["app"].statusText, "Ready to play")
+        self.assertTrue(p["launch"].canPlay)
+
+    def test_no_game_means_no_play_and_a_clear_status(self):
+        d = tempfile.mkdtemp(prefix="equ-q-")
+        empty = tempfile.mkdtemp(prefix="equ-game-")
+        self.addCleanup(shutil.rmtree, empty, True)
+        with open(os.path.join(d, "settings.json"), "w") as f:
+            json.dump({"_schema": 1, "game_dir": empty, "imported_from_2x": True}, f)
+        p = self.start(data_dir=d)
+        p["launch"].refresh()
+        pump(300)
+        self.assertFalse(p["launch"].canPlay)
+        self.assertIn("No game found", p["app"].statusText)
+        self.assertTrue(p["app"].statusIsError)
+
+    def test_play_registers_enabled_mods_and_enforces_auto_loot_before_starting(self):
+        from unittest import mock
+        order = []
+        p, game = self.setup_game()
+        with mock.patch("equpdater.core.launch_ops.reconcile_dlls_txt",
+                        lambda *a, **k: order.append("dlls") or [], create=True), \
+                mock.patch("equpdater.core.launch_ops.enforce_autoloot",
+                           lambda *a, **k: order.append("autoloot") or [], create=True):
+            spawned, asked = self.play(p)
+        self.assertEqual(order, ["dlls", "autoloot"])
+        self.assertTrue(spawned)
+
+    def test_a_damaged_loader_stops_play_and_offers_to_reinstall(self):
+        from unittest import mock
+        p, game = self.setup_game()
+        with open(os.path.join(game, "VanillaFixes.exe"), "wb") as f:
+            f.write(b"")
+        asked_for_replace = []
+        with mock.patch.object(p["host"], "_mod_force_replace",
+                               lambda mid: asked_for_replace.append(mid)):
+            spawned, asked = self.play(p, answers=True)
+        self.assertEqual(spawned, [])
+        self.assertEqual(asked_for_replace, ["VanillaFixes"])
+        self.assertEqual([k for k, _t in asked], ["yes_no"])
+
+    def test_declining_the_reinstall_changes_nothing(self):
+        p, game = self.setup_game()
+        with open(os.path.join(game, "VanillaFixes.exe"), "wb") as f:
+            f.write(b"")
+        spawned, asked = self.play(p, answers=False)
+        self.assertEqual(spawned, [])
+        self.assertEqual(os.path.getsize(os.path.join(game, "VanillaFixes.exe")), 0)
+
+    def test_clear_wdb_runs_only_when_asked(self):
+        p, game = self.setup_game()
+        wdb = os.path.join(game, "WDB")
+        os.makedirs(wdb)
+        self.play(p)
+        self.assertTrue(os.path.isdir(wdb))
+        p["general"].clearWdb = True
+        pump(100)
+        p["launch"]._mode = "play"
+        self.play(p)
+        self.assertFalse(os.path.isdir(wdb))
+
+    def test_minimize_on_launch_is_asked_for_after_the_game_starts(self):
+        p, game = self.setup_game()
+        got = []
+        p["app"].minimizeRequested.connect(lambda: got.append(1))
+        p["general"].closeOnLaunch = True
+        spawned, asked = self.play(p)
+        pump(until=lambda: got, limit=4000)
+        self.assertTrue(spawned and got)
+
+    def test_play_cannot_be_pressed_twice_while_busy(self):
+        p, game = self.setup_game()
+        p["host"]._set_btn_busy("Installing…")
+        pump(100)
+        self.assertFalse(p["launch"].canPlay)
+        spawned, asked = self.play(p)
+        self.assertEqual(spawned, [])
+
+    def test_a_mod_in_error_holds_play_back_with_a_link_to_the_mods_tab(self):
+        from equpdater import config
+        p, game = self.setup_game()
+        config.update_config(lambda c: c.setdefault("mods", {}).__setitem__(
+            "dxvk", {"managed": True, "error": "download blocked"}))
+        p["host"]._refresh_ready_state()
+        pump(100)
+        self.assertFalse(p["launch"].canPlay)
+        self.assertIn("Mod errors", p["app"].statusText)
+        self.assertTrue(p["app"].statusIsError)
+
+
 class TestOffline(Base):
     def test_offline_shows_cache_and_an_error_not_an_empty_page(self):
         p = self.start()
@@ -662,9 +786,14 @@ class TestLaunch(Base):
         self.assertEqual([e["label"] for e in launch.entries if e["checked"]], ["WoW.exe"])
         self.assertEqual(p["settings"].get("launch_default"), "WoW.exe")
         spawned = []
-        launch.service._spawn = lambda argv, **k: spawned.append((argv, k))
-        launch.play()
-        pump(until=lambda: spawned, limit=3000)
+        from unittest import mock
+        from equpdater import diagnostics, platforms
+        p["host"]._diag_begin = lambda c, d: diagnostics.NullAttempt()
+        p["dialog"].auto = lambda *a: True
+        with mock.patch.object(platforms, "spawn_detached",
+                               lambda argv, **k: spawned.append((argv, k)) or mock.Mock(pid=1)):
+            launch.play()
+            pump(until=lambda: spawned, limit=5000)
         self.assertTrue(spawned, p["app"].statusText)
         self.assertTrue(spawned[0][0][0].lower().endswith("wow.exe"), repr(spawned))
         shutil.rmtree(game, ignore_errors=True)

@@ -42,18 +42,22 @@ class SettingsStore(_store.JsonStore):
     has no config yet. Reading and writing ``game_dir`` here goes to the
     shared record, so 2.x and 3.0 can never disagree about it."""
 
+    #: settings key -> the 2.x config key that owns it (shared records)
+    SHARED = {"game_dir": "out_dir", "launch_default": "launch_default",
+              "game_launcher": "game_launcher"}
+
     def get(self, key, default=None):
-        if key == "game_dir":
+        if key in self.SHARED:
             from .. import config as _cfg
-            out = _cfg.load_config().get("out_dir")
-            if out:
-                return os.path.normpath(out)
+            val = _cfg.load_config().get(self.SHARED[key])
+            if val:
+                return os.path.normpath(val) if key == "game_dir" else val
         return super().get(key, default)
 
     def set(self, key, value):
-        if key == "game_dir" and value:
+        if key in self.SHARED and value:
             from .. import config as _cfg
-            _cfg.update_config(lambda c: c.__setitem__("out_dir", value))
+            _cfg.update_config(lambda c: c.__setitem__(self.SHARED[key], value))
         super().set(key, value)
 
 
@@ -84,11 +88,11 @@ def import_legacy(s, legacy: dict) -> None:
     if choice in ("friz", "opendyslexic"):           # 2.x's "arial" was its default
         s.set("font_override", choice)
     if legacy.get("launch_default"):
-        s.set("launch_default", legacy["launch_default"])
+        _store.JsonStore.set(s, "launch_default", legacy["launch_default"])
     if "animated_background" in legacy:
         s.set("animated_background", bool(legacy["animated_background"]))
     if legacy.get("game_launcher"):
-        s.set("game_launcher", legacy["game_launcher"])
+        _store.JsonStore.set(s, "game_launcher", legacy["game_launcher"])
     seen = legacy.get("news_seen")
     if isinstance(seen, dict):
         s.set("news_seen", {k: v for k, v in seen.items()

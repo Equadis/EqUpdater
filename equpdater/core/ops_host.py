@@ -26,12 +26,14 @@ import threading
 from .. import config as _config
 from ..config import load_config
 from .addons_ops import AddonsOps
+from ..i18n import tr
 from .logsink import log
 from .mods_ops import ModsOps
 from .mods_rows import ModsRows
 from .mpq_ops import MPQ_PATCHES
 from .mpq_page_ops import MpqPageOps
 from .settings_ops import SettingsOps
+from .launch_ops import LaunchOps
 
 
 def CONFIG_FILE_PATH():
@@ -78,7 +80,7 @@ class AutoDialogs:
         self.asked.append(("error", title))
 
 
-class OpsHost(SettingsOps, MpqPageOps, ModsRows, AddonsOps, ModsOps):
+class OpsHost(LaunchOps, SettingsOps, MpqPageOps, ModsRows, AddonsOps, ModsOps):
     def __init__(self, settings, schedule=None, events=None, dialogs=None):
         self.settings = settings
         self._schedule = schedule or (lambda ms, fn, *a: fn(*a))
@@ -131,12 +133,41 @@ class OpsHost(SettingsOps, MpqPageOps, ModsRows, AddonsOps, ModsOps):
     def _set_btn_busy(self, label="…"):
         self._btn_mode = "busy"
         self.events("busy", on=True, label=label)
+        self.events("btn", mode="busy", label=label)
 
     def _set_btn_play(self):
         self._btn_mode = "play"
         self.events("busy", on=False, label="")
+        self.events("btn", mode="play", label="")
 
-    _set_btn_update = _set_btn_play
+    def _set_btn_update(self):
+        self._btn_mode = "update"
+        self.events("busy", on=False, label="")
+        self.events("btn", mode="update", label="")
+
+    def _refresh_ready_state(self):
+        """PLAY and the status line. 3.0 has no base-client sync, so there is
+        no "update available": the client is ready when there is something
+        to start. Otherwise the 2.x rules: never while addons install, and
+        not while a mod is in an error state."""
+        self._refresh_launch_menu()
+        if self._addons_installing:
+            self._set_btn_busy(tr("Installing…"))
+            self._status_var.set(tr("Downloading addons…"))
+            return
+        client = self._game_path.get().strip()
+        self._client_ready = bool(client) and bool(self._launch_target(client))
+        if not self._client_ready:
+            self._set_btn_update()
+            self._status_error("No game found - choose the game folder in Settings", None)
+            return
+        if self._mods_have_errors():
+            self._set_btn_busy(tr("PLAY"))
+            self._status_error(tr("Mod errors – check the MODS tab"),
+                               lambda: self._show_page("MODS"))
+        else:
+            self._set_btn_play()
+            self._status_var.set("Ready to play")
 
     def _status_error(self, text, action=None):
         self.events("status_error", text=text)
@@ -188,6 +219,19 @@ class OpsHost(SettingsOps, MpqPageOps, ModsRows, AddonsOps, ModsOps):
         except Exception as exc:
             self._log_line(f"Tweak patch failed: {exc}", "err")
 
+    def _show_page(self, page):
+        self.events("show_page", page=page)
+
+    def _minimize_window(self):
+        self.events("minimize")
+
+    def _refresh_launch_menu(self):
+        self.events("launch_menu")
+
+    def _diag_changed(self, _attempt=None):
+        """From an observer thread: tell the view (if any) to re-read the disk."""
+        self.after(0, lambda: self.events("diag_changed"))
+
     def _refresh_nav_badges(self):
         self.events("nav_badges")
 
@@ -199,9 +243,6 @@ class OpsHost(SettingsOps, MpqPageOps, ModsRows, AddonsOps, ModsOps):
 
     def _refresh_mpq_badge(self):
         self.events("mpq_badge", count=self._mpq_updates_count)
-
-    def _refresh_ready_state(self):
-        self.events("ready")
 
     def _refresh_update_all_btn(self):
         self.events("update_all")

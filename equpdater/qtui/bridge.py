@@ -222,18 +222,24 @@ class NewsBridge(QObject):
 class LaunchBridge(QObject):
     changed = Signal()
 
-    def __init__(self, service: LaunchService, tasks: TaskManager, app_bridge):
+    def __init__(self, service: LaunchService, tasks: TaskManager, app_bridge, host=None):
         super().__init__()
-        self.service, self.tasks, self.app = service, tasks, app_bridge
+        self.service, self.tasks, self.app, self.host = service, tasks, app_bridge, host
         self._options, self._target = [], None
+        self._mode, self._label = "play", ""
 
     @Property(str, notify=changed)
     def playText(self):
-        return tr("PLAY")
+        return self._label or tr("PLAY")
+
+    def setMode(self, mode: str, label: str = ""):
+        """The host says what PLAY is right now: play | busy | update."""
+        self._mode, self._label = mode, label
+        self.changed.emit()
 
     @Property(bool, notify=changed)
     def canPlay(self):
-        return self._target is not None
+        return self._target is not None and self._mode == "play"
 
     @Property(str, notify=changed)
     def heading(self):
@@ -246,6 +252,15 @@ class LaunchBridge(QObject):
 
     @Slot()
     def refresh(self):
+        """Detect launch files (worker), then settle PLAY and the status line."""
+        self._detect(settle=True)
+
+    def reload_options(self):
+        """The host redrew PLAY's menu: re-read the files only. (Settling again
+        from here would make the host redraw the menu again, forever.)"""
+        self._detect(settle=False)
+
+    def _detect(self, settle: bool):
         """Detection runs on a worker: a slow disk never blocks the window."""
         def work():
             opts = self.service.options()
@@ -254,6 +269,8 @@ class LaunchBridge(QObject):
         def done(res):
             self._options, self._target = res
             self.changed.emit()
+            if settle and self.host is not None:
+                self.host._refresh_ready_state()
         self.tasks.submit("launch:options", work, on_done=done)
 
     @Slot(str)
@@ -264,12 +281,22 @@ class LaunchBridge(QObject):
 
     @Slot()
     def play(self):
-        self.app.setStatus(tr("Launching…"), False)
+        """PLAY through the real pipeline (the lifted 2.x `_launch_game`): the
+        dlls.txt check, Auto Loot, the launch record, preflight, the start and
+        its watch. It runs on a worker; every question it asks is posted to
+        the GUI thread and the worker waits for the answer."""
+        if self._mode != "play" or self._target is None:
+            return
+        if self.host is None:                         # service-only mode (tests)
+            self.app.setStatus(tr("Launching…"), False)
 
-        def done(res):
-            self.app.setStatus(tr(res.message) if not res.ok else res.message,
-                               not res.ok)
-        self.tasks.submit("launch:start", self.service.launch, on_done=done)
+            def done(res):
+                self.app.setStatus(tr(res.message) if not res.ok else res.message,
+                                   not res.ok)
+            self.tasks.submit("launch:start", self.service.launch, on_done=done)
+            return
+        self.tasks.submit("launch:start", self.host._launch_game,
+                          on_error=lambda e: self.app.setStatus(str(e), True))
 
 
 # ── tweaks ───────────────────────────────────────────────────────────────────
@@ -533,6 +560,7 @@ class AppBridge(QObject):
     statusChanged = Signal()
     animationChanged = Signal()
     countsChanged = Signal()
+    minimizeRequested = Signal()          # close_on_launch
     screenshotRequested = Signal(str)     # QA/docs only (EQU3_SCREENSHOT)
     debugAction = Signal(str)             # QA/docs only (EQU3_OPEN)
 

@@ -352,6 +352,20 @@ from .core.mpq_ops import (  # noqa: E402,F401
 
 from .core.settings_ops import SettingsOps  # noqa: E402
 
+# core.launch_funcs (lifted by tools/lift.py)
+from .core.launch_funcs import (  # noqa: E402,F401
+    ENV_PROBLEMS,
+    LAUNCH_OUTPUT,
+    LAUNCH_PROBLEMS,
+    LAUNCH_WATCH_MS,
+    enforce_autoloot,
+    env_problem_text,
+    get_client_version,
+    launch_problem_text,
+    remove_wdb)
+
+from .core.launch_ops import LaunchOps  # noqa: E402
+
 # Secure networking lives in core/net.py (shared with the Qt front end);
 # re-exported so every existing call site and test keeps its name.
 from .core.net import (  # noqa: E402,F401
@@ -389,38 +403,8 @@ def log(msg: str, tag: str = ""):
 logsink.set_sink(log)
 
 
-def remove_wdb(client_dir: str):
-    """Delete the client's WDB folder (server-data cache, safe to drop)."""
-    wdb = gamepaths.game_path(client_dir, "WDB")
-    if not os.path.isdir(wdb):
-        return
-    try:
-        shutil.rmtree(wdb)
-        log("WDB cache cleared.", "dim")
-    except Exception as e:
-        log(f"Could not clear WDB: {e}", "err")
 
 
-def get_client_version(out_dir: str) -> str:
-    """Read version + build from fixed offsets in the client's WoW.exe."""
-    exe_path = os.path.join(out_dir, "WoW.exe")
-    if not os.path.exists(exe_path):
-        return ""
-    try:
-        # Read only the two small fields, not the whole ~5 MB binary.
-        with open(exe_path, "rb") as f:
-            f.seek(0x00437bfc)
-            build   = f.read(4).decode("utf-8", errors="replace").rstrip("\x00")
-            f.seek(0x00437c04)
-            version = f.read(6).decode("utf-8", errors="replace").rstrip("\x00")
-    except Exception:
-        return ""
-    # Unexpected build, or an exe half-written mid-update, reads junk there -
-    # show nothing rather than garbage. A real read looks like version "1.12.1",
-    # build "5875".
-    if not re.fullmatch(r"\d+(?:\.\d+)+", version) or not build.isdigit():
-        return ""
-    return f"{version} ({build})"
 
 
 def fmt_size(num_bytes: float) -> str:
@@ -1430,46 +1414,14 @@ def wheel_steps(event) -> int:
 
 
 
-#: What is wrong with a line of the Game launcher's environment variables,
-#: by platforms.parse_env_lines reason.
-ENV_PROBLEMS = {
-    "no_equals": N_("Line {line}: write it as NAME=value."),
-    "bad_name":  N_("Line {line}: a name starts with a letter or _ and has "
-                    "only letters, digits and _."),
-    "nul":       N_("Line {line}: the value contains a character that "
-                    "cannot be used."),
-}
 
 
-def env_problem_text(problems) -> str:
-    """One translated line per unusable environment variable line."""
-    return "\n".join(tr(ENV_PROBLEMS[reason], line=number)
-                     for number, reason in problems)
 
 
-#: Why a Linux launch would fail at once, by platforms.launch_problems reason.
-LAUNCH_PROBLEMS = {
-    "runner_missing":     N_("'{value}' was not found in PATH."),
-    "runner_not_file":    N_("The launcher program does not exist or cannot "
-                             "be run:\n{value}"),
-    "prefix_relative":    N_("The Wine prefix is not a full path:\n{value}"),
-    "prefix_not_dir":     N_("The Wine prefix is a file, not a folder:\n{value}"),
-    "prefix_parent":      N_("The Wine prefix's parent folder does not "
-                             "exist:\n{value}"),
-    "protonpath_missing": N_("PROTONPATH does not exist:\n{value}"),
-}
 
 
-def launch_problem_text(problems) -> str:
-    """One translated paragraph per launch problem."""
-    return "\n\n".join(tr(LAUNCH_PROBLEMS[reason], value=value)
-                       for reason, value in problems)
 
 
-#: How long after PLAY a runner that quits with an error counts as one that
-#: could not start the game, and where its output goes (Linux).
-LAUNCH_WATCH_MS = 8000
-LAUNCH_OUTPUT = os.path.join(APP_DATA_DIR, "last-launch.log")
 
 
 
@@ -1592,36 +1544,6 @@ LAUNCH_OUTPUT = os.path.join(APP_DATA_DIR, "last-launch.log")
 
 
 
-def enforce_autoloot(client_dir: str) -> list:
-    """Make WoW.exe say what the Auto Loot checkbox says,
-    just before the game starts. OctoLauncher patches WoW.exe to its own
-    setting whenever it plays, so the bytes can change behind the checkbox.
-    Returns what it did, for the log. Never prevents a launch."""
-    notes = []
-    wanted = load_tweaks_config().get("alwaysAutoLoot")
-    exe = os.path.join(client_dir, "WoW.exe")
-    state = lootgate.exe_state(exe)
-    target = state if wanted is None else bool(wanted)
-    if state is not None and (state != target
-                              or not lootgate.exe_complete(exe, target)):
-        if client_exe_locked(client_dir):
-            notes.append("Auto Loot: WoW.exe does not match the setting, and "
-                         "it is in use so it was left as it is.")
-        else:
-            lootgate.set_exe_state(exe, target)
-            notes.append(
-                f"Auto Loot: WoW.exe did not match the setting (another "
-                f"launcher, or an older EqUpdater, patched it); set to "
-                f"{'on' if target else 'off'}." if state != target else
-                f"Auto Loot: WoW.exe now reads Shift when you loot "
-                f"(set to {'on' if target else 'off'}).")
-    try:
-        if lootgate.remove_gate(writable_addons_path(client_dir)):
-            notes.append("Auto Loot: removed the !EqLootGate addon; "
-                         "WoW.exe does its job now.")
-    except Exception:
-        pass
-    return notes
 
 
 
@@ -1872,7 +1794,7 @@ class SlimScrollbar(tk.Canvas):
         if self.command:
             self.command("moveto", first)
 
-class EqUpdaterApp(SettingsOps, MpqPageOps, ModsRows, AddonsOps, ModsOps, tk.Tk):
+class EqUpdaterApp(LaunchOps, SettingsOps, MpqPageOps, ModsRows, AddonsOps, ModsOps, tk.Tk):
     def __init__(self):
         # Give EqUpdater its own Windows taskbar identity before Tk creates
         # the native window. This prevents Windows from grouping it under an
@@ -4919,6 +4841,12 @@ class EqUpdaterApp(SettingsOps, MpqPageOps, ModsRows, AddonsOps, ModsOps, tk.Tk)
     def _refresh_mpq_badge(self):
         self._draw_nav_tab("MPQ")
 
+    def _show_page(self, page):
+        self._switch_tab(page)
+
+    def _minimize_window(self):
+        self.iconify()
+
     def _refresh_nav_badges(self):
         for tab in ("MODS", "ADDONS", "MPQ"):
             self._draw_nav_tab(tab)
@@ -7820,42 +7748,10 @@ class EqUpdaterApp(SettingsOps, MpqPageOps, ModsRows, AddonsOps, ModsOps, tk.Tk)
         self._btn_glow.configure(bg="#1b2c43")
         self._refresh_update_all_btn()
 
-    def _mods_have_errors(self) -> bool:
-        return any(bool(s.get("error"))
-                   for s in load_config().get("mods", {}).values())
 
-    def _refresh_ready_state(self):
-        """Recompute the footer status/button after an operation finishes.
-        PLAY is only offered when the client files are up to date AND no mod
-        is in an error state – otherwise the button stays grey and inactive."""
-        self._refresh_launch_menu()
-        # Never re-enable PLAY while addons are actively installing — this
-        # guards against a stray call during the mods→addons setup chain or a
-        # post-install verify flipping the button back on mid-download.
-        if self._addons_installing:
-            self._set_btn_busy(tr("Installing…"))
-            self._status_var.set(tr("Downloading addons…"))
-            return
-        if not self._client_ready:
-            self._status_var.set(tr("Update available!"))
-            self._set_btn_update()
-            return
-        if self._mods_have_errors():
-            self._set_btn_busy(tr("PLAY"))
-            self._status_error(tr("Mod errors – check the MODS tab"),
-                               lambda: self._switch_tab("MODS"))
-        else:
-            self._set_btn_play()
-            self._status_var.set(tr("Everything up to date!"))
 
     # ── what PLAY starts ─────────────────────────────────────────────────────
 
-    def _launch_target(self, client_dir: str) -> str | None:
-        """The file PLAY starts in this folder, looked up on disk each time:
-        a game-folder change or a mod install needs nothing else to notice."""
-        return platforms.resolve_launch_target(
-            platforms.launch_options(client_dir),
-            load_config().get("launch_default"))
 
     def _toggle_launch_menu(self):
         if getattr(self, "_launch_menu", None) is not None:
@@ -7954,63 +7850,10 @@ class EqUpdaterApp(SettingsOps, MpqPageOps, ModsRows, AddonsOps, ModsOps, tk.Tk)
         if getattr(self, "_launch_menu", None) is not None:
             self._open_launch_menu()
 
-    def _btn_click(self):
-        self._close_launch_menu()
-        if self._btn_mode == "play":
-            self._launch_game()
-        elif self._btn_mode == "update":
-            self._start_update()
 
-    def _diag_store(self):
-        store = getattr(self, "_diag_store_obj", None)
-        if store is None:
-            store = self._diag_store_obj = diagnostics.Store(
-                os.path.join(APP_DATA_DIR, "diagnostics"))
-        return store
 
-    def _diag_probe(self):
-        if not hasattr(self, "_diag_probe_obj"):
-            self._diag_probe_obj = diagnostics.default_probe()
-        return self._diag_probe_obj
 
-    def _diag_begin(self, client_dir: str, diagnostic: bool):
-        """The record of one PLAY, on disk before anything else happens. If
-        it cannot be made the game still starts: the view reports the error."""
-        try:
-            attempt = diagnostics.Attempt(
-                self._diag_store(), client_dir, UPDATER_VERSION,
-                sys.platform, diagnostic)
-            if client_dir and os.path.isdir(client_dir):
-                attempt.data["client_build"] = get_client_version(client_dir) or None
-            diagnostics.begin_baseline(attempt, self._diag_probe())
-            return attempt
-        except Exception as e:
-            self._log_line(f"Game Diagnostics could not record this launch: {e}\n",
-                           "err")
-            return diagnostics.NullAttempt()
 
-    def _diag_watch(self, attempt, proc, exe_lbl: str, output):
-        """Watch this attempt on its own thread. It outlives nothing it
-        needs: what it sees is on disk, for whichever EqUpdater looks next."""
-        if isinstance(attempt, diagnostics.NullAttempt):
-            return
-        try:
-            direct = exe_lbl.lower() == platforms.GAME_EXE.lower() \
-                and attempt.data["route"].get("runner") == "windows"
-            role = "game" if direct else "launcher"
-            attempt.process(role, proc.pid, exe_lbl)
-            attempt.stage("process_created")
-            attempt.event("spawned", role=role, pid=proc.pid, name=exe_lbl)
-            observer = diagnostics.Observer(
-                attempt, self._diag_probe(), proc, role, exe_lbl, output,
-                on_change=self._diag_changed,
-                output_copy=LAUNCH_OUTPUT if output else None)
-            self._diag_observers = [o for o in getattr(self, "_diag_observers", [])
-                                    if not o.done] + [observer]
-            observer.start()
-        except Exception as e:
-            self._log_line(f"Game Diagnostics could not watch this launch: {e}\n",
-                           "err")
 
     def _diag_changed(self, _attempt=None):
         """From an observer's thread: redraw the view if it is open."""
@@ -8021,255 +7864,14 @@ class EqUpdaterApp(SettingsOps, MpqPageOps, ModsRows, AddonsOps, ModsOps, tk.Tk)
             except (tk.TclError, RuntimeError):
                 pass
 
-    def _diag_recover(self):
-        """Attempts the last EqUpdater left open: settle them with whatever
-        evidence is there now, and carry on watching a game still running."""
-        try:
-            probe = self._diag_probe()
-            store = self._diag_store()
-            for data in diagnostics.recover(store, probe):
-                diagnostics.watch_again(store, data, probe,
-                                        on_change=self._diag_changed).start()
-        except Exception as e:
-            log(f"Game Diagnostics could not read its earlier attempts: {e}")
 
     def _open_game_diagnostics(self):
         from . import diagnostics_ui
         diagnostics_ui.open_view(self)
 
-    def _launch_game(self, diagnostic: bool = False):
-        """Launch the game detached.
-        If VanillaFixes is installed use VanillaFixes.exe (it injects dlls then
-        starts WoW.exe itself). Otherwise fall back to WoW.exe directly. On
-        Linux either one is started through the game runner (see
-        platforms.launch_plan)."""
-        client_dir = self._game_path.get().strip()
-        cfg        = load_config()
-        attempt    = self._diag_begin(client_dir, diagnostic)
 
-        # The loader reads dlls.txt in a moment. Anything that edited that file
-        # since the last Apply - the official launcher, a restore, a hand edit
-        # - can have dropped an enabled mod, and a mod dropped here is a mod
-        # that silently does not exist in the game. Last chance to put it back.
-        try:
-            for name in reconcile_dlls_txt(client_dir, cfg.get("mods", {})):
-                self._log_line(f"{name} was missing from dlls.txt - "
-                               f"re-registered before launch.\n", "acct")
-        except Exception as e:
-            self._log_line(f"Could not check dlls.txt before launch: {e}\n", "err")
-        try:
-            for note in enforce_autoloot(client_dir):
-                self._log_line(note + "\n", "acct")
-        except Exception as e:
-            self._log_line(f"Could not check Auto Loot before launch: {e}\n", "err")
 
-        # Trust VanillaFixes.exe on disk, not the config record. That record
-        # is absent after a game-folder switch, after a config reset, and on
-        # any install this updater did not perform itself - and falling back
-        # to WoW.exe in those cases launches the game with *none* of the
-        # dlls.txt mods loaded, silently. Whether the loader is actually there
-        # is the thing that matters. Unless the player chose otherwise, it is
-        # what starts.
-        exe_lbl = self._launch_target(client_dir) or platforms.GAME_EXE
-        exe     = os.path.join(client_dir, exe_lbl)
-        vf_installed = os.path.exists(os.path.join(client_dir,
-                                                   platforms.LOADER_EXE))
 
-        if os.path.exists(_dlls_txt_path(client_dir)):
-            if not vf_installed:
-                self._log_line(
-                    "VanillaFixes.exe is missing, so the mods listed in "
-                    "dlls.txt will NOT load. Install VanillaFixes from the "
-                    "Mods tab.\n", "err")
-            elif exe_lbl.lower() == platforms.GAME_EXE.lower():
-                self._log_line(
-                    "Starting WoW.exe directly, as chosen: the mods listed "
-                    "in dlls.txt will not load.\n", "acct")
-
-        if not os.path.exists(exe):
-            self._log_line(f"{exe_lbl} not found at: {exe}\n", "err")
-            attempt.block("executable", f"The launch target {exe_lbl} was not "
-                          f"found in the game folder.")
-            return
-        if exe_lbl.lower().endswith(".exe") and self._launch_target_damaged(
-                exe, exe_lbl, attempt):
-            return
-
-        # One-time DXVK first-launch notice (armed when DXVK was installed).
-        if cfg.get("dxvk_notice_pending"):
-            self._cfg = update_config(
-                lambda c: c.pop("dxvk_notice_pending", None))
-            from tkinter import messagebox
-            messagebox.showinfo(
-                tr("DXVK mod first launch"),
-                tr("Initial shader compilation may cause temporary in-game stuttering during the first launch. This is a normal process while the game builds its shader cache.\n\nUsers with AMD GPUs experiencing stability issues can switch to DXVK 2.5.3."),
-                parent=self)
-
-        # How to start it: the executable itself on Windows; on Linux the
-        # player's launch command, else Wine, else UMU (platforms.launch_plan).
-        plan = platforms.launch_plan(client_dir, exe,
-                                     load_config().get("game_launcher"))
-        if plan.env_problems:
-            from tkinter import messagebox
-            attempt.block("launch_settings",
-                          "The launcher's environment variables have lines "
-                          "that cannot be used: " + env_problem_text(plan.env_problems))
-            self._log_line("Not launched: the game launcher's environment "
-                           "variables have lines that cannot be used.\n",
-                           "err")
-            messagebox.showerror(
-                tr("Cannot start the game"),
-                tr("Fix the environment variables in Settings → Game "
-                   "launcher:\n\n{problems}",
-                   problems=env_problem_text(plan.env_problems)),
-                parent=self)
-            return
-        if not plan.ok:
-            from tkinter import messagebox
-            attempt.block("launch_settings",
-                          "No way to run the game was found: no usable launch "
-                          "command, and no wine or umu-run on PATH.")
-            self._log_line("No way to run the Windows game client was found "
-                           "(no launch command set, no wine or umu-run on "
-                           "PATH).\n", "err")
-            messagebox.showerror(
-                tr("Cannot start the game"),
-                tr("{app} found no way to run the Windows game client. "
-                   "Install Wine, or set a launch command in Settings \u2192 "
-                   "Game launcher.", app=branding.APP_NAME),
-                parent=self)
-            return
-
-        attempt.route(plan, exe, exe_lbl)
-        diagnostics.preflight(attempt, client_dir, exe, plan)
-        problems = platforms.launch_problems(plan)
-        if problems:
-            attempt.block("launch_settings", "; ".join(
-                f"{reason}: {value}" for reason, value in problems))
-            self._launch_failed(
-                launch_problem_text(problems),
-                "Not launched: " + "; ".join(f"{r}: {v}" for r, v in problems)
-                + f"\n  command: {plan.argv}\n")
-            return
-
-        if self._cfg.get("clear_wdb_on_launch", False):
-            remove_wdb(client_dir)
-
-        output = None
-        if plan.runner != "windows":
-            try:
-                ensure_dir(os.path.dirname(LAUNCH_OUTPUT))
-                output = attempt.output_path() or LAUNCH_OUTPUT
-            except OSError:
-                pass
-        if diagnostic:
-            # This launch only: in its own environment, never saved anywhere.
-            extra = diagnostics.diagnostic_env(plan.runner,
-                                               attempt.folder() or APP_DATA_DIR)
-            plan.env = {**(plan.env or platforms.child_env()), **extra}
-            attempt.route(plan, exe, exe_lbl)
-        try:
-            proc = platforms.spawn_detached(plan.argv, cwd=plan.cwd,
-                                            env=plan.env, output=output,
-                                            console=plan.console)
-        except OSError as e:
-            attempt.block("process_creation",
-                          f"{exe_lbl} could not be started: {e.strerror or e}", e)
-            self._launch_failed(
-                tr("{program} could not be started: {error}",
-                   program=plan.argv[0], error=e.strerror or e),
-                f"Failed to launch {exe_lbl}: {e}\n  command: {plan.argv}\n")
-            return
-        try:
-            how = "" if plan.runner == "windows" else f" with {plan.runner}"
-            self._log_line(f"Launched {exe_lbl}{how}!\n", "ok")
-            self._diag_watch(attempt, proc, exe_lbl, output)
-            if output:
-                self._watch_launch(proc, plan.argv, output, 0)
-            # Briefly disable PLAY so a double-click can't spawn two clients.
-            self._set_btn_busy(tr("PLAY"))
-            self._status_var.set(tr("Launching…"))
-            # Optionally minimize (close) the updater to the taskbar shortly after launch
-            if self._cfg.get("close_on_launch", False):
-                self.after(1000, self.iconify) # self._on_close and return
-            self.after(5000, self._refresh_ready_state)
-        except Exception as e:
-            self._log_line(f"Failed to launch {exe_lbl}: {e}\n", "err")
-
-    def _launch_target_damaged(self, exe: str, exe_lbl: str, attempt) -> bool:
-        """Stop before starting a file that is not a whole Windows program,
-        and say what to do. Started anyway, Windows answers only "WinError
-        193: %1 is not a valid Win32 application" -- which is what players saw
-        when VanillaFixes.exe was empty or cut short. True when stopped."""
-        from tkinter import messagebox
-        try:
-            problem = platforms.program_problem(exe)
-        except OSError as e:
-            problem, size = None, None
-            self._log_line(f"Could not read {exe_lbl} before launch: {e}\n", "err")
-        if problem is None:
-            return False
-        size = os.path.getsize(exe)
-        attempt.block("executable", f"{exe_lbl} is {problem} ({size} bytes): "
-                      f"not a complete Windows program.")
-        self._log_line(f"Not launched: {exe_lbl} is {problem} ({size} bytes), "
-                       f"not a complete Windows program.\n", "err")
-        what = (tr("{program} is empty.", program=exe_lbl) if problem == "empty"
-                else tr("{program} is damaged: it is not a complete Windows "
-                        "program.", program=exe_lbl))
-        loader = exe_lbl.lower() == platforms.LOADER_EXE.lower()
-        if loader:
-            if messagebox.askyesno(
-                    tr("Cannot start the game"),
-                    what + " " + tr("An interrupted download or an antivirus "
-                                    "can leave it like this.") + "\n\n"
-                    + tr("Reinstall VanillaFixes now?"), parent=self):
-                self._switch_tab("MODS")
-                self._mod_force_replace("VanillaFixes")
-        else:
-            messagebox.showerror(
-                tr("Cannot start the game"),
-                what + " " + tr("Run Settings → Verify game files to repair "
-                                "it."), parent=self)
-        self._refresh_ready_state()
-        return True
-
-    def _launch_failed(self, message: str, details: str):
-        """PLAY did not start the game: the details to the log, a short
-        reason to the player, PLAY ready again."""
-        from tkinter import messagebox
-        self._log_line(details, "err")
-        messagebox.showerror(tr("Cannot start the game"),
-                             tr("Could not launch the game.") + "\n\n" + message,
-                             parent=self)
-        self._refresh_ready_state()
-
-    def _watch_launch(self, proc, argv, output, waited: int):
-        """Linux: a runner that quits with an error within LAUNCH_WATCH_MS
-        of PLAY did not start the game -- a bad prefix, a Proton that is not
-        there. Say so, with the end of what it printed, rather than let
-        PLAY come back as if nothing happened. Quitting cleanly is fine:
-        VanillaFixes.exe exits once it has started WoW.exe."""
-        code = proc.poll()
-        if code is None:
-            if waited < LAUNCH_WATCH_MS:
-                self.after(250, lambda: self._watch_launch(
-                    proc, argv, output, waited + 250))
-            return
-        if code == 0:
-            return
-        try:
-            with open(output, encoding="utf-8", errors="replace") as f:
-                lines = [l.rstrip() for l in f.read().splitlines() if l.strip()]
-        except OSError:
-            lines = []
-        tail = "\n".join(lines[-40:])
-        self._launch_failed(
-            tr("{program} stopped at once (exit code {code}).",
-               program=os.path.basename(argv[0]), code=code)
-            + ("\n\n" + "\n".join(lines[-6:]) if lines else ""),
-            f"The game runner exited with code {code} right after launch.\n"
-            f"  command: {argv}\n  output ({output}):\n{tail}\n")
 
     # ── verify lifecycle ──────────────────────────────────────────────────────────
 
