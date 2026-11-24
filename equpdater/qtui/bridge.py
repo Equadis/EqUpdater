@@ -632,6 +632,27 @@ class AppBridge(QObject):
 
     _addon_updates = 0
     _mpq_updates = 0
+    progressChanged = Signal()
+    _progress = (0, 0, "")
+
+    def setProgress(self, done: int, total: int, label: str = ""):
+        if (done, total, label) != self._progress:
+            self._progress = (done, total, label)
+            self.progressChanged.emit()
+
+    @Property(bool, notify=progressChanged)
+    def progressActive(self):
+        return self._progress[1] > 0
+
+    @Property(float, notify=progressChanged)
+    def progressValue(self):
+        done, total, _l = self._progress
+        return done / total if total else 0.0
+
+    @Property(str, notify=progressChanged)
+    def progressText(self):
+        done, total, label = self._progress
+        return f"{min(done + 1, total)} / {total}  {label}" if total else ""
     update_all_hook = None                  # set by the shell: runs the lifted _update_all
     update_all_state = lambda self: (False, False)   # (running, can start)
 

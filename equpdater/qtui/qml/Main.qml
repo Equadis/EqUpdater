@@ -135,10 +135,19 @@ Window {
                     onArrowClicked: menu.visible ? menu.close() : menu.open()
                 }
                 SkinProgressBar {
+                    objectName: "batchProgress"
                     visible: app.busy
                     width: 160
                     anchors.verticalCenter: parent.verticalCenter
-                    indeterminate: true
+                    indeterminate: !app.progressActive
+                    value: app.progressValue
+                }
+                SkinText {
+                    objectName: "batchProgressText"
+                    visible: app.busy && app.progressActive
+                    anchors.verticalCenter: parent.verticalCenter
+                    kind: "text.dim"
+                    text: app.progressText
                 }
             }
         }

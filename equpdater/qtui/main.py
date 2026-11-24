@@ -165,6 +165,8 @@ def build(argv=None):
             launch_bridge.setMode(kw["mode"], kw.get("label", ""))
         elif name == "busy":
             app_bridge.setBusy(kw["on"] and kw.get("label") != "PLAY")
+        elif name == "progress":
+            app_bridge.setProgress(kw["done"], kw["total"], kw["label"])
         elif name == "update_all":
             app_bridge.busyChanged.emit()           # the footer arrow becomes a spinner
         elif name == "diag_changed":

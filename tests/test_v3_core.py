@@ -1170,6 +1170,88 @@ class TestUpdateAllAndFirstRun(unittest.TestCase):
         self.assertTrue(load_config()["auto_install_mods"])
 
 
+class TestBatchProgress(unittest.TestCase):
+    """Per-item progress: "3 of 12: pfUI" for batch installs."""
+
+    def setUp(self):
+        from equpdater import config
+        from tests.ns import patch_all
+        from equpdater.core import addons_ops
+        from equpdater.core.ops_host import OpsHost
+        self.d = tempfile.mkdtemp()
+        self.game = os.path.join(self.d, "game")
+        os.makedirs(os.path.join(self.game, "Interface", "AddOns"))
+        ns = addons_ops.load_config.__globals__
+        old = ns["CONFIG_FILE"]
+        ns["CONFIG_FILE"] = os.path.join(self.d, "config.json")
+        self.addCleanup(ns.__setitem__, "CONFIG_FILE", old)
+        settings = type("S", (), {"get": lambda s, k, d=None: self.game if k == "game_dir" else d})()
+        self.events = []
+        self.host = OpsHost(settings, events=lambda name, **kw: self.events.append((name, kw)))
+        self.host._addons_verify = lambda *a, **k: None
+        self.host._render_addons = lambda *a, **k: None
+        self.fail = set()
+        installed = self.installed = []
+
+        def install(client, folder, git, sha):
+            if folder in self.fail:
+                raise RuntimeError("boom")
+            installed.append(folder)
+        for name, new_fn in (("addon_install_source", lambda g: g),
+                             ("addon_remote_sha", lambda *a, **k: "a" * 40),
+                             ("install_addon_files", install),
+                             ("folder_hash", lambda p: "h")):
+            p = patch_all(addons_ops, name, new_fn)
+            p.start()
+            self.addCleanup(p.stop)
+
+    def recs(self, *names):
+        return [{"folder": n, "status": "available", "git": f"https://github.com/o/{n}",
+                 "branch": None, "ref": None, "toc": {}, "description": None, "error": None}
+                for n in names]
+
+    def wait(self):
+        end = time.time() + 5
+        while self.host._addons_busy and time.time() < end:
+            time.sleep(0.01)
+        self.assertFalse(self.host._addons_busy)
+
+    def progress(self):
+        return [(kw["done"], kw["total"], kw["label"]) for n, kw in self.events if n == "progress"]
+
+    def test_each_addon_reports_its_place_and_the_bar_clears_at_the_end(self):
+        self.host._addon_apply(self.recs("A", "B", "C"), force=True)
+        self.wait()
+        got = self.progress()
+        self.assertEqual(got[:3], [(0, 3, "A"), (1, 3, "B"), (2, 3, "C")])
+        self.assertEqual(got[-1], (0, 0, ""))
+        self.assertIsNone(self.host._progress)
+        self.assertEqual(self.installed, ["A", "B", "C"])
+
+    def test_a_failing_item_still_ends_the_bar(self):
+        self.fail = {"B"}
+        self.host._addon_apply(self.recs("A", "B", "C"), force=True)
+        self.wait()
+        self.assertEqual(self.progress()[-1], (0, 0, ""))
+        self.assertEqual(self.installed, ["A", "C"])
+
+    def test_a_mods_run_reports_each_mod_it_visits_and_finishing_clears_it(self):
+        from equpdater.core import mods
+        first = mods.MODS_REGISTRY[0]
+        self.host._mod_pending_state = {}
+        self.host._apply_mods_worker(self.game, only_mod_id=first["id"])
+        end = time.time() + 5
+        while not any(n == "mods_finished" for n, _ in self.events) and time.time() < end:
+            time.sleep(0.01)
+        got = self.progress()
+        self.assertEqual(got[0], (0, 1, first["name"]))
+        self.assertEqual(got[-1], (0, 0, ""))
+
+    def test_clearing_twice_is_quiet(self):
+        self.host._progress_clear()
+        self.assertEqual(self.progress(), [])
+
+
 class TestPatchExeSafety(unittest.TestCase):
     """The 0-byte WoW.exe found on a dev machine: a bad cached base must never
     be written over the game."""

@@ -891,6 +891,27 @@ class TestGapOverlays(Base):
         self.assertEqual(self.qml_errors(), [])
 
 
+class TestBatchProgressBar(Base):
+    def test_the_footer_shows_n_of_m_and_the_name_and_goes_back_to_indeterminate(self):
+        p = self.start()
+        p["app"].setBusy(True)
+        bar = self.win.findChild(QObject, "batchProgress")
+        txt = self.win.findChild(QObject, "batchProgressText")
+        pump(60)
+        self.assertTrue(bar.property("indeterminate"))
+        self.assertFalse(txt.property("visible"))
+        p["host"]._progress_set(2, 5, "pfUI")
+        pump(60)
+        self.assertFalse(bar.property("indeterminate"))
+        self.assertAlmostEqual(bar.property("value"), 0.4)
+        self.assertTrue(txt.property("visible"))
+        self.assertEqual(txt.property("text"), "3 / 5  pfUI")
+        p["host"]._progress_clear()
+        pump(60)
+        self.assertTrue(bar.property("indeterminate"))
+        self.assertEqual(self.qml_errors(), [])
+
+
 class TestOffline(Base):
     def test_offline_shows_cache_and_an_error_not_an_empty_page(self):
         p = self.start()

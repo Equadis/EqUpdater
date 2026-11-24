@@ -457,7 +457,9 @@ class AddonsOps:
         failures = []        # (folder, update?, template, values)
 
         def worker():
-            for rec in recs:
+            for index, rec in enumerate(recs):
+                self.after(0, lambda i=index, n=len(recs), f=rec["folder"]:
+                           self._progress_set(i, n, f))
                 self.after(0, lambda n=rec["folder"]: self._status_var.set(
                     tr("Installing {name}…", name=n)))
                 updating = before[rec["folder"]][1] or os.path.isdir(
@@ -511,6 +513,7 @@ class AddonsOps:
                             "git": rec.get("git")}
 
             def done():
+                self._progress_clear()
                 self._addons_busy = False
                 self._addons_installing = False
                 self._addons_verified_ts = 0.0   # make the re-verify run

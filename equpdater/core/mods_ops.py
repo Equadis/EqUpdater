@@ -416,6 +416,13 @@ class ModsOps:
             self._cfg = update_config(_merge)
         return set(found)
 
+    def _progress_set(self, done: int, total: int, label: str = ""):
+        """A batch is ``done`` of ``total`` items in; a view may draw it. The
+        Tk window has no such bar, so the default does nothing."""
+
+    def _progress_clear(self):
+        """The batch is over."""
+
     def _apply_mods_worker(self, client_dir: str, only_mod_id: str | None = None,
                            force: bool = False):
         """Install, update and remove mods according to the plan.
@@ -436,10 +443,13 @@ class ModsOps:
         # this run — the new d3d9.dll invalidates the shader cache.
         set_dxvk_notice = False
 
+        targets = [m for m in ordered if only_mod_id is None or m["id"] == only_mod_id]
         for mod in ordered:
             mid   = mod["id"]
             if only_mod_id is not None and mid != only_mod_id:
                 continue
+            self.after(0, lambda i=targets.index(mod), n=len(targets), name=mod["name"]:
+                       self._progress_set(i, n, name))
             state = mods_cfg.get(mid, {})
 
             # Read enabled/ignore from pending UI changes first, fall back to

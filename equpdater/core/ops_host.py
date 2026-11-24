@@ -196,7 +196,19 @@ class OpsHost(AntivirusOps, LaunchOps, SettingsOps, MpqPageOps, ModsRows, Addons
     def _refresh_apply_btn_visibility(self):
         self.events("pending", pending=dict(self._mod_pending_state))
 
+    def _progress_set(self, done, total, label=""):
+        self._progress = (done, total, label)
+        self.events("progress", done=done, total=total, label=label)
+
+    def _progress_clear(self):
+        if self._progress is not None:
+            self._progress = None
+            self.events("progress", done=0, total=0, label="")
+
+    _progress = None
+
     def _mods_finished(self, fresh_mods):
+        self._progress_clear()
         self._mod_pending_state = self._mod_pending_state  # kept as the logic set it
         self.events("mods_finished")
         self.events("mods_rows")
