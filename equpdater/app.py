@@ -334,6 +334,24 @@ from .core.addons_ops import AddonsOps  # noqa: E402
 
 from .core.mods_rows import ModsRows  # noqa: E402
 
+# core.mpq_ops (lifted by tools/lift.py)
+from .core.mpq_ops import (  # noqa: E402,F401
+    MPQ_PATCHES,
+    download_mpq,
+    fetch_mpq_sha256,
+    mpq_patch_for,
+    resolve_mpq_source,
+    sha256_file)
+
+from .core.mpq_page_ops import MpqPageOps  # noqa: E402
+
+# core.mpq_ops (lifted, part 2)
+from .core.mpq_ops import (  # noqa: E402,F401
+    _MPQ_RELEASE_CACHE,
+    _MPQ_RELEASE_TTL)
+
+from .core.settings_ops import SettingsOps  # noqa: E402
+
 # Secure networking lives in core/net.py (shared with the Qt front end);
 # re-exported so every existing call site and test keeps its name.
 from .core.net import (  # noqa: E402,F401
@@ -743,141 +761,18 @@ def prune_stale_client_files(client_dir: str, files) -> list:
     return removed
 
 
-# Downloadable MPQ content patches (not shipped with the client). Each is
-# a single HTTP file with a `<url>.sha256` sidecar; an update is available when
-# that published sha differs from the on-disk file's.
-MPQ_PATCHES = [
-    {
-        "file": "patch-O.mpq",
-        "name": "Octo Raid Visuals",
-        "description": N_("Adds ground markers and sounds for boss abilities in raids."),
-        "url":  "https://dl.octowow.st/client/latest/Data/patch-O.mpq",
-        # Where the pack is made. Shown as a credit and a link for the user's
-        # browser; downloads still come from OctoWoW's own copy above, which
-        # publishes a checksum and is reachable by an app (octowow.st/git,
-        # like the forum, answers apps with its DDoS check).
-        "author":   "Rook",
-        "homepage": "https://octowow.st/git/Rook/RaidVisuals-OctoWoW",
-    },
-]
 
 
-def mpq_patch_for(filename: str):
-    """The registry entry whose file matches `filename` (case-insensitive)."""
-    lc = filename.lower()
-    return next((e for e in MPQ_PATCHES if e["file"].lower() == lc), None)
 
 
-def sha256_file(path: str) -> str:
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            h.update(chunk)
-    return h.hexdigest().lower()
 
 
-def fetch_mpq_sha256(url: str) -> str:
-    """The published SHA256 of an MPQ patch, from its `<url>.sha256` sidecar."""
-    req = urllib.request.Request(url + ".sha256", headers={"User-Agent": UA})
-    with secure_urlopen(req, timeout=NEWS_TIMEOUT,
-                        allowed_hosts=ALLOWED_DOWNLOAD_HOSTS) as r:
-        return r.read().decode("ascii", "ignore").strip().split()[0].lower()
 
 
-#: Latest-release lookups for linked texture packs, per repository, so that
-#: switching to the MPQ tab does not spend GitHub's unauthenticated rate
-#: limit (60 an hour) on every visit.
-_MPQ_RELEASE_CACHE: dict = {}
-_MPQ_RELEASE_TTL = 600
 
 
-def resolve_mpq_source(src: dict, local_file: str) -> mpq.Remote:
-    """Ask a texture-pack source what it publishes now. Raises on any
-    failure -- the caller treats that as "unable to verify", never as news."""
-    kind = src.get("kind")
-    if kind == "catalogue":
-        entry = mpq_patch_for(src.get("file") or "")
-        if entry is None:
-            raise RuntimeError("no longer in the %s list" % branding.APP_NAME)
-        return mpq.Remote(sha=fetch_mpq_sha256(entry["url"]), marker=None,
-                          url=entry["url"])
-    if kind == "url":
-        return mpq.Remote(sha=fetch_mpq_sha256(src["url"]), marker=None,
-                          url=src["url"])
-    if kind in ("github_release", "codeberg_release", "gitea_release"):
-        key = (kind, src.get("forge"), src["owner"].lower(), src["repo"].lower())
-        hit = _MPQ_RELEASE_CACHE.get(key)
-        if hit and time.time() - hit[0] < _MPQ_RELEASE_TTL:
-            release = hit[1]
-        else:
-            if kind == "gitea_release":
-                forge = forge_named(src.get("forge") or "")
-                if forge is None or forge.kind != "gitea":
-                    raise RuntimeError("unknown source kind %r" % kind)
-                release = _gitea_latest(forge.api, src["owner"], src["repo"],
-                                        raise_errors=True)
-            else:
-                latest = (_github_latest if kind == "github_release"
-                          else _codeberg_latest)
-                release = latest(src["owner"], src["repo"], raise_errors=True)
-            if not release:
-                raise RuntimeError("the repository has no releases")
-            _MPQ_RELEASE_CACHE[key] = (time.time(), release)
-        try:
-            asset = mpq.pick_asset(release.get("assets") or [],
-                                   src.get("asset"), local_file)
-        except ValueError as e:
-            raise RuntimeError(str(e)) from e
-        return mpq.asset_remote(asset)
-    raise RuntimeError("unknown source kind %r" % kind)
 
 
-def download_mpq(remote: mpq.Remote, data_dir: str, filename: str,
-                 keep_existing: bool = False, on_progress=None) -> str:
-    """Fetch `remote` into <data_dir>/<filename> and return its SHA-256.
-
-    Verified against the published checksum whenever the source publishes
-    one; a release asset without a digest is protected by TLS alone, which
-    is exactly what a browser download of it would have been.
-
-    `keep_existing` renames the current file to `<filename>.<stamp>.bak`
-    in the same folder before the new one goes in -- a rename, not a copy,
-    because packs run to hundreds of megabytes. The game only loads
-    patch-?.mpq, so the kept copy is inert until renamed back."""
-    if not remote.url:
-        raise RuntimeError("the source gave no download link")
-    ensure_dir(data_dir)
-    tmp = os.path.join(data_dir, filename + ".part")
-    h = hashlib.sha256()
-    req = urllib.request.Request(remote.url, headers={"User-Agent": UA})
-    with secure_urlopen(req, timeout=DOWNLOAD_TIMEOUT,
-                        allowed_hosts=ALLOWED_DOWNLOAD_HOSTS) as r:
-        total = int(r.headers.get("Content-Length") or 0)
-        done  = 0
-        with open(tmp, "wb") as f:
-            while True:
-                chunk = r.read(256 * 1024)
-                if not chunk:
-                    break
-                f.write(chunk)
-                h.update(chunk)
-                done += len(chunk)
-                if on_progress:
-                    on_progress(done, total)
-    got = h.hexdigest().lower()
-    if remote.sha and got != remote.sha:
-        try:
-            os.remove(tmp)
-        except OSError:
-            pass
-        raise RuntimeError("checksum verification failed")
-    dest = os.path.join(data_dir, filename)
-    if keep_existing and os.path.exists(dest):
-        kept = "%s.%s.bak" % (dest, time.strftime("%Y%m%d-%H%M%S"))
-        os.replace(dest, kept)
-        log("  Kept your previous copy as %s" % os.path.basename(kept), "dim")
-    os.replace(tmp, dest)
-    return got
 
 
 def clear_torrent_resume_state():
@@ -1977,7 +1872,7 @@ class SlimScrollbar(tk.Canvas):
         if self.command:
             self.command("moveto", first)
 
-class EqUpdaterApp(ModsRows, AddonsOps, ModsOps, tk.Tk):
+class EqUpdaterApp(SettingsOps, MpqPageOps, ModsRows, AddonsOps, ModsOps, tk.Tk):
     def __init__(self):
         # Give EqUpdater its own Windows taskbar identity before Tk creates
         # the native window. This prevents Windows from grouping it under an
@@ -4398,23 +4293,6 @@ class EqUpdaterApp(ModsRows, AddonsOps, ModsOps, tk.Tk):
         # half-written.
         self.after(0, self._offer_language_restart)
 
-    def _offer_language_restart(self):
-        """EqUpdater's text is drawn once, so a new Language shows in
-        EqUpdater after a restart. Offered, never forced, and asked in the
-        language just chosen -- the one the player can read."""
-        wanted = i18n.ui_language(
-            load_tweaks_config().get("locale", DEFAULT_LOCALE))
-        current = i18n.language()
-        if wanted == current:
-            return
-        from tkinter import messagebox
-        i18n.set_language(wanted)
-        title = tr("Restart {app}?", app=branding.APP_NAME)
-        body = tr("{app} restarts to show its text in the language you "
-                  "chose.\n\nRestart now?", app=branding.APP_NAME)
-        i18n.set_language(current)
-        if messagebox.askyesno(title, body, parent=self):
-            self._restart()
 
     def _restart(self):
         """Start a fresh EqUpdater, then close this one."""
@@ -5154,6 +5032,13 @@ class EqUpdaterApp(ModsRows, AddonsOps, ModsOps, tk.Tk):
     def _new_bool_var(self, value=False):
         return tk.BooleanVar(master=self, value=value)
 
+    def _refresh_mpq_badge(self):
+        self._draw_nav_tab("MPQ")
+
+    def _refresh_nav_badges(self):
+        for tab in ("MODS", "ADDONS", "MPQ"):
+            self._draw_nav_tab(tab)
+
     # ── dialog hooks used by the lifted logic (core/mods_ops, addons_ops) ──
     def _ask_yes_no(self, title, body, **kw):
         from tkinter import messagebox
@@ -5327,105 +5212,9 @@ class EqUpdaterApp(ModsRows, AddonsOps, ModsOps, tk.Tk):
         cv.yview_moveto(0)
         self._mpq_inner = inner
 
-    def _scan_mpq_patches(self) -> list:
-        """Lettered patch archives (patch-<letter>.mpq, case-insensitive) present in the
-        game's Data folder, e.g. Patch-A.mpq / patch-b.MPQ. Sorted by letter."""
-        out = self._game_path.get().strip()
-        data_dir = gamepaths.game_path(out, "Data") if out else ""
-        found = []
-        if data_dir and os.path.isdir(data_dir):
-            for name in os.listdir(data_dir):
-                if re.fullmatch(r"patch-[a-z]\.mpq", name, re.IGNORECASE):
-                    found.append(name)
-        found.sort(key=str.lower)
-        return found
 
-    @staticmethod
-    def _mpq_record(records: dict, filename: str):
-        """A pack's record, matched case-insensitively: Windows does not care
-        whether the file is patch-O.mpq or Patch-O.MPQ, so neither may this."""
-        lc = filename.lower()
-        return next((r for k, r in (records or {}).items()
-                     if k.lower() == lc and isinstance(r, dict)), None)
 
-    @staticmethod
-    def _mpq_save_record(filename: str, record):
-        """Write (or, with None, drop) one pack's record. Safe from a worker
-        thread: update_config holds the config lock."""
-        def _merge(c):
-            recs = c.setdefault("mpq", {})
-            for k in [k for k in recs if k.lower() == filename.lower()]:
-                del recs[k]
-            if record is not None:
-                recs[filename] = record
-        update_config(_merge)
 
-    def _mpq_check(self):
-        """Scan Data/ for lettered patches and ask each *linked* pack's source
-        what it publishes now. Feeds the INSTALLED/AVAILABLE lists and the
-        tab badge; the source checks run in the background so the list
-        appears immediately.
-
-        A pack nobody linked is not checked at all. Its file name matching
-        one of ours is not evidence of where it came from, and comparing it
-        with a source it may have nothing to do with would produce exactly
-        the confident wrong answer this updater exists to avoid."""
-        installed_files = self._scan_mpq_patches()
-        installed_lc    = {f.lower() for f in installed_files}
-        records = load_config().get("mpq", {}) or {}
-        rows = []
-        for f in installed_files:
-            rec = self._mpq_record(records, f)
-            src = mpq.source_of(rec, f)
-            rows.append({"file": f, "entry": mpq_patch_for(f), "record": rec,
-                         "source": src,
-                         "state": None if src else "unmanaged",
-                         "update": False})
-        self._mpq_installed_rows = rows
-        self._mpq_available_rows = [
-            e for e in MPQ_PATCHES if e["file"].lower() not in installed_lc]
-        self._render_mpq()
-
-        out = self._game_path.get().strip()
-        data_dir = gamepaths.game_path(out, "Data") if out else ""
-        linked = [r for r in rows if r["source"]]
-        if not (linked and data_dir):
-            self._mpq_updates_count = 0
-            self._draw_nav_tab("MPQ")
-            return
-
-        def worker():
-            results = {}
-            for row in linked:
-                name, rec = row["file"], row["record"]
-                try:
-                    local = sha256_file(os.path.join(data_dir, name))
-                except OSError:
-                    results[name] = ("unverifiable", False)
-                    continue
-                try:
-                    remote, failed = resolve_mpq_source(row["source"], name), False
-                except Exception:
-                    # Could not ask. Not an update, not an error the user has
-                    # to clear - just an unknown, and unknowns are left alone.
-                    remote, failed = None, True
-                results[name] = mpq.judge(rec, local, remote, failed)
-                settled = mpq.settle(rec, local, remote)
-                if settled:
-                    self._mpq_save_record(name, settled)
-
-            def apply():
-                count = 0
-                for row in self._mpq_installed_rows:
-                    state = results.get(row["file"])
-                    if state:
-                        row["state"], row["update"] = state
-                        count += bool(row["update"])
-                self._mpq_updates_count = count
-                self._draw_nav_tab("MPQ")
-                self._render_mpq()
-            self.after(0, apply)
-        threading.Thread(target=worker, daemon=True).start()
 
     def _render_mpq(self):
         if not hasattr(self, "_mpq_inner"):
@@ -5507,26 +5296,6 @@ class EqUpdaterApp(ModsRows, AddonsOps, ModsOps, tk.Tk):
                      fg=C_TEXT_DIM, bg=C_PANEL).pack(anchor="w",
                                                      padx=self._px(8))
 
-    #: MPQ state -> (label, colour, tooltip). A patch MPQ carries no version,
-    #: so "differs from what the source ships today" is the only comparison
-    #: available -- and it is equally true of an older pack, a newer one, and
-    #: one somebody made themselves. These say which is which instead of
-    #: calling all three out of date and offering to replace them.
-    _MPQ_STATES = {
-        "modified":      (N_("Modified locally"), "#d4b43c",
-                          N_("This file has changed since EqUpdater installed "
-                          "or linked it. Automatic updates are held back.")),
-        "unverifiable":  (N_("Unable to verify"), None,
-                          N_("The source could not be checked, so nothing is "
-                          "replaced.")),
-        "sourceDiffers": (N_("Differs from source"), "#d4b43c",
-                          N_("This is not the file its source publishes now. An MPQ carries no version, so it could be older, newer or edited – it is left alone. Replace installs the source's copy and keeps yours as a .bak file.")),
-        "unconfirmed":   (N_("Source not confirmed"), None,
-                          N_("The source publishes no checksum, so EqUpdater "
-                          "cannot prove this file is its copy. Replace "
-                          "installs the source's copy, keeps yours as a "
-                          ".bak file, and tracks updates from then on.")),
-    }
 
     def _mpq_row(self, name, filename, description, busy=None, button=None,
                  state=None, replace=None, source_line=None, credit=None,
@@ -5637,153 +5406,12 @@ class EqUpdaterApp(ModsRows, AddonsOps, ModsOps, tk.Tk):
                         "know where it came from, so it cannot check it for "
                         "updates. Linking its source changes no files."))
 
-    def _mpq_start(self, filename: str, text: str) -> str | None:
-        """Mark one pack busy and return the Data folder, or None if another
-        pack is busy or there is no game folder."""
-        if getattr(self, "_mpq_busy", None):
-            return None                              # one at a time
-        out = self._game_path.get().strip()
-        if not out:
-            self._log_line("Set the game folder first.\n", "err")
-            return None
-        self._mpq_busy, self._mpq_busy_text = filename, text
-        self._render_mpq()
-        return gamepaths.game_path(out, "Data")
 
-    def _mpq_finish(self):
-        self._mpq_busy = None
-        self._mpq_check()                            # re-scan + re-check + badge
 
-    def _mpq_fetch(self, filename: str, source: dict, label: str,
-                   replace: bool = False):
-        """Install, update or replace one pack from `source`.
 
-        An ordinary update only goes ahead if the file is still exactly what
-        was recorded -- it may have changed since the row was drawn -- and
-        then overwrites it, because it is the source's own older copy. A
-        replace is the user overruling a held-back state after a warning,
-        and keeps their file beside the new one."""
-        data_dir = self._mpq_start(filename, tr("Downloading…"))
-        if data_dir is None:
-            return
-        self._log_line(f"\nDownloading {label}…\n", "acct")
-        path = os.path.join(data_dir, filename)
 
-        def worker():
-            err = None
-            try:
-                if not replace and os.path.exists(path):
-                    rec = self._mpq_record(load_config().get("mpq", {}), filename)
-                    if not (rec and rec.get("sha")
-                            and sha256_file(path) == rec["sha"]):
-                        raise RuntimeError(
-                            "the file changed since it was checked; "
-                            "nothing was replaced")
-                remote = resolve_mpq_source(source, filename)
-                sha = download_mpq(remote, data_dir, filename,
-                                   keep_existing=replace)
-                # Ours now, and this is the fingerprint of what we wrote -
-                # which is what lets a later run tell an edited pack from an
-                # untouched one, instead of calling both "out of date".
-                self._mpq_save_record(filename, mpq.installed_record(
-                    sha=sha, source=source, remote=remote,
-                    installed_by=branding.APP_NAME))
-            except Exception as e:
-                err = str(e)
 
-            def done():
-                if err:
-                    self._log_line(f"✗  {label} failed: {err}\n", "err")
-                else:
-                    self._log_line(f"✓  {label} installed.\n", "ok")
-                self._mpq_finish()
-            self.after(0, done)
-        threading.Thread(target=worker, daemon=True).start()
 
-    def _mpq_replace(self, row):
-        from tkinter import messagebox
-        fname = row["file"]
-        if not messagebox.askyesno(
-                tr("Replace {name}?", name=fname),
-                tr("{file} will be replaced with the copy from:\n    {source}\n\n"
-                   "Your current file is not deleted. It is renamed to\n"
-                   "    {file}.<date>.bak\n"
-                   "in the Data folder, where the game ignores it. Rename it "
-                   "back to undo.\n\nReplace it?",
-                   file=fname, source=mpq.describe_source(row["source"])),
-                parent=self):
-            return
-        entry = row.get("entry")
-        self._mpq_fetch(fname, row["source"],
-                        entry["name"] if entry else fname, replace=True)
-
-    def _mpq_uninstall(self, filename: str):
-        """Delete a pack from Data, after asking, and forget its record."""
-        from tkinter import messagebox
-        out = self._game_path.get().strip()
-        if not out or getattr(self, "_mpq_busy", None):
-            return
-        if not messagebox.askyesno(
-                tr("Uninstall {name}?", name=filename),
-                tr("{file} is deleted from the game's Data folder.",
-                   file=filename), parent=self):
-            return
-        try:
-            os.remove(os.path.join(gamepaths.game_path(out, "Data"), filename))
-        except FileNotFoundError:
-            pass
-        except OSError as e:
-            self._log_line(f"Could not uninstall {filename}: {e}\n", "err")
-            return
-        self._mpq_save_record(filename, None)
-        self._log_line(f"\n{filename} uninstalled.\n", "acct")
-        self._mpq_check()
-
-    def _mpq_unlink(self, filename: str):
-        """Forget where a pack came from. The file stays exactly where it is;
-        it simply stops being checked, as if it had been installed by hand."""
-        self._mpq_save_record(filename, None)
-        self._log_line("\n%s is no longer linked to a source; the file is "
-                       "untouched.\n" % filename, "acct")
-        self._mpq_check()
-
-    def _mpq_link(self, filename: str, source: dict):
-        """Record that `filename` comes from `source`. **Changes no file.**
-
-        The source is asked what it publishes now and the pack is
-        fingerprinted as it is. If the two agree, the pack is tracked from
-        here like one EqUpdater installed; if they do not, the link is kept
-        and the pack is held as differing from its source. If the source
-        cannot be reached, nothing is recorded: a link that was never
-        checked would read as one that was."""
-        data_dir = self._mpq_start(filename, tr("Checking…"))
-        if data_dir is None:
-            return
-        where = mpq.describe_source(source)
-
-        def worker():
-            err, rec = None, None
-            try:
-                local = sha256_file(os.path.join(data_dir, filename))
-                remote = resolve_mpq_source(source, filename)
-                rec = mpq.linked_record(sha=local, source=source, remote=remote)
-                self._mpq_save_record(filename, rec)
-            except Exception as e:
-                err = str(e)
-
-            def done():
-                if err:
-                    self._log_line("\n✗  Could not link %s to %s: %s\n"
-                                   "Nothing was changed.\n"
-                                   % (filename, where, err), "err")
-                else:
-                    self._log_line("\n%s is now linked to %s. Its file was "
-                                   "not changed.\n%s\n"
-                                   % (filename, where, mpq.link_outcome(rec)),
-                                   "acct")
-                self._mpq_finish()
-            self.after(0, done)
-        threading.Thread(target=worker, daemon=True).start()
 
     def _open_mpq_link_dialog(self, filename: str):
         """Ask where a manually installed pack comes from: one of the packs
@@ -7247,61 +6875,6 @@ class EqUpdaterApp(ModsRows, AddonsOps, ModsOps, tk.Tk):
 
     # ── helpers ───────────────────────────────────────────────────────────────
 
-    def _game_folder_changed(self, new_val: str):
-        """Wipe all state tied to the previous game folder – the folder-scoped
-        config (mods/addons install records) and session TTLs/badges – and
-        point everything at new_val. Called from _close_settings when the user
-        has switched to a different folder."""
-        if os.path.exists(os.path.join(new_val, "WoW.exe")):
-            remove_wdb(new_val)
-
-        # Wipe folder-scoped config and set the new path in one atomic merge.
-        # This also re-arms the default-mods / recommended-addons auto-install.
-        # Settings copied from a Windows or Wine install name the old folder
-        # as a Windows path, which is no folder here at all: choosing the
-        # game folder then is moving the settings across, not switching to
-        # another game, so the mod and addon records are kept. Each is
-        # checked against the files in the new folder as usual -- a record
-        # whose files differ shows as changed, never as up to date.
-        old_dir = self._cfg.get("out_dir") or ""
-        keep_records = platforms.foreign_windows_path(old_dir)
-
-        def _wipe(c):
-            c["out_dir"] = new_val
-            if not keep_records:
-                for k in ("mods", "addons"):
-                    c.pop(k, None)
-        self._cfg = update_config(_wipe)
-        if keep_records:
-            self._log_line(f"Settings came from a Windows/Wine install "
-                           f"({old_dir}); mod and addon records kept and "
-                           f"checked against the new folder.\n", "acct")
-
-        self._mod_pending_state = {}
-        self._default_mods_install_started = False
-        self._default_addons_install_started = False
-        self._client_ready = False
-
-        # Reset session-level state so nothing from the previous folder is
-        # served from memory: addons verify + rendered list, news timers, badges.
-        self._addons_verified_ts = 0.0
-        self._addons_status = {"state": "idle", "addons": {}, "available": []}
-        self._addon_errors = {}
-        self._mod_updates_count = 0
-        self._addon_updates_count = 0
-        self._mpq_updates_count = 0
-        self._mpq_installed_rows = []
-        self._mpq_available_rows = list(MPQ_PATCHES)
-        self._draw_nav_tab("MODS")
-        self._draw_nav_tab("ADDONS")
-        self._draw_nav_tab("MPQ")
-        self._update_all_chain = False
-        self._update_all_running = False
-        self._refresh_update_all_btn()
-        self._render_addons()
-        self._render_mpq()
-
-        self._log_line("\nGame folder changed – state reset.\n", "acct")
 
     def _set_pending_reconcile(self, mode):
         """Set the pending-reconcile mode (None / 'full' / 'keep-config') and
@@ -8256,56 +7829,7 @@ class EqUpdaterApp(ModsRows, AddonsOps, ModsOps, tk.Tk):
             lambda c: c.__setitem__("ignore_speech",
                                     self._ignore_speech_var.get()))
 
-    def _install_missing_essential_mods(self):
-        """Install every essential mod not already present. Used when the user
-        turns 'Install essential mods' on after the fact."""
-        if self._running:
-            return
-        out = self._game_path.get().strip()
-        if not out or not os.path.exists(os.path.join(out, "WoW.exe")):
-            return  # no client yet — the fresh-folder auto-install handles it
-        mods_cfg = load_config().get("mods", {})
-        pending = False
-        for mod in MODS_REGISTRY:
-            if not mod.get("essential", False):
-                continue
-            state = mods_cfg.get(mod["id"], {})
-            if (state.get("installed_version")
-                    and mod_installed_files_present(mod, out)):
-                continue  # already installed
-            if mod_files_on_disk(mod, out):
-                continue  # somebody else's copy: shown for adoption, not replaced
-            if any(mods_cfg.get(t, {}).get("enabled")
-                   for t in mod_twins(mod["id"])):
-                continue  # another build of it is on (a custom fork)
-            self._mod_pending_state.setdefault(mod["id"], {})["enabled"] = True
-            pending = True
-        if not pending:
-            return
-        self._log_line("\nInstalling essential mods...\n", "acct")
-        self._set_btn_busy(tr("Installing…"))
-        self._status_var.set(tr("Downloading mods…"))
-        threading.Thread(target=self._apply_mods_worker,
-                         args=(out,), daemon=True).start()
 
-    def _install_missing_recommended_addons(self):
-        """Install every recommended addon not already present. Used when the
-        user turns 'Install recommended addons' on afterwards."""
-        if self._addons_busy:
-            return
-        out = self._game_path.get().strip()
-        if not out or not os.path.exists(os.path.join(out, "WoW.exe")):
-            return
-        ap = addons_path(out)
-        recs = [{"folder": name, "status": "available", "git": url,
-                 "branch": None, "ref": None, "toc": {},
-                 "description": None, "error": None}
-                for name, url in RECOMMENDED_ADDONS.items()
-                if not os.path.isdir(os.path.join(ap, name))]
-        if not recs:
-            return
-        self._log_line("\nInstalling recommended addons...\n", "acct")
-        self._addon_apply(recs)
 
     def _verify_game_files(self):
         """Full integrity pass: aria2 hash-checks every game file's pieces

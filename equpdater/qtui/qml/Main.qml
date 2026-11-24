@@ -65,7 +65,8 @@ Window {
                     text: app.t(modelData.label)
                     selected: app.tab === modelData.id
                     badge: modelData.id === "mods" ? app.modUpdates
-                         : modelData.id === "addons" ? app.addonUpdates : 0
+                         : modelData.id === "addons" ? app.addonUpdates
+                         : modelData.id === "mpq" ? app.mpqUpdates : 0
                     onClicked: app.tab = modelData.id
                 }
             }
@@ -100,6 +101,7 @@ Window {
                       : modelData.id === "tweaks" ? "pages/TweaksPage.qml"
                       : modelData.id === "mods" ? "pages/ModsPage.qml"
                       : modelData.id === "addons" ? "pages/AddonsPage.qml"
+                      : modelData.id === "mpq" ? "pages/MpqPage.qml"
                       : "pages/PlaceholderPage.qml"
                 onLoaded: if (item.pageName !== undefined) item.pageName = app.t(modelData.label)
             }

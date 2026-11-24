@@ -33,7 +33,7 @@ Item {
         color: Style.pick(root.spec.textColors, "normal", "#fff")
         font.family: root.spec.font.family
         font.pixelSize: root.spec.font.size
-        onTextEdited: root.edited(text)
+        onTextEdited: { root.text = text; root.edited(text) }
         Text {
             visible: field.text === "" && !field.activeFocus
             text: root.placeholder

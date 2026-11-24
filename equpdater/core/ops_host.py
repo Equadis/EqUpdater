@@ -27,6 +27,9 @@ from .addons_ops import AddonsOps
 from .logsink import log
 from .mods_ops import ModsOps
 from .mods_rows import ModsRows
+from .mpq_ops import MPQ_PATCHES
+from .mpq_page_ops import MpqPageOps
+from .settings_ops import SettingsOps
 
 
 class Var:
@@ -69,7 +72,7 @@ class AutoDialogs:
         self.asked.append(("error", title))
 
 
-class OpsHost(ModsRows, AddonsOps, ModsOps):
+class OpsHost(SettingsOps, MpqPageOps, ModsRows, AddonsOps, ModsOps):
     def __init__(self, settings, schedule=None, events=None, dialogs=None):
         self.settings = settings
         self._schedule = schedule or (lambda ms, fn, *a: fn(*a))
@@ -93,6 +96,13 @@ class OpsHost(ModsRows, AddonsOps, ModsOps):
         self._default_addons_install_started = False
         self._update_all_chain = False
         self._update_all_running = False
+        self._mpq_busy = None
+        self._mpq_busy_text = ""
+        self._mpq_installed_rows: list = []
+        self._mpq_available_rows: list = list(MPQ_PATCHES)
+        self._mpq_updates_count = 0
+        self._running = False
+        self._client_ready = False
         self._btn_mode = "play"
         self._status_var = Var("", lambda v: self.events("status", text=v))
         self._lock = threading.RLock()
@@ -155,6 +165,18 @@ class OpsHost(ModsRows, AddonsOps, ModsOps):
         if self._update_all_chain:
             self.after(0, self._chain_addon_update_all)
         self._refresh_ready_state()
+
+    def _refresh_nav_badges(self):
+        self.events("nav_badges")
+
+    def _restart(self):
+        self.events("restart")
+
+    def _render_mpq(self):
+        self.events("mpq_rows")
+
+    def _refresh_mpq_badge(self):
+        self.events("mpq_badge", count=self._mpq_updates_count)
 
     def _refresh_ready_state(self):
         self.events("ready")

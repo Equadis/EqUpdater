@@ -592,6 +592,16 @@ class AppBridge(QObject):
             self.countsChanged.emit()
 
     _addon_updates = 0
+    _mpq_updates = 0
+
+    @Property(int, notify=countsChanged)
+    def mpqUpdates(self):
+        return self._mpq_updates
+
+    def setMpqUpdates(self, n: int):
+        if n != self._mpq_updates:
+            self._mpq_updates = n
+            self.countsChanged.emit()
 
     @Property(int, notify=countsChanged)
     def addonUpdates(self):

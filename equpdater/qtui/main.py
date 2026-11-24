@@ -40,6 +40,7 @@ from ..core.tweaks_service import TweaksService              # noqa: E402
 from . import bridge, ops_bridge                             # noqa: E402
 from ..core.mods_service import ModsService                  # noqa: E402
 from ..core.addons_service import AddonsService              # noqa: E402
+from ..core.mpq_service import MpqService                    # noqa: E402
 
 QML_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "qml")
 
@@ -105,6 +106,8 @@ def build(argv=None):
     host, holder = ops_bridge.make_host(settings, dialog_bridge, app_bridge, dispatcher)
     mods_service = ModsService(host, tasks)
     mods_bridge = ops_bridge.ModsBridge(mods_service, host, app_bridge)
+    mpq_service = MpqService(host, tasks)
+    mpq_bridge = ops_bridge.MpqBridge(mpq_service, host, app_bridge)
     addons_service = AddonsService(host, tasks)
     addons_bridge = ops_bridge.AddonsBridge(addons_service, host, app_bridge)
 
@@ -119,6 +122,11 @@ def build(argv=None):
         elif name == "addons_badge":
             app_bridge.setAddonUpdates(kw["count"])
             addons_bridge.badgeChanged.emit()
+        elif name == "mpq_rows":
+            mpq_service.rebuild()
+        elif name == "mpq_badge":
+            app_bridge.setMpqUpdates(kw["count"])
+            mpq_bridge.badgeChanged.emit()
         elif name == "busy":
             app_bridge.setBusy(kw["on"])
         elif name == "status_error":
@@ -144,12 +152,12 @@ def build(argv=None):
     for name, obj in (("app", app_bridge), ("skin", skin_bridge),
                       ("settings", settings_bridge), ("news", news_bridge),
                       ("tweaks", tweaks_bridge), ("launch", launch_bridge),
-                      ("mods", mods_bridge), ("addons", addons_bridge),
+                      ("mods", mods_bridge), ("addons", addons_bridge), ("mpq", mpq_bridge),
                       ("dialog", dialog_bridge)):
         ctx.setContextProperty(name, obj)
     marks["objects_ready_ms"] = round((time.perf_counter() - _T0) * 1000)
 
-    parts = dict(addons=addons_bridge, addons_service=addons_service,
+    parts = dict(mpq=mpq_bridge, mpq_service=mpq_service, addons=addons_bridge, addons_service=addons_service,
                  mods=mods_bridge, mods_service=mods_service, host=host,
                  dialog=dialog_bridge, tweaks=tweaks_bridge, settings=settings, tasks=tasks, news=news_bridge,
                  launch=launch_bridge, app=app_bridge, skin=skin_bridge,

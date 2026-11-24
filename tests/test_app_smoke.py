@@ -2092,16 +2092,18 @@ class TestTexturePackDownload(unittest.TestCase):
             f.write(b"theirs")
         self.body = b"the source's build"
         self.sha = hashlib.sha256(self.body).hexdigest()
-        self._real = app.secure_urlopen
+        from tests.ns import patch_all
 
         class Resp(io.BytesIO):
             headers = {}
             def __enter__(s): return s
             def __exit__(s, *a): s.close()
-        app.secure_urlopen = lambda *a, **kw: Resp(self.body)
+        # download_mpq lives in core/mpq_ops.py now: patch where it reads it
+        self._patch = patch_all(app, "secure_urlopen", lambda *a, **kw: Resp(self.body))
+        self._patch.start()
 
     def tearDown(self):
-        self.m.secure_urlopen = self._real
+        self._patch.stop()
         shutil.rmtree(self.data, ignore_errors=True)
 
     def remote(self, sha):

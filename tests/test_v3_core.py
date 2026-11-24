@@ -607,6 +607,88 @@ class TestAddonsService(unittest.TestCase):
         self.assertEqual([kw["count"] for n, kw in got if n == "addons_badge"], [want])
 
 
+class TestMpqService(unittest.TestCase):
+    def setUp(self):
+        from equpdater import config
+        from equpdater.core.mpq_service import MpqService
+        from equpdater.core.ops_host import OpsHost, AutoDialogs
+        self.d = tempfile.mkdtemp()
+        self.game = os.path.join(self.d, "game")
+        os.makedirs(os.path.join(self.game, "Data"))
+        self._cfg = config.CONFIG_FILE
+        config.CONFIG_FILE = os.path.join(self.d, "config.json")
+        self.addCleanup(setattr, config, "CONFIG_FILE", self._cfg)
+        s = {"game_dir": self.game}
+        settings = type("S", (), {"get": lambda _s, k, d=None: s.get(k, d)})()
+        self.events = []
+        self.dialogs = AutoDialogs(yes=True)
+        self.host = OpsHost(settings, events=lambda n, **kw: self.events.append(n),
+                            dialogs=self.dialogs)
+        self.pump = Pump()
+        self.tasks = TaskManager(2, self.pump)
+        self.svc = MpqService(self.host, self.tasks)
+
+    def put(self, name, data=b"theirs"):
+        with open(os.path.join(self.game, "Data", name), "wb") as f:
+            f.write(data)
+
+    def scan(self):
+        self.host._mpq_installed_rows = []
+        # the lifted check does the scan on the calling thread, then asks sources
+        # in a worker; with nothing linked it never starts one
+        self.host._mpq_check()
+        return self.svc.build_items()
+
+    def test_a_pack_nobody_linked_is_listed_but_never_checked(self):
+        self.put("patch-O.mpq")
+        self.put("patch-Q.mpq")
+        items = self.scan()
+        rows = {i["file"]: i for i in items if i["kind"] == "pack"}
+        self.assertEqual(rows["patch-O.mpq"]["name"], "Octo Raid Visuals")
+        self.assertTrue(rows["patch-Q.mpq"]["canLink"])
+        self.assertFalse(rows["patch-Q.mpq"]["linked"])
+        self.assertEqual(rows["patch-Q.mpq"]["action"], "")          # no "update" for strangers
+        self.assertNotIn("patch-O.mpq", [r["file"] for r in rows.values() if r["section"] == "AVAILABLE"])
+
+    def test_available_lists_the_catalogue_when_nothing_is_installed(self):
+        items = self.scan()
+        rows = [i for i in items if i["kind"] == "pack"]
+        self.assertEqual([(r["section"], r["action"]) for r in rows], [("AVAILABLE", "install")])
+        self.assertEqual(rows[0]["author"], "Rook")
+
+    def test_uninstall_asks_and_declining_keeps_the_file(self):
+        self.put("patch-Q.mpq")
+        self.dialogs.yes = False
+        self.svc.uninstall("patch-Q.mpq")
+        self.assertTrue(os.path.exists(os.path.join(self.game, "Data", "patch-Q.mpq")))
+        self.dialogs.yes = True
+        self.svc.uninstall("patch-Q.mpq")
+        self.assertFalse(os.path.exists(os.path.join(self.game, "Data", "patch-Q.mpq")))
+
+    def test_link_refuses_a_bad_address_with_the_reason_and_changes_nothing(self):
+        self.put("patch-Q.mpq")
+        err = self.svc.link("patch-Q.mpq", "url", "not a link")
+        self.assertTrue(err)
+        self.assertEqual(open(os.path.join(self.game, "Data", "patch-Q.mpq"), "rb").read(), b"theirs")
+
+    def test_one_pack_at_a_time(self):
+        self.put("patch-Q.mpq")
+        self.assertIsNotNone(self.host._mpq_start("patch-Q.mpq", "x"))
+        self.assertIsNone(self.host._mpq_start("patch-O.mpq", "y"))
+        self.host._mpq_busy = None
+
+    def test_the_state_words_cover_every_judgement_that_holds_a_pack_back(self):
+        from equpdater import mpq
+        states = type(self.host)._MPQ_STATES
+        for st in mpq.REPLACEABLE + ("unverifiable",):
+            self.assertIn(st, states)
+
+    def test_speech_setting_is_stored_in_the_shared_config(self):
+        self.assertFalse(self.svc.ignore_speech())
+        self.svc.set_ignore_speech(True)
+        self.assertTrue(self.svc.ignore_speech())
+
+
 class TestPatchExeSafety(unittest.TestCase):
     """The 0-byte WoW.exe found on a dev machine: a bad cached base must never
     be written over the game."""

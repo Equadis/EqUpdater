@@ -448,6 +448,54 @@ class TestAddonsPage(Base):
         self.assertEqual(p["addons"].model.stats["resets"], 0)
 
 
+class TestMpqPage(Base):
+    def open_page(self):
+        game = tempfile.mkdtemp(prefix="equ-mpq-")
+        os.makedirs(os.path.join(game, "Data"))
+        for n in ("patch-O.mpq", "patch-Q.mpq"):
+            with open(os.path.join(game, "Data", n), "wb") as f:
+                f.write(b"theirs")
+        self.addCleanup(shutil.rmtree, game, True)
+        d = tempfile.mkdtemp(prefix="equ-q-")
+        with open(os.path.join(d, "settings.json"), "w") as f:
+            json.dump({"_schema": 1, "game_dir": game, "imported_from_2x": True}, f)
+        p = self.start(data_dir=d)
+        names = [i.objectName() for i in walk(self.win.property("contentItem"))]
+        self.assertNotIn("mpqPanel", names)
+        p["app"].tab = "mpq"
+        pump(until=lambda: p["mpq"].model.rowCount() > 0, limit=6000)
+        pump(300)
+        self.assertEqual(self.qml_errors(), [])
+        return p
+
+    def test_lists_installed_packs_and_renders_in_both_skins(self):
+        p = self.open_page()
+        self.assertEqual(p["mpq"].model.rowCount(), 2 + 2)       # 2 headers + 2 packs
+        for sid in p["manager"].skins:
+            p["settings_bridge"].setSkin(sid)
+            pump(200)
+        self.assertEqual(self.qml_errors(), [])
+
+    def test_link_dialog_opens_refuses_a_bad_link_and_closes(self):
+        p = self.open_page()
+        p["mpq"].openLink("patch-Q.mpq")
+        pump(100)
+        dlg = self.lst("mpqLinkDialog")
+        self.assertTrue(dlg.property("visible"))
+        self.assertTrue(p["mpq"].link("url", "nonsense"))        # reason returned, dialog stays
+        self.assertEqual(p["mpq"].linkFor, "patch-Q.mpq")
+        p["mpq"].closeLink()
+        pump(100)
+        self.assertFalse(dlg.property("visible"))
+
+    def test_collapsing_a_section_does_not_reset_the_model(self):
+        p = self.open_page()
+        before = p["mpq"].model.stats["resets"]
+        p["mpq"].toggleSection("INSTALLED")
+        pump(until=lambda: p["mpq"].model.rowCount() == 2, limit=4000)
+        self.assertEqual(p["mpq"].model.stats["resets"], before)
+
+
 class TestOffline(Base):
     def test_offline_shows_cache_and_an_error_not_an_empty_page(self):
         p = self.start()

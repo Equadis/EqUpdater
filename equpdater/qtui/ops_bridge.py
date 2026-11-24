@@ -12,6 +12,7 @@ from PySide6.QtCore import (QEventLoop, QObject, QTimer, Property, Signal, Slot)
 
 from ..core.addons_service import AddonsService
 from ..core.mods_service import ModsService
+from ..core.mpq_service import MpqService
 from ..core.ops_host import OpsHost
 from ..i18n import tr
 from .models import KeyedListModel
@@ -275,6 +276,107 @@ class AddonsBridge(QObject):
     @Slot()
     def updateAll(self):
         self.service.update_all()
+
+    @Slot(str)
+    def openUrl(self, url):
+        self.app.openUrl(url)
+
+
+_MPQ_ROLES = ["key", "kind", "section", "file", "name", "showFile", "description",
+              "installed", "linked", "busy", "action", "actionText", "stateText",
+              "stateTone", "stateTip", "offersReplace", "sourceText", "canLink",
+              "linkTip", "author", "homepage", "title", "count", "open"]
+
+
+class MpqBridge(QObject):
+    changed = Signal()
+    linkChanged = Signal()
+    badgeChanged = Signal()
+
+    def __init__(self, service: MpqService, host: OpsHost, app_bridge):
+        super().__init__()
+        self.service, self.host, self.app = service, host, app_bridge
+        self.lm = KeyedListModel(_MPQ_ROLES)
+        self._link_for = ""
+        service.on_rows = self._rows
+
+    def _rows(self, items):
+        self.lm.set_items([{**{k: None for k in _MPQ_ROLES}, **it} for it in items])
+        self.changed.emit()
+
+    @Property(QObject, constant=True)
+    def model(self):
+        return self.lm
+
+    @Property(int, notify=badgeChanged)
+    def updates(self):
+        return self.host._mpq_updates_count
+
+    @Property(bool, notify=changed)
+    def hasGame(self):
+        return bool(self.host._game_path.get())
+
+    @Property(bool, notify=changed)
+    def ignoreSpeech(self):
+        return self.service.ignore_speech()
+
+    @ignoreSpeech.setter
+    def ignoreSpeech(self, v):
+        self.service.set_ignore_speech(v)
+        self.changed.emit()
+
+    @Property(str, notify=linkChanged)
+    def linkFor(self):
+        return self._link_for
+
+    @Property("QVariantList", constant=True)
+    def catalogue(self):
+        return self.service.catalogue()
+
+    @Slot()
+    def open(self):
+        self.service.open()
+
+    @Slot()
+    def recheck(self):
+        self.service.check()
+
+    @Slot(str)
+    def toggleSection(self, title):
+        self.service.toggle_section(title)
+
+    @Slot(str, str)
+    def click(self, file, action):
+        self.service.click(file, action)
+
+    @Slot(str)
+    def replace(self, file):
+        self.service.replace(file)
+
+    @Slot(str)
+    def uninstall(self, file):
+        self.service.uninstall(file)
+
+    @Slot(str)
+    def unlink(self, file):
+        self.service.unlink(file)
+
+    @Slot(str)
+    def openLink(self, file):
+        self._link_for = file
+        self.linkChanged.emit()
+
+    @Slot()
+    def closeLink(self):
+        self._link_for = ""
+        self.linkChanged.emit()
+
+    @Slot(str, str, result=str)
+    def link(self, choice, url):
+        err = self.service.link(self._link_for, choice, url)
+        if not err:
+            self.closeLink()
+        return err
 
     @Slot(str)
     def openUrl(self, url):

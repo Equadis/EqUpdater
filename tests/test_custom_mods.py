@@ -454,6 +454,11 @@ class TestDialog(unittest.TestCase):
             del sys.modules[mod]
         from equpdater import app
         cls.m = app
+        # The first-run mods question opens an overlay of its own whenever a
+        # game folder appears; answered *before* the window starts, no start-up
+        # timer can raise it in the middle of a test.
+        app.update_config(lambda c: c.update(essential_mods_asked=True,
+                                             auto_install_mods=False))
         cls.app = app.EqUpdaterApp()
         for _ in range(8):
             cls.app.update()
