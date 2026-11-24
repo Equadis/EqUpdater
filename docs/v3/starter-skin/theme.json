@@ -1,0 +1,58 @@
+{
+  "palette": {
+    "bg": "#1b1d22",
+    "panel": "#25282e",
+    "dialog": "#2b2f36",
+    "panelBorder": "#3b3f48",
+    "text": "#e8e9ec",
+    "textDim": "#9a9fa8",
+    "accent": "#e0a458",
+    "accentLight": "#f0c27e",
+    "link": "#7cb7e8",
+    "danger": "#ef7b7b",
+    "ok": "#7ccf94",
+    "new": "#ef7b7b",
+    "scrim": "#99000000",
+    "buttonFace": "#32363d",
+    "buttonHover": "#3d424a",
+    "buttonPressed": "#292c32",
+    "buttonDisabled": "#2a2d33",
+    "primary": "#3f7f4f",
+    "primaryHover": "#4a925c",
+    "primaryPressed": "#336a41"
+  },
+  "fonts": {
+    "body": {
+      "family": "Segoe UI",
+      "size": 13
+    },
+    "dim": {
+      "family": "Segoe UI",
+      "size": 11
+    },
+    "heading": {
+      "family": "Segoe UI",
+      "size": 15,
+      "bold": true
+    },
+    "title": {
+      "family": "Segoe UI",
+      "size": 24,
+      "bold": true
+    },
+    "button": {
+      "family": "Segoe UI",
+      "size": 13,
+      "bold": true
+    },
+    "nav": {
+      "family": "Segoe UI",
+      "size": 13,
+      "bold": true
+    }
+  },
+  "background": {
+    "color": "$bg"
+  },
+  "components": {}
+}

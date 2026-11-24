@@ -1,0 +1,9 @@
+{
+  "id": "my-skin",
+  "name": "My Skin",
+  "version": "1.0.0",
+  "skin_api": 1,
+  "author": "Your name",
+  "license": "Your licence for the artwork",
+  "description": "A starting point: colours only. Copy this folder to your skins folder, change id and name, edit theme.json."
+}

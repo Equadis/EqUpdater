@@ -36,7 +36,7 @@ my-skin/
 ```
 * Colours: `#RRGGBB` or `#AARRGGBB` (alpha first, as Qt writes it). `$name` refers to the palette. 
 * Sizes are logical pixels (HiDPI is automatic).
-* Palette names the app itself uses (`bg panel panelBorder text textDim accent accentLight link danger ok new scrim buttonFace buttonHover buttonPressed buttonDisabled primary primaryHover primaryPressed`) already have defaults; add your own names freely and refer to them with `$`.
+* Palette names the app itself uses (`bg panel dialog panelBorder text textDim accent accentLight link danger ok new scrim buttonFace buttonHover buttonPressed buttonDisabled primary primaryHover primaryPressed`) already have defaults; add your own names freely and refer to them with `$`.
 
 ### A component
 Every visual element is a **component id** (below). Each takes the same optional keys:
@@ -74,4 +74,8 @@ Files are only read if: path is relative and stays inside the skin folder (no `.
 ## Troubleshooting
 Settings → Skin shows ⚠ and the list of problems for the selected skin. Typical: *file not found* (check case and folder), *not the image type its name says* (re-export), *leaves the skin folder* (use relative paths without `..`), *skin_api N* (the skin is newer than the app).
 
-*Phase 5 adds the complete asset reference with images, the blank starter skin and the other three official skins; this file describes the engine as built in the proof of concept.*
+## More
+* `COMPONENTS.md`: every component id, its keys, states and what uses it.
+* `SKIN_ASSETS.md`: the five official skins, how their art is made, sizes and limits.
+* `starter-skin/`: a complete colours-only skin to copy.
+* The five official skins: Bubbles (default), Classic (2004), Minimal, Minimal Dark, Minimal Light. Settings → Skin lists them first, then yours.

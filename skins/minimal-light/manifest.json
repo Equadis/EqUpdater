@@ -1,0 +1,9 @@
+{
+  "version": "1.0.0",
+  "skin_api": 1,
+  "author": "EqUpdater",
+  "id": "minimal-light",
+  "name": "Minimal Light",
+  "license": "Artwork: EqUpdater project",
+  "description": "Neutral light theme. Colours and icons only, no animated background."
+}

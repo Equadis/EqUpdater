@@ -1,0 +1,207 @@
+{
+  "palette": {
+    "bg": "#070b14",
+    "panel": "#e60a1018",
+    "dialog": "#f20a1018",
+    "panelBorder": "#4a3a1c",
+    "text": "#f0e6c8",
+    "textDim": "#a79d7e",
+    "accent": "#ffd100",
+    "accentLight": "#ffe680",
+    "link": "#4fa3ff",
+    "danger": "#ff5a4f",
+    "ok": "#5fd35f",
+    "new": "#ff3b3b",
+    "scrim": "#b3000510",
+    "buttonFace": "#2c3440",
+    "buttonHover": "#3c4858",
+    "buttonPressed": "#1a2028",
+    "buttonDisabled": "#22262d",
+    "primary": "#3e6b2a",
+    "primaryHover": "#59932f",
+    "primaryPressed": "#1d3612"
+  },
+  "fonts": {
+    "body": {
+      "family": "Friz Quadrata",
+      "size": 13
+    },
+    "dim": {
+      "family": "Friz Quadrata",
+      "size": 11
+    },
+    "heading": {
+      "family": "Friz Quadrata",
+      "size": 15,
+      "bold": true
+    },
+    "title": {
+      "family": "Friz Quadrata",
+      "size": 24,
+      "bold": true
+    },
+    "button": {
+      "family": "Friz Quadrata",
+      "size": 13,
+      "bold": true
+    },
+    "nav": {
+      "family": "Friz Quadrata",
+      "size": 13,
+      "bold": true
+    }
+  },
+  "background": {
+    "color": "$bg",
+    "static": "backgrounds/stone-blue.webp",
+    "animation": "backgrounds/login-2004.webp",
+    "darken": 0.55,
+    "fadeTop": 0,
+    "fadeBottom": 0
+  },
+  "components": {
+    "panel": {
+      "textures": {
+        "normal": "panels/frame.png"
+      },
+      "slice": [
+        56,
+        56,
+        56,
+        56
+      ],
+      "padding": [
+        26,
+        22,
+        26,
+        20
+      ]
+    },
+    "dialog": {
+      "textures": {
+        "normal": "panels/frame.png"
+      },
+      "slice": [
+        56,
+        56,
+        56,
+        56
+      ],
+      "padding": [
+        26,
+        22,
+        26,
+        20
+      ]
+    },
+    "button": {
+      "textures": {
+        "normal": "buttons/normal-normal.png",
+        "hover": "buttons/normal-hover.png",
+        "pressed": "buttons/normal-pressed.png",
+        "disabled": "buttons/normal-disabled.png",
+        "selected": "buttons/normal-hover.png"
+      },
+      "slice": [
+        10,
+        10,
+        10,
+        10
+      ],
+      "textColors": {
+        "normal": "#ffd100",
+        "hover": "#ffffff",
+        "pressed": "#e6c25a",
+        "disabled": "#7d7a6e",
+        "selected": "#ffffff"
+      },
+      "padding": [
+        14,
+        6,
+        14,
+        6
+      ]
+    },
+    "button.play": {
+      "textures": {
+        "normal": "buttons/play-normal.png",
+        "hover": "buttons/play-hover.png",
+        "pressed": "buttons/play-pressed.png",
+        "disabled": "buttons/play-disabled.png",
+        "selected": "buttons/play-hover.png"
+      },
+      "slice": [
+        10,
+        10,
+        10,
+        10
+      ],
+      "textColors": {
+        "normal": "#ffd100",
+        "hover": "#ffffff",
+        "pressed": "#e6c25a",
+        "disabled": "#7d7a6e"
+      },
+      "minHeight": 40,
+      "padding": [
+        34,
+        8,
+        34,
+        8
+      ]
+    },
+    "nav.tab": {
+      "textColors": {
+        "normal": "#ffd100",
+        "hover": "#ffffff",
+        "selected": "#ffffff"
+      }
+    },
+    "text.heading": {
+      "textColors": {
+        "normal": "#ffd100"
+      }
+    },
+    "panel.header": {
+      "textColors": {
+        "normal": "#ffd100"
+      }
+    },
+    "icon.logo": {
+      "icon": "icons/logo.png"
+    },
+    "icon.refresh": {
+      "icon": "icons/refresh.png"
+    },
+    "icon.settings": {
+      "icon": "icons/settings.png"
+    },
+    "icon.arrow-down": {
+      "icon": "icons/arrow-down.png"
+    },
+    "icon.discord": {
+      "icon": "icons/discord.png"
+    },
+    "icon.support": {
+      "icon": "icons/support.png"
+    },
+    "icon.download": {
+      "icon": "icons/download.png"
+    },
+    "icon.remove": {
+      "icon": "icons/remove.png"
+    },
+    "icon.release": {
+      "icon": "icons/release.png"
+    },
+    "icon.link": {
+      "icon": "icons/link.png"
+    },
+    "icon.check": {
+      "icon": "icons/check.png"
+    },
+    "icon.update": {
+      "icon": "icons/swap.png"
+    }
+  }
+}

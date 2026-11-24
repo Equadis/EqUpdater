@@ -1,0 +1,102 @@
+{
+  "palette": {
+    "bg": "#eef0f3",
+    "panel": "#ffffff",
+    "dialog": "#ffffff",
+    "panelBorder": "#cfd3da",
+    "text": "#1f2329",
+    "textDim": "#5d6572",
+    "accent": "#2563c9",
+    "accentLight": "#4a85e6",
+    "link": "#1f5bbf",
+    "danger": "#c93c3c",
+    "ok": "#238a4a",
+    "new": "#c93c3c",
+    "scrim": "#66000000",
+    "buttonFace": "#e3e6eb",
+    "buttonHover": "#d6dae1",
+    "buttonPressed": "#c9ced6",
+    "buttonDisabled": "#eceef1",
+    "primary": "#2563c9",
+    "primaryHover": "#3874de",
+    "primaryPressed": "#1d52a8"
+  },
+  "fonts": {
+    "body": {
+      "family": "Segoe UI",
+      "size": 13
+    },
+    "dim": {
+      "family": "Segoe UI",
+      "size": 11
+    },
+    "heading": {
+      "family": "Segoe UI",
+      "size": 15,
+      "bold": true
+    },
+    "title": {
+      "family": "Segoe UI",
+      "size": 24,
+      "bold": true
+    },
+    "button": {
+      "family": "Segoe UI",
+      "size": 13,
+      "bold": true
+    },
+    "nav": {
+      "family": "Segoe UI",
+      "size": 13,
+      "bold": true
+    }
+  },
+  "background": {
+    "color": "$bg"
+  },
+  "components": {
+    "icon.logo": {
+      "icon": "icons/logo.png"
+    },
+    "icon.refresh": {
+      "icon": "icons/refresh.png"
+    },
+    "icon.settings": {
+      "icon": "icons/settings.png"
+    },
+    "icon.arrow-down": {
+      "icon": "icons/arrow-down.png"
+    },
+    "icon.discord": {
+      "icon": "icons/discord.png"
+    },
+    "icon.support": {
+      "icon": "icons/support.png"
+    },
+    "icon.download": {
+      "icon": "icons/download.png"
+    },
+    "icon.remove": {
+      "icon": "icons/remove.png"
+    },
+    "icon.release": {
+      "icon": "icons/release.png"
+    },
+    "icon.link": {
+      "icon": "icons/link.png"
+    },
+    "icon.check": {
+      "icon": "icons/check.png"
+    },
+    "icon.update": {
+      "icon": "icons/swap.png"
+    },
+    "button.play": {
+      "textColors": {
+        "normal": "#ffffff",
+        "hover": "#ffffff",
+        "disabled": "#8a919c"
+      }
+    }
+  }
+}
