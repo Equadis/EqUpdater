@@ -57,7 +57,7 @@ STATES = ("normal", "hover", "pressed", "disabled", "selected")
 #: The stable component ids. Documented in docs/v3/SKINNING.md. A skin may
 #: define any subset; every id always resolves (to the built-in theme at worst).
 COMPONENTS = (
-    "window", "panel", "panel.header", "divider", "scrim",
+    "window", "panel", "dialog", "panel.header", "divider", "scrim",
     "button", "button.primary", "button.play", "button.small", "button.link",
     "splitbutton.arrow",
     "nav.tab", "checkbox", "menu", "menu.item", "progress", "scrollbar",
@@ -69,14 +69,14 @@ COMPONENTS = (
 )
 
 #: Implicit parents (``extends`` in a theme overrides these).
-PARENT = {"panel.header": "panel", "button.primary": "button",
+PARENT = {"panel.header": "panel", "dialog": "panel", "button.primary": "button",
           "button.play": "button.primary", "button.small": "button",
           "button.link": "button", "menu.item": "button",
           "splitbutton.arrow": "button.play"}
 
 BUILTIN_THEME = {
     "palette": {
-        "bg": "#14161a", "panel": "#1d2025", "panelBorder": "#33373e",
+        "bg": "#14161a", "panel": "#1d2025", "dialog": "#1d2025", "panelBorder": "#33373e",
         "text": "#e6e8eb", "textDim": "#9aa1ab", "accent": "#d9b44a",
         "accentLight": "#f0d27a", "link": "#7fb0ff", "danger": "#ff6b6b",
         "ok": "#6fcf97", "new": "#ff5d5d", "scrim": "#99000000",
@@ -100,6 +100,7 @@ BUILTIN_THEME = {
         "panel": {"colors": {"normal": "$panel"}, "borderColors":
                   {"normal": "$panelBorder"}, "borderWidth": 1, "radius": 3,
                   "padding": [14, 12, 14, 12]},
+        "dialog": {"colors": {"normal": "$dialog"}},
         "panel.header": {"textColors": {"normal": "$accent"}, "font": "heading"},
         "divider": {"colors": {"normal": "$panelBorder"}},
         "scrim": {"colors": {"normal": "$scrim"}},
@@ -138,7 +139,7 @@ BUILTIN_THEME = {
         "checkbox": {"colors": {"normal": "$buttonFace", "selected": "$accent"},
                      "borderColors": {"normal": "$panelBorder"},
                      "textColors": {"normal": "$text", "hover": "$accentLight"}},
-        "menu": {"colors": {"normal": "$panel"},
+        "menu": {"colors": {"normal": "$dialog"},
                  "borderColors": {"normal": "$panelBorder"}, "borderWidth": 1,
                  "padding": [4, 4, 4, 4]},
         "menu.item": {"textures": None,

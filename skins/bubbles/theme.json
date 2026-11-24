@@ -2,6 +2,7 @@
   "palette": {
     "bg": "#06132d",
     "panel": "#e6081a35",
+    "dialog": "#ff0a1f3d",
     "panelBorder": "#18385f",
     "text": "#eee9dc",
     "textDim": "#91a3bd",

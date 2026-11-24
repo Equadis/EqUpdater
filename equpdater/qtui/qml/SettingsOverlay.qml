@@ -19,6 +19,7 @@ Item {
     }
     SkinPanel {
         id: box
+        kind: "dialog"
         width: Math.min(560, parent.width - 60)
         height: Math.min(560, parent.height - 60)
         anchors.centerIn: parent

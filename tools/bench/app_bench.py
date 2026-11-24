@@ -177,11 +177,12 @@ def main():
     ap.add_argument("--runs", type=int, default=5)
     ap.add_argument("--idle-s", type=int, default=10)
     ap.add_argument("--only", nargs="*", default=["startup", "scenarios"])
+    ap.add_argument("--targets", nargs="*", default=["old", "new"])
     a = ap.parse_args()
     result = {"machine": {"cpu": psutil.cpu_count(), "python": sys.version.split()[0],
                           "ram_gb": round(psutil.virtual_memory().total / 2**30, 1)},
               "old": a.old, "new": a.new}
-    targets = (("old", a.old), ("new", a.new))
+    targets = tuple(t for t in (("old", a.old), ("new", a.new)) if t[0] in a.targets)
     if "startup" in a.only:
         for which, root in targets:
             for animated in (True, False):

@@ -1,0 +1,205 @@
+{
+ "machine": {
+  "cpu": 12,
+  "python": "3.12.10",
+  "ram_gb": 31.9
+ },
+ "old": "D:/EqUpdater-queue",
+ "new": "D:\\EqUpdater",
+ "new_anim_on_first_launch_empty_cache": {
+  "which": "new",
+  "visible_ms": 926,
+  "interactive_ms": 1091,
+  "python_marks": {
+   "process_to_main_ms": 323,
+   "objects_ready_ms": 414,
+   "qml_loaded_ms": 843,
+   "first_frame_ms": 1007,
+   "interactive_ms": 1008,
+   "epoch_interactive": 1795487730.8156412
+  }
+ },
+ "new_anim_on_cached": {
+  "visible_ms": 1088,
+  "interactive_ms": 1249,
+  "idle_cpu_pct": 0.3,
+  "rss_mb": 192.4,
+  "requests": null,
+  "runs": 5
+ },
+ "new_anim_on_cached_rows": [
+  {
+   "which": "new",
+   "visible_ms": 876,
+   "interactive_ms": 1042,
+   "python_marks": {
+    "process_to_main_ms": 314,
+    "objects_ready_ms": 396,
+    "qml_loaded_ms": 802,
+    "first_frame_ms": 964,
+    "interactive_ms": 964,
+    "epoch_interactive": 1795487732.3198035
+   },
+   "idle_cpu_pct": 15.2,
+   "rss_mb": 216.47
+  },
+  {
+   "which": "new",
+   "visible_ms": 1173,
+   "interactive_ms": 1342,
+   "python_marks": {
+    "process_to_main_ms": 306,
+    "objects_ready_ms": 403,
+    "qml_loaded_ms": 1097,
+    "first_frame_ms": 1264,
+    "interactive_ms": 1264,
+    "epoch_interactive": 1795487747.1373253
+   },
+   "idle_cpu_pct": 0.2,
+   "rss_mb": 192.42
+  },
+  {
+   "which": "new",
+   "visible_ms": 1069,
+   "interactive_ms": 1227,
+   "python_marks": {
+    "process_to_main_ms": 286,
+    "objects_ready_ms": 375,
+    "qml_loaded_ms": 996,
+    "first_frame_ms": 1154,
+    "interactive_ms": 1154,
+    "epoch_interactive": 1795487761.8246102
+   },
+   "idle_cpu_pct": 0.2,
+   "rss_mb": 192.73
+  },
+  {
+   "which": "new",
+   "visible_ms": 1088,
+   "interactive_ms": 1249,
+   "python_marks": {
+    "process_to_main_ms": 288,
+    "objects_ready_ms": 378,
+    "qml_loaded_ms": 1020,
+    "first_frame_ms": 1179,
+    "interactive_ms": 1179,
+    "epoch_interactive": 1795487776.5271049
+   },
+   "idle_cpu_pct": 0.6,
+   "rss_mb": 191.02
+  },
+  {
+   "which": "new",
+   "visible_ms": 1200,
+   "interactive_ms": 1374,
+   "python_marks": {
+    "process_to_main_ms": 305,
+    "objects_ready_ms": 398,
+    "qml_loaded_ms": 1064,
+    "first_frame_ms": 1238,
+    "interactive_ms": 1238,
+    "epoch_interactive": 1795487791.363163
+   },
+   "idle_cpu_pct": 0.3,
+   "rss_mb": 192.2
+  }
+ ],
+ "new_anim_off_first_launch_empty_cache": {
+  "which": "new",
+  "visible_ms": 945,
+  "interactive_ms": 1098,
+  "python_marks": {
+   "process_to_main_ms": 307,
+   "objects_ready_ms": 397,
+   "qml_loaded_ms": 869,
+   "first_frame_ms": 1025,
+   "interactive_ms": 1025,
+   "epoch_interactive": 1795487805.9279697
+  }
+ },
+ "new_anim_off_cached": {
+  "visible_ms": 1094,
+  "interactive_ms": 1257,
+  "idle_cpu_pct": 0.0,
+  "rss_mb": 184.9,
+  "requests": null,
+  "runs": 5
+ },
+ "new_anim_off_cached_rows": [
+  {
+   "which": "new",
+   "visible_ms": 847,
+   "interactive_ms": 1005,
+   "python_marks": {
+    "process_to_main_ms": 301,
+    "objects_ready_ms": 390,
+    "qml_loaded_ms": 771,
+    "first_frame_ms": 927,
+    "interactive_ms": 927,
+    "epoch_interactive": 1795487807.389296
+   },
+   "idle_cpu_pct": 0.0,
+   "rss_mb": 184.9
+  },
+  {
+   "which": "new",
+   "visible_ms": 1093,
+   "interactive_ms": 1252,
+   "python_marks": {
+    "process_to_main_ms": 289,
+    "objects_ready_ms": 381,
+    "qml_loaded_ms": 1025,
+    "first_frame_ms": 1182,
+    "interactive_ms": 1182,
+    "epoch_interactive": 1795487822.100701
+   },
+   "idle_cpu_pct": 0.0,
+   "rss_mb": 184.12
+  },
+  {
+   "which": "new",
+   "visible_ms": 1135,
+   "interactive_ms": 1308,
+   "python_marks": {
+    "process_to_main_ms": 292,
+    "objects_ready_ms": 384,
+    "qml_loaded_ms": 1066,
+    "first_frame_ms": 1237,
+    "interactive_ms": 1237,
+    "epoch_interactive": 1795487836.865526
+   },
+   "idle_cpu_pct": 0.2,
+   "rss_mb": 185.26
+  },
+  {
+   "which": "new",
+   "visible_ms": 1094,
+   "interactive_ms": 1257,
+   "python_marks": {
+    "process_to_main_ms": 306,
+    "objects_ready_ms": 397,
+    "qml_loaded_ms": 1025,
+    "first_frame_ms": 1183,
+    "interactive_ms": 1183,
+    "epoch_interactive": 1795487851.5786798
+   },
+   "idle_cpu_pct": 0.0,
+   "rss_mb": 185.4
+  },
+  {
+   "which": "new",
+   "visible_ms": 1103,
+   "interactive_ms": 1264,
+   "python_marks": {
+    "process_to_main_ms": 300,
+    "objects_ready_ms": 393,
+    "qml_loaded_ms": 1032,
+    "first_frame_ms": 1191,
+    "interactive_ms": 1191,
+    "epoch_interactive": 1795487866.3012342
+   },
+   "idle_cpu_pct": 0.0,
+   "rss_mb": 184.56
+  }
+ ]
+}

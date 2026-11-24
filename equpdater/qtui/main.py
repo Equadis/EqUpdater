@@ -140,6 +140,8 @@ def run(argv=None) -> int:
         marks["epoch_interactive"] = time.time()    # for cross-process timing
         p["news"].start()
         p["launch"].refresh()
+        if os.environ.get("EQU3_OPEN"):             # QA/docs: show a panel
+            QTimer.singleShot(800, lambda: p["app"].debugAction.emit(os.environ["EQU3_OPEN"]))
         out = os.environ.get("EQU3_MARKS")
         if out:
             with open(out, "w") as f:

@@ -418,6 +418,7 @@ class AppBridge(QObject):
     animationChanged = Signal()
     countsChanged = Signal()
     screenshotRequested = Signal(str)     # QA/docs only (EQU3_SCREENSHOT)
+    debugAction = Signal(str)             # QA/docs only (EQU3_OPEN)
 
     def __init__(self, settings):
         super().__init__()

@@ -28,6 +28,11 @@ Window {
 
     Connections {
         target: app
+        function onDebugAction(name) {
+            if (name === "settings") settingsView.open()
+            else if (name === "menu") menu.open()
+            else app.tab = name
+        }
         function onScreenshotRequested(path) {
             win.contentItem.grabToImage(function (r) { r.saveToFile(path) })
         }
@@ -158,10 +163,17 @@ Window {
         parent: C.Overlay.overlay
         heading: launch.heading
         entries: launch.entries
-        x: play.mapToItem(null, 0, 0).x
-        y: play.mapToItem(null, 0, 0).y - height - 6
         onChosen: function (label) { launch.chooseDefault(label); close() }
         onAboutToShow: launch.refresh()
+        // Above the button, left edges in line, as in 2.x. Placed on every
+        // open (and when its content changes size), not bound once.
+        function place() {
+            var o = play.mapToItem(C.Overlay.overlay, 0, 0)
+            x = o.x
+            y = Math.max(4, o.y - height - 6)
+        }
+        onOpened: place()
+        onHeightChanged: if (visible) place()
     }
 
     SettingsOverlay { id: settingsView; anchors.fill: parent }

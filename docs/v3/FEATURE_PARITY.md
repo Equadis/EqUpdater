@@ -43,3 +43,11 @@ Source of truth: `equpdater/app.py` function index + `HANDOFF.md` + tests. Statu
 
 ## New in 3.0 (no parity row)
 Skin engine + 5 skins · OctoBot server chip · conditional/dedup/backoff network layer · split config/cache stores · benchmark harness
+
+
+## Phase 2 status (proof of concept, `python -m equpdater.qtui`)
+`☑` = built in 3.0 and tested; `◐` = partly.
+
+☑ Shell, header/nav/footer layout, version, Discord/support links, Settings overlay (skin, animation options) · ☑ Skin engine + Bubbles + Minimal Dark (proof) · ☑ animated background (+ pause minimised/unfocused, disable, still fallback) · ☑ News: Announcements + Changelog, expand/collapse, latest open by default, author/date, links, Open in Browser, NEW!, Read more/Show less (14 lines), Load more / Show more, refresh per panel, persistent cache of listing **and** bodies, offline/error line with cached content kept, pinned-topic ordering, topic-id dedupe, 24 h body refresh, no request on scroll · ☑ PLAY split-button, option detection, saved default (kept when file missing), checkbox menu · ◐ Play start (no pre-launch pipeline, no launch-failure dialogs, no watcher, no `close_on_launch`) · ◐ news.json fallback (Announcements only, newest item + note, as 2.x) · ☐ sticky headers (dropped on purpose: 2.x's sticky header was a source of duplicated text; not reintroduced) · ☐ tab pages other than News (placeholder) · ☐ status line states (UPDATE / Everything up to date / error-as-link) · ☐ update-all arrow · ☐ translations of new strings; QML string extraction · ☐ keyboard focus order audit · ☐ screen-reader labels exist on controls, not yet verified with a reader · ☐ everything under Tweaks/Addons/Mods/MPQ/Settings/Diagnostics/Install
+
+**Removed on purpose (approved):** base-client download via aria2/torrent (ARIA2_AUDIT.md), and per your clarification, skin import/export UI, skin editor, hot-reload tooling.

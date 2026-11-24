@@ -113,3 +113,14 @@ P1 audit/arch (done) → P2 shell + skin engine + Bubbles + animated bg + News +
 - **D2 Torrent/aria2 base-client sync.** Drop in 3.0 (setup only configures an existing install), or keep as a clearly separate legacy feature?
 - **D3 Framework.** Approve PySide6/QML pending the §7 gate.
 - **D4 Baseline failures.** 4 smoke-test failures already exist on this branch (see `PERFORMANCE.md`); fix before the rebuild or carry as known?
+
+
+## 10. Decisions made in Phase 2 (all consistent with the approvals; revisit if you disagree)
+* **Package layout:** `equpdater/core/` (Qt-free) and `equpdater/qtui/` (only Qt importer). The Tk `equpdater/ui.py` keeps its name until the Tk shell is deleted; the Qt package is `qtui` to avoid the clash.
+* **Bridge:** QML sees five objects only: `app`, `skin`, `settings`, `news`, `launch` (`qtui/bridge.py`), plus the skin's theme read through one cached `Style.theme`. No file, network or rule logic in QML. Core results reach the GUI thread via one queued-signal `Dispatcher`.
+* **Background:** animated WebP via `AnimatedImage{cache:false}` (measured, PERFORMANCE.md); video supported but lazy.
+* **No skin editor/marketplace/import-export** (your clarification): skins are folders; Settings only selects, opens the folder, restores default. The earlier "import/export, hot reload" items are dropped; re-scanning on opening Settings gives the edit-reload loop.
+* **State:** 3.0 owns `v3/settings.json` and `v3/cache/`; 2.x `config.json` is read-only to 3.0 (MIGRATION.md).
+* **Fonts/i18n:** PoC QML strings go through `app.t()` (Python `tr`). Strings new to 3.0 have no translations yet and show in English; QML string extraction and the six-language test is a Phase 3 task (listed in FEATURE_PARITY.md).
+* **TLS context** is built on first request, not at import.
+* **Play:** selection, persistence and detection are the real 2.x functions; the *pre-launch pipeline* (dlls.txt reconcile, Auto Loot gate, diagnostics attempt, WDB clearing, post-launch watch) is **not yet wired** — Play in the PoC starts the chosen file only. Do not use the PoC build to play with mods until Phase 3.
