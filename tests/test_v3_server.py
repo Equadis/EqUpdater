@@ -53,8 +53,13 @@ class Net:
         return S.Response(304, b"", tag) if etag == tag else S.Response(200, body, tag)
 
 
+def status_obj():
+    return status()["sample"]
+
+
 def feed(net=None, clock=None, jitter=lambda a, b: 0.0, **kw):
     store = JsonStore(tempfile.mkdtemp() + "/server.json", {"snapshot": None, "fetched_at": 0}, delay=0)
+    kw.setdefault("snapshot_url", "")          # the static files, unless a test is about the snapshot
     f = S.ServerFeed(store, fetch=net or Net(), now=clock or Clock(), jitter=jitter, **kw)
     return f, store
 
@@ -176,6 +181,16 @@ class TestPolling(unittest.TestCase):
             self.assertNotIn("workers.dev", u)
             self.assertNotIn("/api/", u)
 
+    def test_the_only_worker_endpoint_ever_requested_is_the_launcher_snapshot(self):
+        net = Net()
+        f, _ = feed(net, snapshot_url=None)                 # the default configuration
+        for _ in range(3):
+            f.fetch_once()
+        workers = {u for u in net.urls if "workers.dev" in u}
+        self.assertEqual(workers, {S.SNAPSHOT_URL})
+        self.assertTrue(S.SNAPSHOT_URL.endswith("/api/snapshot"))
+        self.assertTrue(all(u.split("/")[2] in S.ALLOWED_HOSTS for u in net.urls))
+
     def test_the_combined_snapshot_url_means_one_request(self):
         obj = {"schema": 1, "population": live(), "status": status()["sample"]}
         calls = []
@@ -187,6 +202,107 @@ class TestPolling(unittest.TestCase):
         f.fetch_once()
         self.assertEqual(calls, ["https://example.invalid/snapshot.json"])
         self.assertEqual(f.view()["total"], 1381)
+
+    def snapshot_net(self, status=200):
+        obj = {"schema": 1, "cadence_s": 60, "population": live(), "status": status_obj()}
+        calls = []
+
+        def fetch(url, etag="", timeout=8.0):
+            calls.append(url)
+            if url == S.SNAPSHOT_URL:
+                if status != 200:
+                    return S.Response(status, b'{"error":"not_found"}')
+                body = json.dumps(obj).encode()
+                return S.Response(304, b"", '"v"') if etag == '"v"' else S.Response(200, body, '"v"')
+            return Net()(url, etag)
+        return fetch, calls
+
+    def test_the_snapshot_is_used_when_it_exists_and_the_static_files_are_not_touched(self):
+        fetch, calls = self.snapshot_net()
+        f, _ = feed(fetch, snapshot_url=None)
+        self.assertTrue(f.fetch_once())
+        self.assertEqual(f.source, "snapshot")
+        self.assertEqual(f.view()["total"], 1381)
+        self.assertEqual(calls, [S.SNAPSHOT_URL])
+        self.assertFalse(f.fetch_once())                    # 304
+        self.assertEqual(calls, [S.SNAPSHOT_URL] * 2)
+
+    def test_until_it_is_deployed_a_404_falls_back_to_the_static_files_and_asks_again_tomorrow(self):
+        fetch, calls = self.snapshot_net(404)
+        clock = Clock()
+        f, _ = feed(fetch, clock=clock, snapshot_url=None)
+        self.assertTrue(f.fetch_once())
+        self.assertEqual(f.source, "static")
+        self.assertEqual(f.view()["total"], 1381)
+        self.assertFalse(f.unavailable)                     # a missing snapshot is not an outage
+        self.assertEqual(calls.count(S.SNAPSHOT_URL), 1)
+        clock.t += 3600
+        f.fetch_once()
+        f.fetch_once()
+        self.assertEqual(calls.count(S.SNAPSHOT_URL), 1)    # not asked again within the day
+        clock.t += S.SNAPSHOT_RETRY_MISSING_S
+        f.fetch_once()
+        self.assertEqual(calls.count(S.SNAPSHOT_URL), 2)
+
+    def test_a_broken_snapshot_falls_back_and_is_retried_soon(self):
+        calls = []
+        clock = Clock()
+
+        def fetch(url, etag="", timeout=8.0):
+            calls.append(url)
+            if url == S.SNAPSHOT_URL:
+                return S.Response(200, b"<html>", '"x"')
+            return Net()(url, etag)
+        f, _ = feed(fetch, clock=clock, snapshot_url=None)
+        f.fetch_once()
+        self.assertEqual(f.source, "static")
+        self.assertEqual(f.view()["total"], 1381)
+        clock.t += S.SNAPSHOT_RETRY_ERROR_S + 1
+        f.fetch_once()
+        self.assertEqual(calls.count(S.SNAPSHOT_URL), 2)
+
+    def test_an_unreachable_worker_does_not_stop_the_static_files_being_read(self):
+        calls = []
+
+        def fetch(url, etag="", timeout=8.0):
+            calls.append(url)
+            if url == S.SNAPSHOT_URL:
+                raise OSError("worker unreachable")
+            return Net()(url, etag)
+        f, _ = feed(fetch, snapshot_url=None)
+        self.assertTrue(f.fetch_once())
+        self.assertEqual(f.view()["total"], 1381)
+
+    def test_a_deployed_snapshot_is_picked_up_without_a_new_release(self):
+        state = {"status": 404}
+
+        def fetch(url, etag="", timeout=8.0):
+            if url == S.SNAPSHOT_URL:
+                return self.snapshot_net(state["status"])[0](url, etag)
+            return Net()(url, etag)
+        clock = Clock()
+        f, _ = feed(fetch, clock=clock, snapshot_url=None)
+        f.fetch_once()
+        self.assertEqual(f.source, "static")
+        state["status"] = 200
+        clock.t += S.SNAPSHOT_RETRY_MISSING_S + 1
+        f.fetch_once()
+        self.assertEqual(f.source, "snapshot")
+
+    def test_fresh_snapshot_data_is_not_stale_where_the_static_files_would_be(self):
+        net = Net()
+        net.live, net.status = live(ago=3 * 3600), status(ago=8 * 3600)             # the real GitHub situation
+        f, _ = feed(net)
+        f.fetch_once()
+        self.assertTrue(f.view()["status_stale"])
+        obj = {"schema": 1, "cadence_s": 60, "population": live(ago=30), "status": status(ago=45)["sample"]}
+        g, _ = feed(lambda url, etag="", timeout=8.0: S.Response(200, json.dumps(obj).encode(), '"v"'),
+                    snapshot_url=None)
+        g.fetch_once()
+        v = g.view()
+        self.assertFalse(v["stale"])
+        self.assertFalse(v["status_stale"])
+        self.assertEqual(v["state"], "online")
 
     def test_cadence_active_unfocused_minimised(self):
         f, _ = feed()

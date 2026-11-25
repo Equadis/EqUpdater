@@ -31,3 +31,9 @@ The planner's product rules (what Update all may touch and why), recovery, confi
 
 ## Numbers
 Automated tests: 1,200 (2.x branch: 881), all passing; see `TESTING.md`. Measurements and method: `PERFORMANCE.md`.
+
+## Beta prep (2026-11-25)
+* Installer: uninstall (Apps & features, `--uninstall`), silent mode with exit codes, marker file, deferred self-delete fix.
+* Server status: snapshot-first client with static fallback (OctoBot PR 77, not deployed).
+* Social: unavailable services can no longer disturb the launcher; every skin lays out the account chip and sidebar (Turtle WoW `navOffset`); opaque sidebar backing in narrow windows.
+* Linux: AppImage build script, pruned Qt layouts, CI job (never run). New docs: `LINUX.md`, `OCTOWOW_INTEGRATION_PROPOSAL.md`, `QA_REPORT.md`.

@@ -46,6 +46,7 @@ Window {
     // ── header: logo left, navigation right, settings gear ─────────────
     Item {
         id: header
+        objectName: "headerArea"
         anchors { left: parent.left; right: parent.right; top: parent.top }
         height: win.layout.headerHeight
         Row {
@@ -60,11 +61,12 @@ Window {
         }
         Row {
             id: nav
+            objectName: "navRow"
             // `navAlign: "left"` puts the tabs beside the logo (Battle.net's way)
             readonly property bool alignLeft: win.layout.navAlign === "left"
             x: alignLeft ? logoRow.x + logoRow.width + (win.layout.navLeftMargin || 40)
                     : parent.width - width - win.layout.navRight
-            anchors { verticalCenter: parent.verticalCenter; verticalCenterOffset: 4 }
+            anchors { verticalCenter: parent.verticalCenter; verticalCenterOffset: win.layout.navOffset !== undefined ? win.layout.navOffset : 4 }
             spacing: win.layout.navSpacing
             Repeater {
                 model: win.pages
@@ -84,6 +86,7 @@ Window {
         }
         Item {
             id: gear
+            objectName: "settingsGear"
             width: 28; height: 28
             anchors { right: parent.right; rightMargin: 10; top: parent.top; topMargin: 8 }
             activeFocusOnTab: true
@@ -136,6 +139,7 @@ Window {
     // ── footer: status + Play (left), links + version (right) ──────────
     Item {
         id: footer
+        objectName: "footerArea"
         anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
         height: win.layout.footerHeight
         Column {

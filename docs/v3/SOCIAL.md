@@ -72,3 +72,5 @@ Everything below is a *request*, written so a small server-side change can switc
 1. Share section 4 with the OctoWoW developers; sign-in (4A) is the smallest useful step and unlocks the account chip.
 2. If they agree to 4B, run the real service through `tools/bench/` style checks (batching, `429`, outage) before enabling `PresenceProvider`.
 3. Until then, nothing to do for players: the friends list works locally and says plainly that statuses are unavailable.
+
+For the OctoWoW developers there is a standalone technical proposal: `OCTOWOW_INTEGRATION_PROPOSAL.md`. Sign-in and live presence stay disabled until those services exist.

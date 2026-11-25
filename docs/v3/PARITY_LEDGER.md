@@ -30,7 +30,7 @@ Current status of every area in the original audit (`FEATURE_PARITY.md` top half
 | Verify game files | Done, **changed** | read-only scan against the manifest (no torrent) |
 | Base client torrent sync, aria2, mirror status, firewall notice | **By design** | |
 | Windows installer and shortcuts | Done (separate beta product) | 2.x installer untouched; not run on a clean machine |
-| Linux AppImage | **Missing** | |
+| Linux AppImage | **Written, never built or run** | `LINUX.md`; needs a Linux machine |
 | Diagnostics: Login Doctor checks, ENV/LAUNCH problems, session log, support ZIP with redaction | Done | redaction tested |
 | Config: atomic writes, lock, v1->v2 migration, corrupt-file copy | Done | shared `config.py`, unchanged |
 | Build / CI | Partly | `tools/build_v3.py` + self-test; `tests.yml` now installs PySide6 (Qt tests no longer skip) and `beta.yml` (manual) builds the installer artifact. **Neither workflow has been run on GitHub yet** |

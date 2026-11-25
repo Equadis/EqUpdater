@@ -180,10 +180,15 @@ class SocialBridge(QObject):
 
     # -- model ---------------------------------------------------------------------------------------
     def _refresh(self):
-        full = [{**{k: None for k in _ROLES}, **row} for row in self.service.rows()]
-        self.lm.set_items(full)
-        for title, text in self.service.take_toasts():
-            self.toast.emit(title, text)
+        """A social failure must never reach the launcher: keep what is shown and carry on."""
+        try:
+            full = [{**{k: None for k in _ROLES}, **row} for row in self.service.rows()]
+            self.lm.set_items(full)
+            for title, text in self.service.take_toasts():
+                self.toast.emit(title, text)
+        except Exception as e:                                          # noqa: BLE001
+            from ..core.logsink import log
+            log(f"Friends list could not be refreshed: {e}", "dim")
         self.changed.emit()
 
     @Property(QObject, constant=True)

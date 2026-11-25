@@ -33,7 +33,7 @@ from ..core.tasks import TaskManager
 from ..core.tweaks_service import TweaksService
 from ..i18n import tr
 
-APP_VERSION_V3 = "3.0.0-beta.1"
+from ..version3 import APP_VERSION_V3          # noqa: E402  (one place for the version)
 
 
 class Dispatcher(QObject):

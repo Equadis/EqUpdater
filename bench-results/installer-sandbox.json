@@ -1,0 +1,101 @@
+{
+ "setup": "D:\\EqUpdater\\dist\\EqUpdater3-v3.0.0-beta.1-Windows-Installer.exe",
+ "setup_mb": 68.1,
+ "sandbox": "C:\\Users\\OLIVER~1\\AppData\\Local\\Temp\\equ3-sandbox-iuo21ev6",
+ "steps": [
+  {
+   "step": "1. real environment, EqUpdater 2 running: install refused and nothing written",
+   "pass": true,
+   "detail": "error: EqUpdater 2 is running. Close it first: two EqUpdater windows should not manage one game folder at once. Nothing was changed."
+  },
+  {
+   "step": "2. silent install",
+   "pass": true,
+   "detail": "installed: C:\\Users\\OLIVER~1\\AppData\\Local\\Temp\\equ3-sandbox-iuo21ev6\\Local\\Programs\\EqUpdater3\\EqUpdater3.exe"
+  },
+  {
+   "step": "2b. Apps & features entry written for this user",
+   "pass": true,
+   "detail": "{'DisplayName': 'EqUpdater 3 Beta', 'DisplayVersion': '3.0.0-beta.1', 'InstallLocation': 'C:\\\\Users\\\\OLIVER~1\\\\AppData\\\\Local\\\\Temp\\\\equ3-sandbox-iuo21ev6\\\\Local\\\\Programs\\\\EqUpdater3', 'UninstallString': '\"C:\\\\Users\\\\OLIVER~1\\\\AppData\\\\Local\\\\Temp\\\\equ3-sandbox-iuo21ev6\\\\Local\\\\Programs\\\\EqUpdater3\\\\EqUpdater3.exe\" --uninstall'}"
+  },
+  {
+   "step": "2c. all seven skins are in the package",
+   "pass": true,
+   "detail": "['battle-net', 'bubbles', 'classic-2004', 'minimal', 'minimal-dark', 'minimal-light', 'turtle-wow']"
+  },
+  {
+   "step": "3. installed program self-test (all pages, all skins, offscreen)",
+   "pass": true,
+   "detail": "['battle-net', 'bubbles', 'classic-2004', 'minimal', 'minimal-dark', 'minimal-light', 'turtle-wow']"
+  },
+  {
+   "step": "4. installing again (upgrade path)",
+   "pass": true,
+   "detail": "installed: C:\\Users\\OLIVER~1\\AppData\\Local\\Temp\\equ3-sandbox-iuo21ev6\\Local\\Programs\\EqUpdater3\\EqUpdater3.exe"
+  },
+  {
+   "step": "6a. settings, game and protected folders unchanged after install and upgrade",
+   "pass": true,
+   "detail": "{}"
+  },
+  {
+   "step": "5. install refused while EqUpdater 3 is running",
+   "pass": true,
+   "detail": "error: EqUpdater 3 Beta is running. Close it and run the installer again. Nothing was changed."
+  },
+  {
+   "step": "5b. uninstall refused while EqUpdater 3 is running",
+   "pass": true,
+   "detail": "error: EqUpdater 3 Beta is running. Close it and try again. Nothing was removed."
+  },
+  {
+   "step": "7. uninstall refuses a folder it did not make (OctoWoW)",
+   "pass": true,
+   "detail": "error: C:\\Users\\OLIVER~1\\AppData\\Local\\Temp\\equ3-sandbox-iuo21ev6\\Games\\OctoWoW was not made by the EqUpdater 3 Beta installer; nothing was removed."
+  },
+  {
+   "step": "7. uninstall refuses a folder it did not make (EqUpdater)",
+   "pass": true,
+   "detail": "error: C:\\Users\\OLIVER~1\\AppData\\Local\\Temp\\equ3-sandbox-iuo21ev6\\Local\\EqUpdater was not made by the EqUpdater 3 Beta installer; nothing was removed."
+  },
+  {
+   "step": "8. uninstall from the installed program: folder gone, entry gone",
+   "pass": true,
+   "detail": "exit 0, folder exists=False, entry=None"
+  },
+  {
+   "step": "8b. settings and game unchanged after uninstall",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "step": "9. uninstall through the setup program",
+   "pass": true,
+   "detail": "removed: Apps & features entry\nremoved: C:\\Users\\OLIVER~1\\AppData\\Local\\Temp\\equ3-sandbox-iuo21ev6\\Local\\Programs\\EqUpdater3"
+  },
+  {
+   "step": "9b. settings and game still unchanged",
+   "pass": true,
+   "detail": ""
+  }
+ ],
+ "passed": true,
+ "protected_folders_checked": [
+  {
+   "path": "C:\\Users\\OLIVER~1\\AppData\\Local\\Temp\\equ3-sandbox-iuo21ev6\\Local\\EqUpdater",
+   "files": 3
+  },
+  {
+   "path": "C:\\Users\\OLIVER~1\\AppData\\Local\\Temp\\equ3-sandbox-iuo21ev6\\Games\\OctoWoW",
+   "files": 6
+  },
+  {
+   "path": "D:\\OctoWoW",
+   "files": 145620
+  },
+  {
+   "path": "C:\\Users\\Oliver Duncan\\Games\\OctoWoW",
+   "files": 43
+  }
+ ]
+}

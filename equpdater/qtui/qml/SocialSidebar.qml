@@ -17,6 +17,14 @@ Item {
     visible: social.enabled
     clip: true
 
+    // Narrow window: an open sidebar floats over the page, so it needs an opaque backing or the
+    // page's text shows through the translucent panel.
+    Rectangle {
+        anchors.fill: parent
+        visible: !root.collapsed && !win.sidebarDocked
+        color: Style.theme.background.color
+    }
+
     SkinPanel {
         anchors.fill: parent
         kind: "sidebar"

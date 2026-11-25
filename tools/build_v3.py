@@ -111,23 +111,52 @@ PRUNE_FILES = ["opengl32sw.dll", "Qt6Quick3D*", "Qt63D*", "Qt6Charts*", "Qt6Grap
                "Qt6SpatialAudio*", "Qt6HttpServer*", "Qt6StateMachine*"]
 
 
+def qt_roots(internal: str) -> list:
+    """Where Qt's files are under PySide6: beside the modules on Windows, in ``Qt/`` (libraries
+    in ``Qt/lib``) on Linux."""
+    base = os.path.join(internal, "PySide6")
+    return [r for r in (base, os.path.join(base, "Qt")) if os.path.isdir(r)]
+
+
 def prune(internal: str) -> int:
-    """Remove what the interface never loads; returns the bytes freed."""
+    """Remove what the interface never loads; returns the bytes freed. Works on both layouts:
+    ``Qt6Core.dll`` beside the modules (Windows) and ``libQt6Core.so.6`` in ``Qt/lib`` (Linux)."""
     import fnmatch
-    qt = os.path.join(internal, "PySide6")
     freed = 0
-    for rel in PRUNE_DIRS:
-        d = os.path.join(qt, *rel.split("/"))
-        if os.path.isdir(d):
-            freed += folder_size(d)
-            shutil.rmtree(d)
-    for name in os.listdir(qt):
-        if any(fnmatch.fnmatch(name, pat) for pat in PRUNE_FILES):
-            p = os.path.join(qt, name)
-            if os.path.isfile(p):
-                freed += os.path.getsize(p)
-                os.remove(p)
+    for qt in qt_roots(internal):
+        for rel in PRUNE_DIRS:
+            d = os.path.join(qt, *rel.split("/"))
+            if os.path.isdir(d):
+                freed += folder_size(d)
+                shutil.rmtree(d)
+        for folder in (qt, os.path.join(qt, "lib")):
+            if not os.path.isdir(folder):
+                continue
+            for name in os.listdir(folder):
+                stem = name[3:] if name.startswith("lib") else name           # libQt6Pdf.so.6 -> Qt6Pdf.so.6
+                if any(fnmatch.fnmatch(stem, pat) or fnmatch.fnmatch(name, pat) for pat in PRUNE_FILES):
+                    p = os.path.join(folder, name)
+                    if os.path.isfile(p):
+                        freed += os.path.getsize(p)
+                        os.remove(p)
     return freed
+
+
+def strip_host_font_stack(internal: str) -> list:
+    """Linux: the host's fontconfig/freetype are used, not the build machine's (an old bundled
+    fontconfig reading a newer /etc/fonts floods the terminal; see platforms.HOST_FONT_STACK and
+    build.py). Returns the names removed. A no-op on Windows."""
+    removed = []
+    if WINDOWS:
+        return removed
+    from equpdater.platforms import HOST_FONT_STACK
+    for folder in (internal, *(os.path.join(r, "lib") for r in qt_roots(internal))):
+        for name in HOST_FONT_STACK:
+            p = os.path.join(folder, name)
+            if os.path.lexists(p):
+                os.remove(p)
+                removed.append(name)
+    return removed
 
 
 def folder_size(path: str) -> int:
@@ -193,6 +222,8 @@ def main() -> None:
     if not os.path.exists(exe):
         raise SystemExit(f"PyInstaller reported success but {exe} is missing")
     freed = prune(os.path.join(folder, "_internal"))
+    if not WINDOWS:
+        print("  host font stack left out:", ", ".join(strip_host_font_stack(os.path.join(folder, "_internal"))) or "none bundled")
     print(f"\n  {exe}\n  folder: {folder_size(folder) / 1048576:.0f} MB "
           f"(left out {freed / 1048576:.0f} MB Qt never loads)")
     if "--no-test" not in sys.argv:

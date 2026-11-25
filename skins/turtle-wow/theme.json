@@ -335,6 +335,7 @@
     "panelGap": 10,
     "footerHeight": 84,
     "navRight": 44,
+    "navOffset": 10,
     "sidebarWidth": 244
   }
 }

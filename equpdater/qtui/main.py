@@ -284,6 +284,18 @@ def first_run_setup(p):
         p["setup"].open()
 
 
+def start_optional_services(p):
+    """The footer chip, the friends sidebar and the account: each is optional, and none may stop
+    the launcher (or the others) from starting, whatever goes wrong inside it."""
+    from ..core.logsink import log
+    for name, start in (("server status", p["server"].start), ("friends", p["social"].start),
+                        ("account", p["account"].restore)):
+        try:
+            start()
+        except Exception as e:                                          # noqa: BLE001
+            log(f"{name} could not start: {e}", "dim")
+
+
 def restart_app():
     """Start a fresh EqUpdater, then close this one (asked in the new language
     by ``_offer_language_restart``; never forced)."""
@@ -361,9 +373,7 @@ def _run(argv=None) -> int:
         marks["interactive_ms"] = round((time.perf_counter() - _T0) * 1000)
         marks["epoch_interactive"] = time.time()    # for cross-process timing
         p["news"].start()
-        p["server"].start()
-        p["social"].start()
-        p["account"].restore()
+        start_optional_services(p)
         p["launch"].refresh()
         # one-time, version-gated migrations (the 1.3 re-patch for installs that
         # predate it), off the UI thread and after the first frame

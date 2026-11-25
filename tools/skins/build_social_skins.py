@@ -226,7 +226,7 @@ def build_turtle():
             "panel.header": {"textColors": {"normal": GOLD}},
             **off.icon_components()}}
     layout = {"headerHeight": 80, "logoSize": 40, "navSpacing": 22, "contentMargin": 28, "panelGap": 10,
-              "footerHeight": 84, "navRight": 44, "sidebarWidth": 244}
+              "footerHeight": 84, "navRight": 44, "navOffset": 10, "sidebarWidth": 244}
     theme["layout"] = layout
     off.write_skin(folder, {
         "id": "turtle-wow", "name": "Turtle WoW", "license": "Artwork: EqUpdater project (drawn for this skin)",

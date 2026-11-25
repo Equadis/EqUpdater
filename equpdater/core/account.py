@@ -336,15 +336,34 @@ class AccountService:
     def _changed(self):
         self.on_change()
 
+    # The credential store is optional machinery: if it fails, the session simply is not remembered.
+    def _store_get(self):
+        try:
+            return self.store.get(SERVICE, ACCOUNT)
+        except Exception:                                              # noqa: BLE001
+            return None
+
+    def _store_set(self, text: str) -> bool:
+        try:
+            return bool(self.store.set(SERVICE, ACCOUNT, text))
+        except Exception:                                              # noqa: BLE001
+            return False
+
+    def _store_delete(self) -> None:
+        try:
+            self.store.delete(SERVICE, ACCOUNT)
+        except Exception:                                              # noqa: BLE001
+            pass
+
     def _save(self):
         if self.tokens:
-            self.store.set(SERVICE, ACCOUNT, self.tokens.dumps())
+            self._store_set(self.tokens.dumps())
         if self.profile:
             self.settings.set("account_username", self.profile.username)
             self.settings.set("account_avatar_url", self.profile.avatar_url)
 
     def _clear(self):
-        self.store.delete(SERVICE, ACCOUNT)
+        self._store_delete()
         for key in ("account_username", "account_avatar_url"):
             self.settings.set(key, "")
         self.tokens = self.profile = None
@@ -359,7 +378,7 @@ class AccountService:
             self._changed()
             return
         with self._lock:
-            tokens = Tokens.loads(self.store.get(SERVICE, ACCOUNT))
+            tokens = Tokens.loads(self._store_get())
             if tokens is None:
                 self.state = SIGNED_OUT
                 self._changed()
@@ -383,7 +402,7 @@ class AccountService:
     def _ensure_fresh(self) -> None:
         if self.tokens and self.tokens.expired(self.now(), EARLY_REFRESH_S):
             self.tokens = self.provider.refresh(self.tokens)
-            self.store.set(SERVICE, ACCOUNT, self.tokens.dumps())
+            self._store_set(self.tokens.dumps())
 
     def valid_access(self) -> str | None:
         """An access token good for the next minute or so, refreshed if need be; None if signed out
@@ -429,7 +448,7 @@ class AccountService:
     def sign_out(self) -> None:
         """Ends the session here for certain; the server is told if it can be reached."""
         with self._lock:
-            tokens = self.tokens or Tokens.loads(self.store.get(SERVICE, ACCOUNT))
+            tokens = self.tokens or Tokens.loads(self._store_get())
             self._clear()
             self.state, self.message = SIGNED_OUT, ""
         if tokens:

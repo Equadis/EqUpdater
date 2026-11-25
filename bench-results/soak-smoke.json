@@ -1,0 +1,148 @@
+{
+ "minutes": 1.0,
+ "actions": 215,
+ "baseline": {
+  "t_s": 15,
+  "rss_mb": 253.7,
+  "py_objects": 50074,
+  "threads": 63,
+  "handles": 1366,
+  "qml_objects": 942,
+  "actions": 54
+ },
+ "final": {
+  "t_s": 60,
+  "rss_mb": 299.9,
+  "py_objects": 50080,
+  "threads": 59,
+  "handles": 1369,
+  "qml_objects": 948,
+  "actions": 215
+ },
+ "rss_growth_mb": 46.2,
+ "py_object_growth": 6,
+ "thread_growth": -4,
+ "handle_growth": 3,
+ "samples": [
+  {
+   "t_s": 0,
+   "rss_mb": 155.8,
+   "py_objects": 44200,
+   "threads": 59,
+   "handles": 683,
+   "qml_objects": 157,
+   "actions": 1
+  },
+  {
+   "t_s": 5,
+   "rss_mb": 257.9,
+   "py_objects": 49289,
+   "threads": 63,
+   "handles": 1365,
+   "qml_objects": 942,
+   "actions": 18
+  },
+  {
+   "t_s": 10,
+   "rss_mb": 257.2,
+   "py_objects": 50102,
+   "threads": 64,
+   "handles": 1372,
+   "qml_objects": 942,
+   "actions": 36
+  },
+  {
+   "t_s": 15,
+   "rss_mb": 253.7,
+   "py_objects": 50074,
+   "threads": 63,
+   "handles": 1366,
+   "qml_objects": 942,
+   "actions": 54
+  },
+  {
+   "t_s": 20,
+   "rss_mb": 283.9,
+   "py_objects": 50102,
+   "threads": 64,
+   "handles": 1375,
+   "qml_objects": 944,
+   "actions": 72
+  },
+  {
+   "t_s": 25,
+   "rss_mb": 284.8,
+   "py_objects": 50104,
+   "threads": 64,
+   "handles": 1376,
+   "qml_objects": 944,
+   "actions": 89
+  },
+  {
+   "t_s": 30,
+   "rss_mb": 268.7,
+   "py_objects": 50104,
+   "threads": 63,
+   "handles": 1373,
+   "qml_objects": 944,
+   "actions": 108
+  },
+  {
+   "t_s": 35,
+   "rss_mb": 295.2,
+   "py_objects": 50104,
+   "threads": 63,
+   "handles": 1374,
+   "qml_objects": 946,
+   "actions": 125
+  },
+  {
+   "t_s": 40,
+   "rss_mb": 304.7,
+   "py_objects": 50106,
+   "threads": 63,
+   "handles": 1375,
+   "qml_objects": 946,
+   "actions": 144
+  },
+  {
+   "t_s": 45,
+   "rss_mb": 282.9,
+   "py_objects": 50106,
+   "threads": 63,
+   "handles": 1375,
+   "qml_objects": 946,
+   "actions": 161
+  },
+  {
+   "t_s": 50,
+   "rss_mb": 282.0,
+   "py_objects": 50106,
+   "threads": 63,
+   "handles": 1375,
+   "qml_objects": 946,
+   "actions": 180
+  },
+  {
+   "t_s": 55,
+   "rss_mb": 310.6,
+   "py_objects": 50106,
+   "threads": 63,
+   "handles": 1377,
+   "qml_objects": 948,
+   "actions": 197
+  },
+  {
+   "t_s": 60,
+   "rss_mb": 299.9,
+   "py_objects": 50080,
+   "threads": 59,
+   "handles": 1369,
+   "qml_objects": 948,
+   "actions": 215
+  }
+ ],
+ "problems": [
+  "memory grew 46.2 MB after warm-up"
+ ]
+}

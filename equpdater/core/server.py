@@ -30,12 +30,18 @@ from datetime import datetime, timezone
 
 from ..i18n import tr
 
-#: Where the data comes from. SNAPSHOT_URL (one combined static object) wins
-#: when set; it is None until the owner approves producing one (OCTOBOT.md).
-SNAPSHOT_URL: str | None = None
+#: Where the data comes from. The preferred source is OctoBot's launcher snapshot, one small
+#: read-only endpoint on its population Worker (OctoBot pull request "population worker: add
+#: read-only GET /api/snapshot"; the **only** Worker endpoint a launcher ever calls). It is fresh
+#: to the minute but does not exist until the owner deploys it; until then a request is a 404 and
+#: the feed falls back to the two static GitHub Pages files, and asks again about once a day.
+#: Pass ``snapshot_url=""`` to ``ServerFeed`` to use the static files only.
+SNAPSHOT_URL: str | None = "https://octobot-population.eqvoice.workers.dev/api/snapshot"
 LIVE_URL = "https://equadis.github.io/OctoBot/live.json"
 STATUS_URL = "https://equadis.github.io/OctoBot/status/latest.json"
-ALLOWED_HOSTS = {"equadis.github.io"}
+ALLOWED_HOSTS = {"equadis.github.io", "octobot-population.eqvoice.workers.dev"}
+SNAPSHOT_RETRY_MISSING_S = 24 * 3600        # not deployed (404): look again tomorrow
+SNAPSHOT_RETRY_ERROR_S = 600                # unreachable or malformed: look again in ten minutes
 
 ACTIVE_S, UNFOCUSED_S, JITTER_S = 60.0, 300.0, 15.0
 BACKOFF_FIRST_S, BACKOFF_MAX_S = 60.0, 900.0
@@ -217,6 +223,14 @@ def age_text(seconds: float) -> str:
 
 # -- the feed ---------------------------------------------------------------------------
 
+class FeedError(Exception):
+    """An answer that was not usable; ``status`` is the HTTP status when there was one."""
+
+    def __init__(self, message: str, status: int = 0):
+        super().__init__(message)
+        self.status = status
+
+
 class Response:
     __slots__ = ("status", "body", "etag")
 
@@ -252,7 +266,9 @@ class ServerFeed:
     def __init__(self, store, fetch=http_fetch, now=time.time, jitter=random.uniform,
                  snapshot_url=None):
         self.store, self.fetch, self.now, self.jitter = store, fetch, now, jitter
-        self.snapshot_url = snapshot_url if snapshot_url is not None else SNAPSHOT_URL
+        self.snapshot_url = SNAPSHOT_URL if snapshot_url is None else snapshot_url
+        self.snapshot_retry_at = 0.0
+        self.source = ""                         # "snapshot" or "static": where the last data came from
         self.etags: dict = {}
         self.snapshot: Snapshot | None = Snapshot.from_json(store.get("snapshot"))
         self.fetched_at: float = float(store.get("fetched_at") or 0)
@@ -281,7 +297,7 @@ class ServerFeed:
         if r.status == 304:
             return None
         if r.status != 200 or len(r.body) > MAX_BYTES:
-            raise ValueError(f"unexpected answer {r.status}")
+            raise FeedError(f"unexpected answer {r.status}", r.status)
         if r.etag:
             self.etags[url] = r.etag
         return json.loads(r.body.decode("utf-8"))
@@ -301,14 +317,23 @@ class ServerFeed:
         return changed
 
     def _fetch_snapshot(self) -> bool:
-        if self.snapshot_url:
-            obj = self._get(self.snapshot_url)
-            if obj is None:
-                return False
-            snap = parse_combined(obj)
-            if snap is None:
-                raise ValueError("not a snapshot")
-            return self._accept(snap)
+        if self.snapshot_url and self.now() >= self.snapshot_retry_at:
+            try:
+                obj = self._get(self.snapshot_url)
+                if obj is None:
+                    self.source = "snapshot"
+                    return False                                   # 304: unchanged
+                snap = parse_combined(obj)
+                if snap is None:
+                    raise FeedError("not a snapshot")
+                self.source = "snapshot"
+                return self._accept(snap)
+            except Exception as e:                                 # noqa: BLE001 - fall back, and say when to ask again
+                missing = isinstance(e, FeedError) and e.status == 404
+                self.snapshot_retry_at = self.now() + (SNAPSHOT_RETRY_MISSING_S if missing
+                                                       else SNAPSHOT_RETRY_ERROR_S)
+                self.etags.pop(self.snapshot_url, None)
+        self.source = "static"
         live, status = self._get(LIVE_URL), self._get(STATUS_URL)
         if live is None and status is None:
             return False                         # both unchanged (304)

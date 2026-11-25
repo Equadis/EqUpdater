@@ -67,8 +67,10 @@ Point at the folder (Find…, or Choose a folder…). If the torrent was never f
 * Data stays in `%LOCALAPPDATA%\EqUpdater` (2.x's `config.json`, read; 3.0's own `v3/`).
 * Not signed: Windows SmartScreen and some antivirus programs distrust new unsigned programs, as with 2.x.
 
-## Not built yet
+## Uninstall and silent install
+* **Uninstall**: Settings > Apps & features > "EqUpdater 3 Beta" (a per-user entry), or `EqUpdater3.exe --uninstall`, or the installer with `--uninstall`. It removes only the program folder (it refuses a folder without its own marker file) and its shortcuts. **Settings, `v3/` data and your game folders are never touched.**
+* **Silent**: `EqUpdater3-...-Installer.exe --silent [--install-dir DIR] [--no-shortcuts] [--no-launch] [--log FILE]`. Exit 0 = done, 1 = refused (for example EqUpdater 2 or 3 is running), 2 = failed.
+* The installer never writes to a game folder. `tools/qa/installer_sandbox.py` runs the real installer against a throwaway profile and checks this by hashing every file in the settings, a sandbox game and the real game folders before and after.
 
-* Linux AppImage for 3.0 (`tools/build_v3.py` builds the folder on Linux, but the AppImage wrapper and a Linux test run are still to do).
-* Detecting 2.x's installer shortcuts and offering to keep or retire them (the beta never changes them).
-* Precompiled QML inside the package (Qt's `qmlcachegen` is for resource-based builds; the install-time warm-up gets most of the benefit).
+## Linux
+The AppImage scripts are written but have not been built or run on Linux: see `LINUX.md`.

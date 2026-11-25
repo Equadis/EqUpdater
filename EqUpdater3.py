@@ -105,7 +105,31 @@ def _self_test(out_path: str, gui: bool) -> int:
     return 1 if problems else 0
 
 
+def _uninstall(silent: bool) -> int:
+    """``EqUpdater3.exe --uninstall``: what Apps & features runs. The program cannot delete the
+    folder it is running from, so the folder is removed by a helper just after this exits.
+    Settings, the game and EqUpdater 2 are never touched."""
+    from equpdater import installer3 as inst
+    folder = os.path.dirname(os.path.abspath(sys.executable))
+    if not silent and os.name == "nt":
+        import ctypes
+        ask = ctypes.windll.user32.MessageBoxW(
+            None, f"Remove {inst.TITLE}?\n\nYour settings and your game files are kept.", inst.TITLE, 0x24)
+        if ask != 6:                                   # not "Yes"
+            return 0
+    try:
+        inst.uninstall(folder, defer=inst.deferred_delete)
+    except inst.InstallError as e:
+        if os.name == "nt" and not silent:
+            import ctypes
+            ctypes.windll.user32.MessageBoxW(None, str(e), inst.TITLE, 0x10)
+        return 1
+    return 0
+
+
 if __name__ == "__main__":
+    if "--uninstall" in sys.argv[1:]:
+        sys.exit(_uninstall("--silent" in sys.argv[1:]))
     for arg in sys.argv[1:]:
         if arg.startswith("--self-test="):
             sys.exit(_self_test(arg.split("=", 1)[1], "--gui" in sys.argv))

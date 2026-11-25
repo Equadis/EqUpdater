@@ -1,6 +1,6 @@
 # QA checklist for the beta (what the automated suite cannot prove)
 
-Automated: 1,190+ tests (core logic, every page and overlay in all five skins, installer logic, packaged self-test). This list is what a person must see. Tick on a **clean Windows user profile** with a real OctoWoW client, then once on Linux/Wine when an AppImage exists. Note the build (`3.0.0-beta.1`), Windows version and GPU.
+Automated: 1,190+ tests (core logic, every page and overlay in all seven skins, installer logic, packaged self-test). This list is what a person must see. Tick on a **clean Windows user profile** with a real OctoWoW client, then once on Linux/Wine once the AppImage has been built (`LINUX.md`). Results so far: `QA_REPORT.md`. Note the build (`3.0.0-beta.1`), Windows version and GPU.
 
 ## 0. Install
 - [ ] Run the installer exe with 2.x *closed*: it installs, starts, and "EqUpdater 3 Beta" is in the Start menu. 2.x's shortcuts still start 2.x.
