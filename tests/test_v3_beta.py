@@ -257,7 +257,7 @@ class TestBetaGate(unittest.TestCase):
     def test_the_gate_notices_a_secret(self):
         import re
         self.assertTrue(self.gate.SECRET.search("token = ghp_" + "a" * 36))
-        self.assertTrue(self.gate.SECRET.search("-----BEGIN RSA PRIVATE KEY-----"))
+        self.assertTrue(self.gate.SECRET.search("-----BEGIN RSA " + "PRIVATE KEY-----"))
         self.assertFalse(self.gate.SECRET.search("nothing to see here"))
 
     def test_the_gate_notices_a_wrong_version_and_a_missing_document(self):

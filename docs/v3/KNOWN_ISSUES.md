@@ -11,6 +11,11 @@ Honest list, most serious first. "Not verified" means the code exists and its lo
 6. **HiDPI and screen readers.** Qt scales automatically and controls carry accessibility roles and names, but nothing has been checked at 150-200 % scaling or with Narrator/NVDA.
 7. **Long runs.** A 5-minute scripted soak is flat; hours have not been run.
 
+## Account and friends (beta 1 addition; `SOCIAL.md`)
+* **Sign-in does not work, because there is nothing to sign in to.** OctoWoW has published no OAuth/OIDC service or API; the Sign In button says so. EqUpdater will not ask for your forum password or scrape the site. The sign-in code (OAuth with PKCE) is tested against a fake server only.
+* **Friend statuses are unavailable**, because OctoWoW offers no character-presence service. The list is local; every friend shows a hollow "?" and the sidebar says why. Nothing is shared about you; the Social privacy settings are saved for when a service exists.
+* Adding a friend by **forum user name** needs a service that resolves accounts to characters; the option is explained but unavailable.
+
 ## Behaviour you will notice
 * **Memory is higher than 2.x**: about 186-217 MB idle against 98 MB, mostly the graphics driver. *Settings > Low-memory rendering* (restart) saves 30-45 MB at a little more CPU. Packaged start-up is about 0.8 s.
 * **The server chip is often dim and "out of date".** It reads OctoBot's public files on GitHub Pages, which are refreshed far less often than promised (hours, measured). It never shows the server as offline because *EqUpdater* could not fetch an update; only OctoBot's own recent probe can colour the dot. A fresh, once-a-minute feed needs a change on OctoBot's side that has been proposed, not made (`OCTOBOT.md`).

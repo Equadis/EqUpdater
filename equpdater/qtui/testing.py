@@ -129,3 +129,46 @@ def server_fixture_fetch(path):
             return srv.Response(304, b"", tag)
         return srv.Response(200, body, tag)
     return fetch
+
+
+class FixturePresenceProvider:
+    """QA only (``EQU3_PRESENCE_FIXTURE=<file>``): serves friends' presence from a JSON file so the
+    sidebar can be seen with data. **Not a real service and never the default.** The file is
+    ``{"<name>@<realm>": {"game": ..., "launcher": ..., "class": ..., "level": ..., "guild": ..., "zone": ...}}``."""
+    from ..core import presence as _p
+
+    id = "fixture"
+    name = "fixture"
+    available = True
+    requires_account = False
+    capabilities = frozenset({"game_presence", "launcher_presence", "character_details"})
+    max_batch = 50
+    unavailable_reason = ""
+
+    def __init__(self, path):
+        self.path = path
+
+    def lookup(self, friends, token):
+        import time as _t
+        from ..core.presence import Observation
+        with open(self.path, encoding="utf-8") as f:
+            data = json.load(f)
+        if data.get("__fail__"):
+            raise OSError("fixture says the service is down")
+        out = []
+        for fr in friends:
+            d = data.get(f"{fr.name.lower()}@{fr.realm}")
+            if d:
+                out.append(Observation(fr.id, d.get("game", "unknown"), d.get("launcher", "unknown"),
+                                       d.get("as_of") or _t.time(), d.get("class", ""), d.get("level"),
+                                       d.get("guild", ""), d.get("zone", ""), fr.realm, "fixture"))
+        return out
+
+    def publish(self, status, token):
+        pass
+
+
+def auth_config_from_env(path):
+    """QA only (``EQU3_AUTH_CONFIG=<file>``): a sign-in configuration to try against a fake server."""
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)

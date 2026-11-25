@@ -50,6 +50,15 @@ Automated: 1,190+ tests (core logic, every page and overlay in all five skins, i
 - [ ] Keyboard only: Tab through the header, a page, a dialog; Escape closes overlays; Narrator/NVDA reads the nav and buttons.
 - [ ] Server chip: dot, number, popover; "Show server status" off removes it.
 
+## 6b. Account and friends
+- [ ] Sign In (no service yet): the explanation appears; nothing pretends to sign in; "Create account" opens octowow.st in the browser.
+- [ ] Sidebar: collapse and expand (remembered after a restart); add a friend by name and realm; the same name on another realm is a separate friend; duplicates refused; favourite, search, realm filter, sort; remove.
+- [ ] Every friend shows the hollow "?" and the note explaining why; the online count is 0; nothing is requested (watch the network).
+- [ ] Settings > Social: every choice survives a restart; turning the sidebar off removes it and the page area widens.
+- [ ] Narrow the window below 940 px with the sidebar open: it overlays the page instead of squeezing it.
+- [ ] Turtle WoW and Battle.net: every page, dialog, menu and tooltip looks like the skin; switching skins and restarting keep the choice.
+- [ ] When OctoWoW provides sign-in and presence (`SOCIAL.md` section 4): repeat with a real account, a rate limit and an outage.
+
 ## 7. Endurance
 - [ ] Leave it open 4+ hours, switching pages and skins now and then: memory in Task Manager stays near where it started.
 - [ ] Sleep/resume the PC, change network, disconnect the network: no error dialogs; news and chip recover.

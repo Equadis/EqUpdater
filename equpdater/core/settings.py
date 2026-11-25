@@ -28,6 +28,27 @@ DEFAULTS = {
 }
 
 
+SOCIAL_DEFAULTS = {
+    "social_enabled": True,
+    "sidebar_collapsed": None,          # None: the skin's own default
+    "show_launcher_presence": False,
+    "show_game_presence": False,
+    "show_character": False,
+    "show_realm": False,
+    "show_zone": False,
+    "friend_notifications": False,
+    "auto_away_minutes": 0,
+    "default_status": "online",
+    "own_status": "online",
+    "friends_sort": "status",
+    "friends_realm": "",
+    "presence_interval": 60,
+    "account_username": "",
+    "account_avatar_url": "",
+}
+DEFAULTS.update(SOCIAL_DEFAULTS)
+
+
 def data_dir() -> str:
     return os.path.join(branding.app_data_dir(), "v3")
 
@@ -68,6 +89,13 @@ def open_server_cache(directory: str | None = None):
     d = directory or data_dir()
     return _store.JsonStore(os.path.join(d, "cache", "server.json"),
                             {"snapshot": None, "fetched_at": 0}, schema=1, delay=2.0)
+
+
+def open_social_store(directory: str | None = None):
+    """The friends list and the realm list, on this computer only."""
+    d = directory or data_dir()
+    return _store.JsonStore(os.path.join(d, "social.json"), {"friends": [], "realms": [], "realms_at": 0},
+                            schema=1, delay=0.5)
 
 
 def open_settings(directory: str | None = None, legacy: dict | None = None):

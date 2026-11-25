@@ -190,6 +190,66 @@ Item {
                 Rectangle { width: parent.width; height: 1
                             color: Style.pick(Style.theme.components["divider"].colors, "normal", "#444") }
 
+                // ── SOCIAL ─────────────────────────────────────────────
+                SkinText { kind: "text.heading"; text: app.t("SOCIAL") }
+                SkinCheckBox { objectName: "socialEnabledToggle"; text: app.t("Enable social sidebar")
+                               checked: social.values.social_enabled
+                               onToggled: social.setSetting("social_enabled", !social.values.social_enabled) }
+                SkinCheckBox { objectName: "showLauncherToggle"; text: app.t("Show my launcher presence")
+                               checked: social.values.show_launcher_presence
+                               onToggled: social.setSetting("show_launcher_presence", !social.values.show_launcher_presence) }
+                SkinCheckBox { objectName: "showGameToggle"; text: app.t("Show my in-game presence")
+                               checked: social.values.show_game_presence
+                               onToggled: social.setSetting("show_game_presence", !social.values.show_game_presence) }
+                SkinCheckBox { objectName: "showCharacterToggle"; text: app.t("Show my current character")
+                               checked: social.values.show_character
+                               onToggled: social.setSetting("show_character", !social.values.show_character) }
+                SkinCheckBox { objectName: "showRealmToggle"; text: app.t("Show my realm")
+                               checked: social.values.show_realm
+                               onToggled: social.setSetting("show_realm", !social.values.show_realm) }
+                SkinCheckBox { objectName: "showZoneToggle"; text: app.t("Show my current zone")
+                               checked: social.values.show_zone
+                               onToggled: social.setSetting("show_zone", !social.values.show_zone) }
+                SkinCheckBox { objectName: "notifyToggle"; text: app.t("Friend login notifications")
+                               checked: social.values.friend_notifications
+                               onToggled: social.setSetting("friend_notifications", !social.values.friend_notifications) }
+                SkinText { kind: "text.body"; text: app.t("Default presence status") }
+                Row {
+                    spacing: 6
+                    Repeater {
+                        model: social.statusChoices
+                        SkinButton { kind: "button.small"; selected: social.values.default_status === modelData
+                                     text: modelData === "online" ? app.t("Online") : modelData === "away" ? app.t("Away") : app.t("Do Not Disturb")
+                                     onClicked: social.setSetting("default_status", modelData) }
+                    }
+                }
+                SkinText { kind: "text.body"; text: app.t("Set Away automatically when EqUpdater is idle") }
+                Row {
+                    spacing: 6
+                    Repeater {
+                        model: social.autoAwayChoices
+                        SkinButton { kind: "button.small"; selected: social.values.auto_away_minutes === modelData
+                                     text: modelData === 0 ? app.t("Never") : modelData + " " + app.t("min")
+                                     onClicked: social.setSetting("auto_away_minutes", modelData) }
+                    }
+                }
+                SkinText { kind: "text.body"; text: app.t("Refresh friends every") }
+                Row {
+                    spacing: 6
+                    Repeater {
+                        model: social.intervalChoices
+                        SkinButton { kind: "button.small"; selected: social.values.presence_interval === modelData
+                                     text: modelData + " s"
+                                     onClicked: social.setSetting("presence_interval", modelData) }
+                    }
+                }
+                SkinText { width: parent.width; kind: "text.dim"; wrapMode: Text.Wrap
+                           text: app.t("Nothing about you is shared today: OctoWoW offers no service for presence yet. These choices are kept and applied when one exists. Your friends list stays on this computer.") }
+                SkinButton { objectName: "settingsSignOut"; visible: account.signedIn; kind: "button.small"
+                             text: app.t("Sign Out") + " (" + account.username + ")"; onClicked: account.signOut() }
+                Rectangle { width: parent.width; height: 1
+                            color: Style.pick(Style.theme.components["divider"].colors, "normal", "#444") }
+
                 // ── LANGUAGE / FONT ────────────────────────────────────
                 SkinText { kind: "text.heading"; text: app.t("Language") }
                 SkinText { kind: "text.body"; text: general.language }

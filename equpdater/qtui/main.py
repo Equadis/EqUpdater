@@ -87,6 +87,7 @@ def build(argv=None):
         settings.data["skin"] = os.environ["EQU3_SKIN"]
     news_cache = core_settings.open_news_cache(data)
     server_cache = core_settings.open_server_cache(data)
+    social_store = core_settings.open_social_store(data)
 
     if (os.environ.get("EQU3_RENDERER") or settings.get("renderer")) == "software":
         # No GPU device or swap chain: about 30 MB less memory, and a safe
@@ -149,6 +150,30 @@ def build(argv=None):
 
     tweaks_bridge = bridge.TweaksBridge(TweaksService(settings, tasks), app_bridge)
     dialog_bridge = ops_bridge.DialogBridge(dispatcher)
+    # -- optional account and social sidebar (nothing here is needed to update, configure or play)
+    from ..core import account as _account, credstore, presence as _presence, realms as _realms
+    from ..core.friends import FriendBook
+    from ..core.server import http_fetch
+    from ..core.social_service import SocialService
+    from .social_bridge import AccountBridge, SocialBridge
+    auth_cfg = None
+    if os.environ.get("EQU3_AUTH_CONFIG"):
+        from .testing import auth_config_from_env
+        auth_cfg = auth_config_from_env(os.environ["EQU3_AUTH_CONFIG"])
+    account_service = _account.AccountService(_account.make_provider(auth_cfg), credstore.open_store(), settings)
+    realm_list = _realms.RealmList(social_store, fetch=None if (
+        os.environ.get("EQU3_OFFLINE") == "1" or os.environ.get("EQUPDATER_OFFLINE")) else http_fetch)
+    friend_book = FriendBook(social_store, realms=realm_list.ids)
+    if os.environ.get("EQU3_PRESENCE_FIXTURE"):
+        from .testing import FixturePresenceProvider
+        presence_provider = FixturePresenceProvider(os.environ["EQU3_PRESENCE_FIXTURE"])
+    else:
+        presence_provider = _presence.UnavailablePresenceProvider()
+    presence_service = _presence.PresenceService(friend_book, presence_provider, account_service)
+    social_service = SocialService(settings, friend_book, presence_service, account_service, realm_list)
+    social_bridge = SocialBridge(social_service, tasks)
+    account_bridge = AccountBridge(account_service, social_service, tasks, dialog_bridge, dispatcher)
+    app_bridge.window_hooks.append(social_bridge.window_state)
     host, holder = ops_bridge.make_host(settings, dialog_bridge, app_bridge, dispatcher)
     mods_service = ModsService(host, tasks)
     mods_bridge = ops_bridge.ModsBridge(mods_service, host, app_bridge)
@@ -234,12 +259,12 @@ def build(argv=None):
     for name, obj in (("app", app_bridge), ("skin", skin_bridge),
                       ("settings", settings_bridge), ("news", news_bridge),
                       ("tweaks", tweaks_bridge), ("launch", launch_bridge),
-                      ("mods", mods_bridge), ("addons", addons_bridge), ("mpq", mpq_bridge), ("general", general_bridge), ("diag", diag_bridge), ("server", server_bridge), ("setup", setup_bridge), ("customSrc", custom_bridge),
+                      ("mods", mods_bridge), ("addons", addons_bridge), ("mpq", mpq_bridge), ("general", general_bridge), ("diag", diag_bridge), ("server", server_bridge), ("account", account_bridge), ("social", social_bridge), ("setup", setup_bridge), ("customSrc", custom_bridge),
                       ("dialog", dialog_bridge)):
         ctx.setContextProperty(name, obj)
     marks["objects_ready_ms"] = round((time.perf_counter() - _T0) * 1000)
 
-    parts = dict(server=server_bridge, server_feed=server_feed, setup=setup_bridge, setup_service=setup_service, custom=custom_bridge, custom_service=custom_service, diag=diag_bridge, diag_service=diag_service, general=general_bridge, general_service=general_service, mpq=mpq_bridge, mpq_service=mpq_service, addons=addons_bridge, addons_service=addons_service,
+    parts = dict(social_store=social_store, server_cache=server_cache, account=account_bridge, account_service=account_service, social=social_bridge, social_service=social_service, presence_service=presence_service, friend_book=friend_book, realm_list=realm_list, server=server_bridge, server_feed=server_feed, setup=setup_bridge, setup_service=setup_service, custom=custom_bridge, custom_service=custom_service, diag=diag_bridge, diag_service=diag_service, general=general_bridge, general_service=general_service, mpq=mpq_bridge, mpq_service=mpq_service, addons=addons_bridge, addons_service=addons_service,
                  mods=mods_bridge, mods_service=mods_service, host=host,
                  dialog=dialog_bridge, tweaks=tweaks_bridge, settings=settings, tasks=tasks, news=news_bridge,
                  launch=launch_bridge, app=app_bridge, skin=skin_bridge,
@@ -337,6 +362,8 @@ def _run(argv=None) -> int:
         marks["epoch_interactive"] = time.time()    # for cross-process timing
         p["news"].start()
         p["server"].start()
+        p["social"].start()
+        p["account"].restore()
         p["launch"].refresh()
         # one-time, version-gated migrations (the 1.3 re-patch for installs that
         # predate it), off the UI thread and after the first frame
@@ -359,8 +386,8 @@ def _run(argv=None) -> int:
     if os.environ.get("EQU3_EXIT_AFTER_MS"):
         QTimer.singleShot(int(os.environ["EQU3_EXIT_AFTER_MS"]), app.quit)
     code = app.exec()
-    p["settings"].flush()
-    p["cache"].flush()
+    for key in ("settings", "cache", "social_store", "server_cache"):
+        p[key].flush()
     p["tasks"].shutdown()
     return code
 

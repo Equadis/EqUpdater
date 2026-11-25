@@ -78,7 +78,12 @@ Window {
                 }
             }
         }
+        AccountChip {
+            id: accountChip
+            anchors { right: gear.left; rightMargin: 12; verticalCenter: gear.verticalCenter }
+        }
         Item {
+            id: gear
             width: 28; height: 28
             anchors { right: parent.right; rightMargin: 10; top: parent.top; topMargin: 8 }
             activeFocusOnTab: true
@@ -93,10 +98,23 @@ Window {
     }
 
     // ── pages: created on first visit, then kept (instant switching) ───
+    // The social sidebar sits to the right of the pages when there is room (or when it is
+    // only the narrow rail); on a narrow window an open sidebar covers the page's edge instead.
+    SocialSidebar {
+        id: sidebar
+        z: 20
+        anchors { right: parent.right; top: header.bottom; bottom: footer.top; bottomMargin: 8
+                  rightMargin: 14 }
+    }
+    Binding { target: social; property: "skinDefaultExpanded"; value: win.layout.sidebarDefault === "expanded" }
+    readonly property bool sidebarDocked: !social.enabled || social.collapsed || win.width >= 940
     Item {
         id: content
+        objectName: "pageArea"
         anchors { left: parent.left; right: parent.right; top: header.bottom; bottom: footer.top
-                  leftMargin: win.layout.contentMargin; rightMargin: win.layout.contentMargin
+                  leftMargin: win.layout.contentMargin
+                  rightMargin: win.layout.contentMargin + (social.enabled && win.sidebarDocked
+                               ? sidebar.width + 10 : 0)
                   bottomMargin: 8 }
         Repeater {
             model: win.pages
@@ -223,6 +241,29 @@ Window {
     LazyOverlay { z: 90; source: "SetupOverlay.qml"; wanted: setup.isOpen }
     LazyOverlay { z: 95; source: "LanguageOverlay.qml"; wanted: general.languagePromptOpen }
     LazyOverlay { z: 100; source: "DialogHost.qml"; wanted: dialog.open }
+
+    LazyOverlay { z: 92; source: "AddFriendOverlay.qml"; wanted: social.addOpen }
+
+    // A friend coming online (only if the player turned notifications on)
+    Rectangle {
+        id: toast
+        objectName: "toast"
+        property string title: ""
+        property string body: ""
+        visible: false
+        z: 120
+        anchors { right: parent.right; rightMargin: 20; bottom: footer.top; bottomMargin: 6 }
+        width: toastCol.implicitWidth + 28; height: toastCol.implicitHeight + 20
+        radius: 6
+        color: Style.pick(Style.theme.components["tooltip"].colors, "normal", "#222")
+        border.color: Style.pick(Style.theme.components["tooltip"].borderColors, "normal", "#555")
+        Column { id: toastCol; anchors.centerIn: parent; spacing: 2
+            SkinText { kind: "text.heading"; text: toast.title }
+            SkinText { kind: "text.body"; text: toast.body } }
+        Timer { id: toastTimer; interval: 5000; onTriggered: toast.visible = false }
+        Connections { target: social
+            function onToast(title, text) { toast.title = title; toast.body = text; toast.visible = true; toastTimer.restart() } }
+    }
 
     function openSettings() {
         settingsL.seen = true

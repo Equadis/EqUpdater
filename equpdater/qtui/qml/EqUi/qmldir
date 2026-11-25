@@ -16,3 +16,4 @@ SkinNumberField 1.0 SkinNumberField.qml
 SkinIconButton 1.0 SkinIconButton.qml
 SkinToolTipArea 1.0 SkinToolTipArea.qml
 SkinSearchField 1.0 SkinSearchField.qml
+SkinActionMenu 1.0 SkinActionMenu.qml

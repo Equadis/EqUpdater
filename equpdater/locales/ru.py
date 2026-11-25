@@ -967,4 +967,76 @@ STRINGS = {
         '{n} ч назад',
     '{n} min ago':
         '{n} мин назад',
+    'A character name is 2 to 12 letters.':
+        'Имя персонажа состоит из 2–12 букв.',
+    'A forum user name is 3 to 32 letters, numbers, spaces, dots, dashes or underscores.':
+        'Имя пользователя форума: 3–32 символа (буквы, цифры, пробелы, точки, дефисы, подчёркивания).',
+    'Away':
+        'Отошёл',
+    "Choose the character's realm.":
+        'Выберите мир персонажа.',
+    'Do not disturb':
+        'Не беспокоить',
+    'Enter a character name and realm, or a forum user name.':
+        'Введите имя и мир персонажа или имя пользователя форума.',
+    'Favourites':
+        'Избранное',
+    'In game':
+        'В игре',
+    'Level {n}':
+        'Уровень {n}',
+    'OctoWoW could not be reached: {error}':
+        'Не удалось связаться с OctoWoW: {error}',
+    'OctoWoW has not published a sign-in service that EqUpdater can use yet, and EqUpdater will not ask for your forum password. Everything else works without an account.':
+        'OctoWoW пока не опубликовал службу входа, которую может использовать EqUpdater, а EqUpdater не будет спрашивать пароль от форума. Всё остальное работает без учётной записи.',
+    'OctoWoW offers no service that says whether a character is online, so friends are shown with an unavailable status. Your friends list is kept on this computer.':
+        'OctoWoW не предоставляет службы, показывающей, в сети ли персонаж, поэтому у друзей отображается статус «недоступен». Список друзей хранится на этом компьютере.',
+    'Offline':
+        'Не в сети',
+    'Offline or unavailable':
+        'Не в сети или недоступны',
+    'Online':
+        'В сети',
+    'Online in EqUpdater':
+        'В сети в EqUpdater',
+    'Showing the last known information.':
+        'Показаны последние известные данные.',
+    'Sign in to OctoWoW':
+        'Войти в OctoWoW',
+    'Sign-in took too long and was stopped.':
+        'Вход занял слишком много времени и был остановлен.',
+    'Sign-in was cancelled.':
+        'Вход отменён.',
+    'Status unavailable':
+        'Статус недоступен',
+    "That realm is not one of OctoWoW's realms.":
+        'Такого мира нет среди миров OctoWoW.',
+    'The friends list is full ({count}).':
+        'Список друзей заполнен ({count}).',
+    'The presence service asked EqUpdater to slow down.':
+        'Служба статусов попросила EqUpdater делать запросы реже.',
+    'The presence service asked EqUpdater to slow down; trying again soon.':
+        'Служба статусов попросила делать запросы реже; повтор скоро.',
+    'The presence service could not be reached.':
+        'Не удалось связаться со службой статусов.',
+    'The sign-in answer could not be verified.':
+        'Не удалось проверить ответ на вход.',
+    'The sign-in service answered unexpectedly ({status}).':
+        'Служба входа ответила неожиданно ({status}).',
+    'The sign-in service did not say who you are.':
+        'Служба входа не сообщила, кто вы.',
+    'The sign-in was not approved.':
+        'Вход не был подтверждён.',
+    'Your sign-in has expired. Please sign in again.':
+        'Срок действия входа истёк. Войдите снова.',
+    'in EqUpdater':
+        'в EqUpdater',
+    'in game':
+        'в игре',
+    'is online {where}':
+        'в сети {where}',
+    '{name} is already in your friends list.':
+        '{name} уже в вашем списке друзей.',
+    '{n} online':
+        '{n} в сети',
 }

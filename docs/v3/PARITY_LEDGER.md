@@ -34,7 +34,8 @@ Current status of every area in the original audit (`FEATURE_PARITY.md` top half
 | Diagnostics: Login Doctor checks, ENV/LAUNCH problems, session log, support ZIP with redaction | Done | redaction tested |
 | Config: atomic writes, lock, v1->v2 migration, corrupt-file copy | Done | shared `config.py`, unchanged |
 | Build / CI | Partly | `tools/build_v3.py` + self-test; `tests.yml` now installs PySide6 (Qt tests no longer skip) and `beta.yml` (manual) builds the installer artifact. **Neither workflow has been run on GitHub yet** |
-| Skin engine, five skins, OctoBot chip, conditional network layer, split stores, benchmarks | New | |
+| Account chip, friends sidebar, presence abstraction, Social settings | New | local friends work; **sign-in and live presence not operational** (no OctoWoW service; `SOCIAL.md`) |
+| Skin engine, seven skins, OctoBot chip, conditional network layer, split stores, benchmarks | New | |
 
 ## What this means for the beta
 Nothing that 2.x did for a player is missing except the in-app update notice, the dark title bar and (via a detour) Octo Updater import; the downloader is gone on purpose. What is *unproven* is real use: see `KNOWN_ISSUES.md` items 1-7.

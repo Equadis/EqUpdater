@@ -28,7 +28,7 @@ sys.path.insert(0, ROOT)
 
 REQUIRED_DOCS = ("BETA.md", "KNOWN_ISSUES.md", "CHANGELOG-3.0.md", "QA_CHECKLIST.md", "PARITY_LEDGER.md",
                  "INSTALLATION.md", "MIGRATION.md", "SAFETY.md", "PERFORMANCE.md", "SKINNING.md",
-                 "COMPONENTS.md", "SKIN_ASSETS.md", "OCTOBOT.md", "TESTING.md", "ARCHITECTURE.md")
+                 "COMPONENTS.md", "SKIN_ASSETS.md", "OCTOBOT.md", "SOCIAL.md", "TESTING.md", "ARCHITECTURE.md")
 #: The 2.x release machinery: the beta must not change any of it.
 TWO_X_FILES = ("build.py", "EqUpdater.py", "EqUpdaterSetup.py", "equpdater/installer.py",
                "equpdater/deploy.py", "install", ".github/workflows/release.yml")

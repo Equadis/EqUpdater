@@ -101,8 +101,8 @@ class Base(unittest.TestCase):
         return self.p
 
     def stop(self):
-        self.p["settings"].flush()
-        self.p["cache"].flush()
+        for key in ("settings", "cache", "social_store", "server_cache"):
+            self.p[key].flush()
         self.p["tasks"].shutdown()
         self.engine.deleteLater()
         QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)

@@ -967,4 +967,76 @@ STRINGS = {
         'hace {n} h',
     '{n} min ago':
         'hace {n} min',
+    'A character name is 2 to 12 letters.':
+        'El nombre de un personaje tiene de 2 a 12 letras.',
+    'A forum user name is 3 to 32 letters, numbers, spaces, dots, dashes or underscores.':
+        'Un nombre de usuario del foro tiene de 3 a 32 letras, números, espacios, puntos, guiones o guiones bajos.',
+    'Away':
+        'Ausente',
+    "Choose the character's realm.":
+        'Elige el reino del personaje.',
+    'Do not disturb':
+        'No molestar',
+    'Enter a character name and realm, or a forum user name.':
+        'Introduce el nombre y el reino de un personaje, o un nombre de usuario del foro.',
+    'Favourites':
+        'Favoritos',
+    'In game':
+        'En el juego',
+    'Level {n}':
+        'Nivel {n}',
+    'OctoWoW could not be reached: {error}':
+        'No se pudo contactar con OctoWoW: {error}',
+    'OctoWoW has not published a sign-in service that EqUpdater can use yet, and EqUpdater will not ask for your forum password. Everything else works without an account.':
+        'OctoWoW aún no ha publicado un servicio de inicio de sesión que EqUpdater pueda usar, y EqUpdater nunca te pedirá tu contraseña del foro. Todo lo demás funciona sin cuenta.',
+    'OctoWoW offers no service that says whether a character is online, so friends are shown with an unavailable status. Your friends list is kept on this computer.':
+        'OctoWoW no ofrece ningún servicio que indique si un personaje está conectado, así que los amigos se muestran con estado no disponible. Tu lista de amigos se guarda en este equipo.',
+    'Offline':
+        'Desconectado',
+    'Offline or unavailable':
+        'Desconectado o no disponible',
+    'Online':
+        'En línea',
+    'Online in EqUpdater':
+        'En línea en EqUpdater',
+    'Showing the last known information.':
+        'Se muestra la última información conocida.',
+    'Sign in to OctoWoW':
+        'Iniciar sesión en OctoWoW',
+    'Sign-in took too long and was stopped.':
+        'El inicio de sesión tardó demasiado y se detuvo.',
+    'Sign-in was cancelled.':
+        'Se canceló el inicio de sesión.',
+    'Status unavailable':
+        'Estado no disponible',
+    "That realm is not one of OctoWoW's realms.":
+        'Ese reino no es uno de los reinos de OctoWoW.',
+    'The friends list is full ({count}).':
+        'La lista de amigos está llena ({count}).',
+    'The presence service asked EqUpdater to slow down.':
+        'El servicio de presencia pidió a EqUpdater que fuera más despacio.',
+    'The presence service asked EqUpdater to slow down; trying again soon.':
+        'El servicio de presencia pidió a EqUpdater que fuera más despacio; se volverá a intentar pronto.',
+    'The presence service could not be reached.':
+        'No se pudo contactar con el servicio de presencia.',
+    'The sign-in answer could not be verified.':
+        'No se pudo verificar la respuesta del inicio de sesión.',
+    'The sign-in service answered unexpectedly ({status}).':
+        'El servicio de inicio de sesión respondió de forma inesperada ({status}).',
+    'The sign-in service did not say who you are.':
+        'El servicio de inicio de sesión no indicó quién eres.',
+    'The sign-in was not approved.':
+        'No se aprobó el inicio de sesión.',
+    'Your sign-in has expired. Please sign in again.':
+        'Tu sesión ha caducado. Inicia sesión de nuevo.',
+    'in EqUpdater':
+        'en EqUpdater',
+    'in game':
+        'en el juego',
+    'is online {where}':
+        'está en línea {where}',
+    '{name} is already in your friends list.':
+        '{name} ya está en tu lista de amigos.',
+    '{n} online':
+        '{n} en línea',
 }

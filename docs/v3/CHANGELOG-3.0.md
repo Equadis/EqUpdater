@@ -2,7 +2,7 @@
 
 ## New
 * **A new interface** (Qt Quick, GPU-drawn) with the same five pages: News, Tweaks, Addons, Mods, MPQ.
-* **Five skins**, selected in Settings: Bubbles (default), Classic (2004), Minimal, Minimal Dark, Minimal Light. A skin is a folder of JSON and images; players can make their own (`SKINNING.md`, `COMPONENTS.md`, `starter-skin/`). There is no skin editor or marketplace, deliberately.
+* **Seven skins**, selected in Settings: Bubbles (default), Classic (2004), Minimal, Minimal Dark, Minimal Light, Turtle WoW, Battle.net (the last two are full skins in the style of those launchers, drawn from scratch). A skin is a folder of JSON and images; players can make their own (`SKINNING.md`, `COMPONENTS.md`, `starter-skin/`). There is no skin editor or marketplace, deliberately.
 * **Animated background** (WebP) that pauses when minimised or, if you choose, unfocused. Idle CPU about 0.3 % against 47 % in 2.x with the animation on.
 * **News rebuilt**: cached listing and bodies, no request on scroll, NEW marks, Read more / Load more per panel, works offline from cache.
 * **Find your game**: finds the folder 2.x or OctoLauncher uses, or a ZIP/torrent copy, and can extract a ZIP/TAR you downloaded, safely (no path escapes, no links, never overwrites).
@@ -12,6 +12,8 @@
 * **Crash reports** and a log folder; one window per data folder.
 * **Low-memory rendering** option; **pooled lists** that stay smooth with hundreds of addons.
 * **Startup** about 0.8 s packaged (2.x: 3.1 s). Skin switch 90 ms, tab switch 7 ms.
+
+* **Optional account and friends** (see `SOCIAL.md`): an account chip in the header, a collapsible friends sidebar with local friend management, presence states, and a Social section in Settings. **Sign-in and live presence are not operational: OctoWoW offers no service for either yet.** The friends list works locally and says its statuses are unavailable.
 
 ## Safer
 * WoW.exe, Auto Loot, dlls.txt, Config.wtf, dxvk.conf, MPQ and pfUI files are written atomically (a failed write leaves the old file), and WoW.exe is never truncated before its replacement is ready (2.x could leave a 0-byte WoW.exe).
