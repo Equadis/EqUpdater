@@ -2,8 +2,7 @@
 
     python tools/skins/build_official_skins.py
 
-* **Minimal**        graphite grey; colours and icons only.
-* **Minimal Light**  light theme; colours and icons only (icons drawn dark).
+* **Minimal (Light)**  light theme; colours and icons only (icons drawn dark).
 * **Classic (2004)** the ornate frame, steel buttons, textured backdrop and the
   animated login scene, from the artwork in ``tools/skins/source/classic/``.
 
@@ -69,23 +68,7 @@ def logo(folder):
     im.resize((128, 128), Image.Resampling.LANCZOS).save(poc.out(folder, "icons", "logo.png"))
 
 
-# ── Minimal and Minimal Light ───────────────────────────────────────────────────
-def build_minimal():
-    poc.write_icons("minimal", hexrgb("#cfd3d9"))
-    logo("minimal")
-    palette = {"bg": "#202226", "panel": "#2a2d32", "dialog": "#2f3238", "panelBorder": "#41454d",
-               "text": "#e9eaec", "textDim": "#9a9fa8", "accent": "#5fb8a6", "accentLight": "#8fd3c5",
-               "link": "#7cc4d6", "danger": "#ef7b7b", "ok": "#7ccf94", "new": "#ef7b7b",
-               "scrim": "#99000000", "buttonFace": "#33363c", "buttonHover": "#3e4249",
-               "buttonPressed": "#2a2d32", "buttonDisabled": "#2b2e33",
-               "primary": "#2d7667", "primaryHover": "#378a79", "primaryPressed": "#265f53"}
-    write_skin("minimal", {
-        "id": "minimal", "name": "Minimal", "license": "Artwork: EqUpdater project",
-        "description": "Neutral graphite theme. Colours and icons only, no animated background."},
-        {"palette": palette, "fonts": fonts("Segoe UI"), "background": {"color": "$bg"},
-         "components": icon_components()})
-
-
+# ── Minimal (Light) ───────────────────────────────────────────────────
 def build_minimal_light():
     poc.write_icons("minimal-light", hexrgb("#444b57"))
     logo("minimal-light")
@@ -96,7 +79,7 @@ def build_minimal_light():
                "buttonPressed": "#c9ced6", "buttonDisabled": "#eceef1",
                "primary": "#2563c9", "primaryHover": "#3874de", "primaryPressed": "#1d52a8"}
     write_skin("minimal-light", {
-        "id": "minimal-light", "name": "Minimal Light", "license": "Artwork: EqUpdater project",
+        "id": "minimal-light", "name": "Minimal (Light)", "license": "Artwork: EqUpdater project",
         "description": "Neutral light theme. Colours and icons only, no animated background."},
         {"palette": palette, "fonts": fonts("Segoe UI"), "background": {"color": "$bg"},
          "components": {**icon_components(), "button.play": {"textColors": {
@@ -178,11 +161,6 @@ STATES = {"normal": ("#3a4452", "#1c222c", None, 1.0),
           "hover": ("#4c5a6e", "#273140", "#ffd100", 1.0),
           "pressed": ("#161b23", "#232b37", None, 0.9),
           "disabled": ("#2a2f37", "#1b1f25", None, 0.45)}
-PLAY_STATES = {"normal": ("#3e6b2a", "#1f3a14", "#ffd100", 1.0),
-               "hover": ("#59932f", "#2c5218", "#ffd100", 1.0),
-               "pressed": ("#1d3612", "#2c5218", None, 0.95),
-               "disabled": ("#2a2f37", "#1b1f25", None, 0.45)}
-
 
 def build_classic():
     folder = "classic-2004"
@@ -195,8 +173,6 @@ def build_classic():
     classic_panel().save(poc.out(folder, "panels", "frame.png"))
     for state, (t, b, tint, dim) in STATES.items():
         classic_button(t, b, tint, dim).save(poc.out(folder, "buttons", f"normal-{state}.png"))
-    for state, (t, b, tint, dim) in PLAY_STATES.items():
-        classic_button(t, b, tint, dim).save(poc.out(folder, "buttons", f"play-{state}.png"))
     palette = {"bg": "#070b14", "panel": "#e60a1018", "dialog": "#f20a1018", "panelBorder": "#4a3a1c",
                "text": "#f0e6c8", "textDim": "#a79d7e", "accent": "#ffd100", "accentLight": "#ffe680",
                "link": "#4fa3ff", "danger": "#ff5a4f", "ok": "#5fd35f", "new": "#ff3b3b",
@@ -223,7 +199,7 @@ def build_classic():
                                       "pressed": "#e6c25a", "disabled": "#7d7a6e",
                                       "selected": "#ffffff"},
                        "padding": [14, 6, 14, 6]},
-            "button.play": {"textures": tex("play"), "slice": [10, 10, 10, 10],
+            "button.play": {"textures": tex("normal"), "slice": [10, 10, 10, 10],
                             "textColors": {"normal": "#ffd100", "hover": "#ffffff",
                                            "pressed": "#e6c25a", "disabled": "#7d7a6e"},
                             "minHeight": 40, "padding": [34, 8, 34, 8]},
@@ -239,7 +215,6 @@ def build_classic():
 
 
 if __name__ == "__main__":
-    build_minimal()
     build_minimal_light()
     build_classic()
     print("skins written to", SK)

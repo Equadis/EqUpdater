@@ -968,24 +968,12 @@ STRINGS = {
         '{n} 小时前',
     '{n} min ago':
         '{n} 分钟前',
-    'A character name is 2 to 12 letters.':
-        '角色名由 2 到 12 个字母组成。',
     'A forum user name is 3 to 32 letters, numbers, spaces, dots, dashes or underscores.':
         '论坛用户名为 3 到 32 个字母、数字、空格、点、连字符或下划线。',
     'Away':
         '离开',
-    "Choose the character's realm.":
-        '请选择角色所在的服务器。',
-    'Do not disturb':
-        '请勿打扰',
-    'Enter a character name and realm, or a forum user name.':
-        '请输入角色名和服务器，或论坛用户名。',
     'Favourites':
         '收藏',
-    'In game':
-        '游戏中',
-    'Level {n}':
-        '{n} 级',
     'OctoWoW could not be reached: {error}':
         '无法连接 OctoWoW：{error}',
     'OctoWoW has not published a sign-in service that EqUpdater can use yet, and EqUpdater will not ask for your forum password. Everything else works without an account.':
@@ -994,12 +982,8 @@ STRINGS = {
         'OctoWoW 没有提供可查询角色是否在线的服务，因此好友显示为状态不可用。你的好友列表保存在这台电脑上。',
     'Offline':
         '离线',
-    'Offline or unavailable':
-        '离线或不可用',
     'Online':
         '在线',
-    'Online in EqUpdater':
-        '在 EqUpdater 中在线',
     'Showing the last known information.':
         '显示的是最近一次已知的信息。',
     'Sign in to OctoWoW':
@@ -1008,10 +992,6 @@ STRINGS = {
         '登录耗时过长，已停止。',
     'Sign-in was cancelled.':
         '登录已取消。',
-    'Status unavailable':
-        '状态不可用',
-    "That realm is not one of OctoWoW's realms.":
-        '该服务器不是 OctoWoW 的服务器。',
     'The friends list is full ({count}).':
         '好友列表已满（{count}）。',
     'The presence service asked EqUpdater to slow down.':
@@ -1030,14 +1010,12 @@ STRINGS = {
         '登录未获批准。',
     'Your sign-in has expired. Please sign in again.':
         '你的登录已过期，请重新登录。',
-    'in EqUpdater':
-        '在 EqUpdater 中',
-    'in game':
-        '在游戏中',
-    'is online {where}':
-        '已上线 {where}',
     '{name} is already in your friends list.':
         '{name} 已在你的好友列表中。',
     '{n} online':
         '{n} 在线',
+    "Do Not Disturb": "请勿打扰",
+    "In Game": "游戏中",
+    "Invisible": "隐身",
+    "Unavailable": "不可用",
 }

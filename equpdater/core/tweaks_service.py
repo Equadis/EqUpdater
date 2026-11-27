@@ -36,13 +36,12 @@ class TweaksService:
             if tid is None:
                 out.append({"id": "", "label": label, "kind": "section"})
                 continue
+            if tid == "locale":              # the Language control lives in Settings, not on this page
+                continue
             row = {"id": tid, "label": label, "kind": kind, "tip": tip or "",
                    "value": self.values.get(tid), "min": lo, "max": hi,
                    "step": step or 1, "default": T.TWEAKS_DEFAULTS.get(tid),
                    "changed": self.values.get(tid) != self.saved.get(tid)}
-            if tid == "locale":
-                row["choices"] = [{"code": c, "label": lab}
-                                  for c, (_i, lab) in T.LOCALES.items()]
             out.append(row)
         return out
 
@@ -103,27 +102,49 @@ class TweaksService:
         self.values = dict(T.TWEAKS_DEFAULTS)
         return self._run(dict(T.TWEAKS_DEFAULTS), "reset", on_done)
 
-    def _run(self, values: dict, why: str, on_done):
+    def set_language(self, code: str, on_done=None):
+        """The Language setting (Settings page): the stored game language, applied exactly as
+        the Language tweak was: saved, then WoW.exe patched and Config.wtf updated. Other edits
+        waiting unsaved on the Tweaks page are neither applied nor lost."""
+        if code not in T.LOCALES or self.busy:
+            return False
+        pending = {k: v for k, v in self.values.items() if v != self.saved.get(k)}
+
+        def values():
+            vals = dict(self._load())
+            vals["locale"] = code
+            return vals
+
+        def finished():
+            self.values.update({k: v for k, v in pending.items() if k != "locale"})
+            if on_done:
+                on_done()
+        return self._run(values, "language", finished)
+
+    def _run(self, values, why: str, on_done):
         if self.busy:
             return False
         self.busy, self.message, self.message_error = True, "", False
         patch_now = self.has_game()
         game = self.game_dir()
+        box = {}
 
         def work():
-            self._save(values)                       # saved first, as in 2.x
+            vals = box["values"] = values() if callable(values) else values
+            values_ = vals
+            self._save(values_)                      # saved first, as in 2.x
             if not game:
                 return "no_game"
             if not patch_now:
                 return "no_exe"
-            self._patch(game, values)
-            self._wtf(game, values)
+            self._patch(game, values_)
+            self._wtf(game, values_)
             return "applied"
 
         def done(result):
             self.busy = False
-            self.saved = dict(values)
-            self.values = dict(values)
+            self.saved = dict(box["values"])
+            self.values = dict(box["values"])
             self.message = {"applied": "Tweaks applied.",
                             "no_exe": "WoW.exe not found – run Update first.",
                             "no_game": "Game folder not set."}[result]

@@ -3,7 +3,7 @@ import QtQuick.Controls.Basic as C
 import EqUi
 
 // A skinned popup of plain actions (the account menu, a friend's context menu).
-// entries: [{id, label, checked?, enabled?, separator?, heading?, tone?}]
+// entries: [{id, label, checked?, enabled?, separator?, heading?, tone?, dot?}]  (dot: a colour, drawn before the label)
 C.Popup {
     id: root
     property var entries: []
@@ -25,7 +25,7 @@ C.Popup {
             model: root.entries
             delegate: Item {
                 width: Math.max(190, implicitWidth)
-                implicitWidth: label.implicitWidth + 36
+                implicitWidth: label.implicitWidth + 36 + (modelData.dot ? 18 : 0)
                 implicitHeight: modelData.separator ? 7 : Style.theme.components["menu.item"].minHeight
                 readonly property bool actionable: !modelData.separator && !modelData.heading && modelData.enabled !== false
                 Rectangle {
@@ -39,10 +39,16 @@ C.Popup {
                     visible: parent.actionable
                     color: Style.pick(Style.theme.components["menu.item"].colors, ma.containsMouse ? "hover" : "normal", "transparent")
                 }
+                Rectangle {
+                    visible: !!modelData.dot
+                    x: 12; width: 10; height: 10; radius: 5
+                    anchors.verticalCenter: parent.verticalCenter
+                    color: modelData.dot || "transparent"
+                }
                 SkinText {
                     id: label
                     visible: !modelData.separator
-                    x: 12
+                    x: modelData.dot ? 30 : 12
                     anchors.verticalCenter: parent.verticalCenter
                     kind: modelData.heading ? "text.dim" : modelData.tone === "danger" ? "text.error"
                           : modelData.enabled === false ? "text.dim" : "text.body"

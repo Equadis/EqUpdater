@@ -1,20 +1,20 @@
 # Proposal: sign-in and friend presence for OctoWoW launchers
 
-**To:** the OctoWoW development team  **From:** the EqUpdater project  **Status:** proposal, nothing deployed  **Date:** 2026-11-25
-**Scope:** an optional OctoWoW account in EqUpdater 3 (a community launcher and updater) and an optional friends list that can show whether friends are online.
+**To:** the OctoWoW development team  **From:** the EqUpdater project  **Status:** proposal, nothing deployed  **Date:** 2026-11-25 (revised 2026-11-27 for the simplified social model)
+**Scope:** an optional OctoWoW account in EqUpdater 3 (a community launcher and updater) and an optional friends list, by forum user name, that shows whether friends have the launcher open or are playing, and on which realm.
 
 This document stands on its own. It says what we would like to build, what we need from OctoWoW to build it, exactly what the requests would look like, how players' privacy is protected, and what we will and will not do. Nothing here changes how players log in to the game, and nothing here is required to play.
 
 ## 1. Summary
 
-EqUpdater 3 already has the screens: an account area in the top-right corner and a collapsible friends sidebar. They are switched **off in effect** because OctoWoW has no published way to (a) let a launcher sign a player in with their existing forum account, or (b) say whether a character is online. We would rather wait for an official answer than guess, scrape, or ask players for their passwords.
+EqUpdater 3 already has the screens: an account area in the top-right corner (with a presence dot: Online, Away, Do Not Disturb, Invisible) and an always-visible friends list, as in Steam or Battle.net. They are switched **off in effect** because OctoWoW has no published way to (a) let a launcher sign a player in with their existing forum account, or (b) say whether a player is online or playing. We would rather wait for an official answer than guess, scrape, or ask players for their passwords.
 
 We are asking for two small, independent things:
 
 | | What | Why | Effort on your side (our estimate) |
 |---|---|---|---|
 | **A** | An OAuth 2.0 sign-in for a public desktop client | Show the player's forum name and avatar; let them see their own status | A standard OAuth server in front of the existing accounts (for example Laravel Passport or an OIDC bridge) |
-| **B** | A batched, opt-in character presence lookup | Show which friends are in game | One read endpoint that reads what the game server already knows; one write endpoint for the player's own visibility choices |
+| **B** | A batched presence lookup and status publish, by forum user name | Show which friends have the launcher open or are playing, and on which realm; let the player choose Online, Away, Do Not Disturb or **Invisible** | One read endpoint, one write endpoint, and a rule: an invisible player is returned as offline |
 
 A is useful on its own. B is optional and can come later or never; the friends list works without it (statuses show as "unavailable").
 
@@ -30,8 +30,8 @@ A is useful on its own. B is optional and can come later or never; the friends l
 1. **Authentication happens on octowow.st, in the player's own browser.** EqUpdater never sees, asks for or stores a forum or game password. It receives a one-time code, exchanges it for tokens, and keeps the tokens in the operating system's credential manager (never in a file).
 2. **Optional everywhere.** Updating, configuring and launching the game never wait for, or depend on, sign-in or presence. If your service is down, slow or removed, the launcher behaves exactly as it does today.
 3. **Forum identity is separate from game accounts.** Nothing here touches a game login or game password.
-4. **Privacy by default.** Nothing about a player is published unless they turn it on in Settings, item by item.
-5. **Polite traffic.** One batched request per refresh (every 30 seconds to 15 minutes, 60 s by default), only while the friends list is open and the window is not minimised, honouring `Retry-After`, with exponential back-off.
+4. **Minimal data.** What is exchanged about a player is: forum user name, avatar, a presence status, and **the realm they are playing on, only while in game**. No character name, class, level, guild or zone is requested, sent or displayed. Players do not configure this: they choose a status (Online, Away, Do Not Disturb, Invisible) and that is all.
+5. **Polite traffic.** One batched request about every five seconds (fixed, not a setting), only while the player is signed in, has friends and the window is not minimised; honouring `Retry-After`, `ETag`/`304` and with exponential back-off. If you offer push (SSE or WebSocket), EqUpdater will use it instead and stop polling (section 5.5).
 6. **No new cost to you beyond the endpoints themselves,** and no collector accounts, bots or scraping on our side.
 
 ## 4. A. Sign-in
@@ -84,16 +84,20 @@ GET {userinfo_url}                     Authorization: Bearer <access token>
 
 ## 5. B. Presence (optional)
 
+Friends are **OctoWoW forum user names**. Nothing about characters is involved.
+
 ### 5.1 Reading friends' status (batched)
 
 ```
 POST {presence_url}/lookup             Authorization: Bearer <access token>   Content-Type: application/json
-{"friends":[{"name":"Thrall","realm":"nzoth"},{"name":"Jaina","realm":"yshaarj"}]}      (1 to 50 entries)
+If-None-Match: "<etag of the last answer>"
+{"friends":["Thrall","Jaina","Arthas"]}                                              (1 to 50 forum user names)
 
-200 {"as_of":"2026-11-25T10:00:00Z",
-     "results":[{"name":"Thrall","realm":"nzoth","game":"in_game","launcher":"online",
-                 "class":"shaman","level":60,"guild":"Horde Elite","zone":"Orgrimmar","as_of":"2026-11-25T09:59:41Z"},
-                {"name":"Jaina","realm":"yshaarj","game":"unknown","launcher":"unknown"}]}
+200 {"as_of":"2026-11-27T10:00:00Z",
+     "results":[{"user":"Thrall","launcher":"online","game":"in_game","realm":"nzoth","as_of":"2026-11-27T09:59:58Z"},
+                {"user":"Jaina","launcher":"away","game":"offline"},
+                {"user":"Arthas","launcher":"offline","game":"offline"}]}
+304                                                                                     (nothing changed)
 429 Retry-After: 120
 ```
 
@@ -101,45 +105,46 @@ Field meanings (EqUpdater treats anything else as `unknown`):
 
 | Field | Values | Meaning |
 |---|---|---|
-| `game` | `in_game`, `offline`, `unknown` | whether the **character** is in the world. `offline` only if you can say so |
-| `launcher` | `online`, `away`, `dnd`, `offline`, `unknown` | whether the **player** has a launcher open and their chosen status |
-| `class`, `level`, `guild`, `zone` | optional | only if the character's owner allowed showing them |
+| `launcher` | `online`, `away`, `dnd`, `offline`, `unknown` | the status the player chose with the launcher open. **A player who chose Invisible must be returned as `offline`** |
+| `game` | `in_game`, `offline`, `unknown` | whether the player has a character in the world. Detected on your side (game server or addon), never typed in by the player |
+| `realm` | a realm id from `realms.json` | **only when `game` is `in_game`** (and the player is not invisible). Omit it otherwise |
 | `as_of` | ISO 8601 | when this was true |
 
-Rules we ask you to apply:
-* **Only return what the character's owner opted in to share.** A player who has not opted in is returned as `unknown`, never as `offline` (otherwise "unknown" would leak "hidden").
-* Do not return account-to-character links unless the owner allowed them.
-* Never invent `offline` for someone who simply is not using a launcher: the launcher distinguishes the two channels and will show "status unavailable" rather than "offline" when `game` is `unknown`.
-* `Cache-Control` and `ETag` on the response are welcome; EqUpdater honours them.
+What EqUpdater shows: `In Game ・ N'Zoth` when `game` is `in_game` and a realm is given (just `In Game` if not), otherwise `Online`, `Away`, `Do Not Disturb` or `Offline`. Nothing is shown that is not in this table.
 
-### 5.2 Publishing the player's own status (optional)
+Rules we ask you to apply:
+* **Invisible means offline to everyone else**, in both `launcher` and `game`, and no `realm`. The player stays signed in and everything works for them locally; only other people's view changes. This is the one behaviour EqUpdater cannot provide by itself.
+* **Only users who have accepted the presence feature** (signing in to EqUpdater and not being invisible counts as acceptance for the launcher channel) are returned with data; others are `unknown`, never `offline`.
+* Never return `offline` for someone who simply is not using a launcher and whose game state you cannot know; return `unknown`. EqUpdater says "Unavailable" for `unknown`, and does not claim they are offline.
+* `Cache-Control` and `ETag` are welcome; EqUpdater sends `If-None-Match`.
+
+### 5.2 Publishing the player's own status
 
 ```
 PUT {presence_url}/me                  Authorization: Bearer <access token>
-{"status":"online","share":{"launcher":true,"game":true,"character":false,"realm":false,"zone":false}}
+{"status":"online"}                    (online | away | dnd | invisible)
 204
 ```
 
-The flags are the player's choices in EqUpdater's Settings; all default to `false`. EqUpdater sends the update only when they change.
+* `away` is also sent automatically after 15 minutes without keyboard or mouse use (EqUpdater's own rule), unless the player chose Do Not Disturb, Away or Invisible, which always win.
+* In-game presence needs no flag from the launcher: if the player is playing, you already know it. Please apply `invisible` to it as well.
+* Sent only when the status changes. There is no other publish call, and no flags for character, realm or zone: the realm is yours to attach while in game, and the character and zone are never needed.
 
-### 5.3 Account-to-character association (optional, owner-controlled)
+### 5.3 Alternatives
+* **No server presence at all:** EqUpdater keeps working with a local friends list and shows "Unavailable".
+* **In-game addon:** an addon could report *the player's own* realm to a file EqUpdater reads locally. That would not tell the launcher about *friends*, so it does not replace 5.1.
 
-```
-GET {presence_url}/characters?user=Thrallfan      Authorization: Bearer ...
-200 {"characters":[{"name":"Thrall","realm":"nzoth"}]}      (only characters the owner made public)
-```
+### 5.4 Adding friends
+EqUpdater adds a friend by forum user name and stores the list on the player's computer only. If you prefer friend relationships to live on your side (so that "add friend" sends a request the other person accepts, as in Steam), that is a larger design and we would adopt it: `GET/POST/DELETE {presence_url}/friends`. Until then nobody is told they were added.
 
-This enables "add friend by forum user name" and showing a friend's characters under their account.
-
-### 5.4 Alternatives
-* **No server presence at all:** EqUpdater keeps working with a local friends list and shows "status unavailable".
-* **In-game addon:** an addon could write the *player's own* current character, realm and zone to a file EqUpdater reads locally. That would let the launcher show your own status in game, not your friends'. Needs your approval of such an addon.
+### 5.5 Push instead of polling (preferred if cheap for you)
+`GET {presence_url}/stream` as Server-Sent Events, carrying the same `results` objects for the signed-in player's friends when they change. EqUpdater would open it once per run and stop polling. One long-lived connection per launcher is less load than a request every five seconds.
 
 ## 6. Performance and cost expectations
 
-* One request per refresh, at most every 30 s while the list is open and the launcher is focused; every 5 minutes if unfocused if the player chooses; none when minimised; none when the player has no friends or has turned the sidebar off.
-* A request carries up to 50 names and one token. Typical response well under 10 KB.
-* With 1,000 launchers open at 60 s that is about 17 requests per second at most, and far fewer in practice (the list must be open).
+* Polling fallback: one request about every five seconds, fixed. One request carries up to 50 names and one token; typical response well under 2 KB, usually `304`.
+* With 1,000 launchers that is up to 200 requests per second on a read that can be served from a cache keyed by the set of names and invalidated when a status changes. If that is more than you want to serve, tell us the interval you prefer (it is one constant in EqUpdater) or provide 5.5.
+* EqUpdater makes no presence requests when the player is signed out, has no friends, has the window minimised, or your service is down (it backs off 30 s, 60 s, 2 min ... up to 10 min).
 * We will not poll anything else of yours: no `/api/*` calls beyond those agreed here.
 
 ## 7. Versioning and compatibility
@@ -150,7 +155,7 @@ This enables "add friend by forum user name" and showing a friend's characters u
 ## 8. Acceptance (how we will know it works)
 1. A player signs in through the browser and EqUpdater shows their forum name and avatar; the token refreshes after an hour; Sign Out revokes it.
 2. A wrong or revoked token signs the player out cleanly with a message, without affecting updating or launching.
-3. A batched lookup returns correct states for characters that are, and are not, sharing; hidden characters appear as `unknown`.
+3. A batched lookup returns correct states; a player who chose Invisible is returned as `offline` with no `realm`; a realm is returned only while in game.
 4. A `429` slows EqUpdater down; an outage leaves the last known data on screen, marked as out of date.
 5. Our automated tests (fake server) and a manual run against a staging deployment both pass before anything is enabled for players.
 
@@ -161,6 +166,6 @@ This enables "add friend by forum user name" and showing a friend's characters u
 4. Enable for everyone only after you are satisfied.
 
 ## 10. What we will not do
-Collect or store passwords; scrape the website or forum; create collector accounts or bots; read your databases; store tokens in plain text; expose a player's characters without their permission; make sign-in a requirement for any feature.
+Collect or store passwords; scrape the website or forum; create collector accounts or bots; read your databases; store tokens in plain text; ask for or display character names, classes, levels, guilds or zones; make sign-in a requirement for any feature.
 
 *Contact: the EqUpdater project (GitHub: Equadis/EqUpdater). Technical detail of the client side: `docs/v3/SOCIAL.md`.*

@@ -375,6 +375,20 @@ class TweaksBridge(QObject):
     def fovHint(self):
         return self.service.fov_hint()
 
+    # -- Language (shown in Settings; the stored value is still the game-language tweak) -------------
+    @Property("QVariantList", notify=changed)
+    def languageChoices(self):
+        from ..core.tweaks import DEFAULT_LOCALE, LOCALES
+        from ..config import load_config
+        current = (load_config().get("tweaks") or {}).get("locale", DEFAULT_LOCALE)
+        return [{"code": c, "label": label, "current": c == current} for c, (_i, label) in LOCALES.items()]
+
+    @Slot(str)
+    def setLanguage(self, code):
+        if self.service.set_language(code, self._applied):
+            self.app.setStatus(tr("Applying tweaks…"), False)
+            self._sync()
+
     def _sync(self):
         self.lm.reload()
         self.changed.emit()
@@ -434,6 +448,13 @@ class SkinBridge(QObject):
     def id(self):
         return self.manager.current.id
 
+    @Property(str, notify=themeChanged)
+    def nativeFont(self):
+        """The current skin's own body face, whatever font override is active: the preview of
+        'Skin default' in Settings."""
+        fonts = (self.manager.current.theme or {}).get("fonts") or {}
+        return str((fonts.get("body") or next(iter(fonts.values()), {}) or {}).get("family") or "")
+
     def refresh(self):
         self._register_fonts()
         self.themeChanged.emit()
@@ -450,6 +471,10 @@ class SkinManager:
     one, and falls back: chosen skin -> bubbles -> built-in flat theme."""
 
     DEFAULT = "bubbles"
+    #: The official skins, in the order the selector shows them. Others follow by name.
+    ORDER = ("bubbles", "classic-2004", "battle-net", "turtle-wow", "minimal-dark", "minimal-light")
+    #: Skins that were removed -> the skin their players move to (the stored id is rewritten).
+    RENAMED = {"minimal": "minimal-dark"}
 
     def __init__(self, official_dir: str, user_dir: str, settings):
         self.official_dir, self.user_dir, self.settings = official_dir, user_dir, settings
@@ -469,6 +494,9 @@ class SkinManager:
             found[sid] = s
         self.skins = found
         wanted = self.settings.get("skin")
+        if wanted in self.RENAMED and wanted not in self.skins:
+            wanted = self.RENAMED[wanted]
+            self.settings.set("skin", wanted)
         self.current = self.skins.get(wanted) or self.skins.get(self.DEFAULT) \
             or core_skin.builtin_skin()
 
@@ -485,7 +513,8 @@ class SkinManager:
 
 
 class SettingsBridge(QObject):
-    skinsChanged = Signal()
+    skinsChanged = Signal()          # the LIST of skins changed (a rescan found a difference)
+    currentChanged = Signal()        # the chosen skin changed: the list itself is untouched
     optionsChanged = Signal()
 
     def __init__(self, settings, manager: SkinManager, skin_bridge: SkinBridge,
@@ -496,16 +525,19 @@ class SettingsBridge(QObject):
 
     @Property("QVariantList", notify=skinsChanged)
     def skins(self):
-        return [{"id": k, "name": v.name, "author": v.author,
+        order = SkinManager.ORDER
+        def rank(kv):
+            k, v = kv
+            return (0, order.index(k), "") if k in order else (1 if v.official else 2, 0, v.name.lower())
+        return [{"id": k, "name": v.name, "author": "" if v.official else v.author,
                  "problems": list(v.problems), "official": v.official}
-                for k, v in sorted(self.manager.skins.items(),
-                                   key=lambda kv: (not kv[1].official, kv[1].name.lower()))]
+                for k, v in sorted(self.manager.skins.items(), key=rank)]
 
-    @Property(str, notify=skinsChanged)
+    @Property(str, notify=currentChanged)
     def currentSkin(self):
         return self.manager.current.id
 
-    @Property("QStringList", notify=skinsChanged)
+    @Property("QStringList", notify=currentChanged)
     def skinProblems(self):
         return list(self.manager.current.problems)
 
@@ -547,20 +579,35 @@ class SettingsBridge(QObject):
         t0 = time.perf_counter()
         if self.manager.select(sid):
             self.skin_bridge.refresh()
-            self.skinsChanged.emit()
+            self.currentChanged.emit()
             self.app.lastSkinSwitchMs = (time.perf_counter() - t0) * 1000
+
+    def _listing(self) -> list:
+        return [(d["id"], d["name"], d["author"], tuple(d["problems"])) for d in self.skins]
+
+    def _rescan(self):
+        """Rescan, and tell the view about the *list* only if it differs. Replacing the list
+        rebuilds every skin button, including the one being clicked: a click that rebuilt its own
+        button used to fall through to the scrim behind the Settings window and close it."""
+        before = self._listing()
+        self.manager.scan()
+        self.skin_bridge.refresh()
+        if self._listing() != before:
+            self.skinsChanged.emit()
+        self.currentChanged.emit()
 
     @Slot()
     def rescanSkins(self):
-        self.manager.scan()
-        self.skin_bridge.refresh()
-        self.skinsChanged.emit()
+        self._rescan()
 
     @Slot()
     def restoreDefaultSkin(self):
-        self.manager.restore_default()
+        before = self._listing()
+        self.manager.restore_default()          # (scans)
         self.skin_bridge.refresh()
-        self.skinsChanged.emit()
+        if self._listing() != before:
+            self.skinsChanged.emit()
+        self.currentChanged.emit()
 
     @Slot()
     def openSkinsFolder(self):

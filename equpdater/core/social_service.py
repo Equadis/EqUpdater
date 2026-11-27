@@ -1,91 +1,82 @@
-"""The social sidebar's logic, Qt-free: rows to show, own status, notifications.
+"""The friends sidebar's logic, Qt-free: rows to show and the player's own status.
 
-Everything optional and private: with ``social_enabled`` off nothing here runs a
-request, and with no presence service (the situation today) the list is a local
-friends list whose entries are shown with an unavailable status.
+There are no social preferences. The sidebar is always there; presence is published only
+for a signed-in player and only as the chosen status allows; the realm is shown while in the game;
+the character and the zone are never shown; the player goes Away after 15 minutes without using
+the computer; the refresh is one batched request about every five seconds, and only while a
+service exists and the player is signed in (``presence.PresenceService``).
+
+With no presence service (the situation today) the list is a local friends list whose entries
+are shown as unavailable, and nothing is requested.
 """
 
 from __future__ import annotations
 
 import time
 
-from ..i18n import tr
 from . import friends as F
 from . import presence as P
-from .settings import SOCIAL_DEFAULTS
+from ..i18n import tr
 
-STATUS_CHOICES = ("online", "away", "dnd")
-AUTO_AWAY_CHOICES = (0, 5, 10, 15, 30)
-INTERVAL_CHOICES = (30, 60, 120, 300)
+STATUS_CHOICES = ("online", "away", "dnd", "invisible")
+AUTO_AWAY_SECONDS = 15 * 60
+
 
 class SocialService:
-    def __init__(self, settings, book: F.FriendBook, presence: P.PresenceService, account, realms, now=time.time):
+    def __init__(self, settings, book: F.FriendBook, presence: P.PresenceService, account, realms=None, now=time.time):
         self.s, self.book, self.presence, self.account, self.realms, self.now = settings, book, presence, account, realms, now
         self.on_change = lambda: None
-        self.toasts: list = []                    # (title, text) the bridge shows and clears
         self.search = ""
         self.auto_away = False
+        self.last_activity = now()
         self._published = None
-        presence.on_friend_online = self._friend_online
-        presence.set_interval(self.get("presence_interval"))
-        presence.enabled = bool(self.get("social_enabled"))
-
-    # -- settings ------------------------------------------------------------------------------
-    def get(self, key):
-        v = self.s.get(key)
-        return SOCIAL_DEFAULTS[key] if v is None and key in SOCIAL_DEFAULTS and key != "sidebar_collapsed" else v
-
-    def set(self, key, value):
-        if key not in SOCIAL_DEFAULTS:
-            raise KeyError(key)
-        if key == "default_status" and value not in STATUS_CHOICES:
-            return
-        if key == "own_status" and value not in STATUS_CHOICES:
-            return
-        if key == "auto_away_minutes" and value not in AUTO_AWAY_CHOICES:
-            return
-        if key == "friends_sort" and value not in F.SORTS:
-            return
-        if key == "presence_interval":
-            value = min(900, max(30, int(value)))
-            self.presence.set_interval(value)
-        self.s.set(key, value)
-        if key == "social_enabled":
-            self.presence.enabled = bool(value)
-        self.on_change()
 
     # -- own status ------------------------------------------------------------------------------
     @property
+    def manual_status(self) -> str:
+        v = self.s.get("own_status")
+        return v if v in STATUS_CHOICES else "online"
+
+    @property
     def status(self) -> str:
-        """What the player's own presence is right now (auto-away only softens 'online')."""
-        manual = self.get("own_status") or self.get("default_status")
-        return "away" if (self.auto_away and manual == "online") else manual
+        """What the player is shown as. A manual Away, Do Not Disturb or Invisible always wins;
+        the idle rule only softens Online to Away."""
+        return "away" if (self.auto_away and self.manual_status == "online") else self.manual_status
 
     def set_status(self, status: str):
         if status in STATUS_CHOICES:
             self.auto_away = False
-            self.set("own_status", status)
-            self.publish()
-
-    def reset_status_for_new_session(self):
-        self.s.set("own_status", self.get("default_status"))
-
-    def window_idle(self, idle: bool):
-        """The window has been unfocused/minimised for the auto-away time (or is back)."""
-        if self.get("auto_away_minutes") and idle != self.auto_away:
-            self.auto_away = idle
+            self.last_activity = self.now()
+            self.s.set("own_status", status)
             self.on_change()
             self.publish()
 
+    def note_activity(self):
+        """The player used the computer (a key, the mouse): cheap, called for every input event."""
+        self.last_activity = self.now()
+
+    def check_idle(self) -> bool:
+        """Apply the 15-minute rule. Returns whether the shown status changed."""
+        idle = self.now() - self.last_activity >= AUTO_AWAY_SECONDS
+        if idle == self.auto_away:
+            return False
+        self.auto_away = idle
+        self.on_change()
+        self.publish()
+        return True
+
     def own(self) -> P.OwnStatus:
-        return P.OwnStatus(self.status, bool(self.get("show_launcher_presence")), bool(self.get("show_game_presence")),
-                           bool(self.get("show_character")), bool(self.get("show_realm")), bool(self.get("show_zone")))
+        """What is shared. Invisible shares nothing: the player appears offline."""
+        st = self.status
+        shared = st != "invisible"
+        return P.OwnStatus(st, share_game=shared, share_realm=shared)
 
     def publish(self) -> bool:
-        """Tell the service (only if one exists, accepts it and the player is signed in and allows it).
-        Blocking: a worker. Returns whether anything was sent."""
+        """Tell the service (only if one exists and the player is signed in). Blocking: a worker.
+        Returns whether anything was sent. Invisible is sent too, so the service can show the
+        player as offline: only the service can hide a player from other people."""
         prov = self.presence.provider
-        if not (prov.available and "publish" in prov.capabilities and self.get("social_enabled")):
+        if not (prov.available and "publish" in prov.capabilities):
             return False
         token = self.account.valid_access() if self.account else None
         if self.account and prov.requires_account and token is None:
@@ -100,28 +91,17 @@ class SocialService:
         self._published = own
         return True
 
-    # -- notifications -----------------------------------------------------------------------------
-    def _friend_online(self, friend, obs):
-        if self.get("friend_notifications") and self.status != "dnd":
-            where = tr("in game") if obs.game == "in_game" else tr("in EqUpdater")
-            self.toasts.append((friend.label, tr("is online {where}", where=where)))
-            self.on_change()
-
-    def take_toasts(self) -> list:
-        out, self.toasts = self.toasts, []
-        return out
-
     # -- the list ---------------------------------------------------------------------------------------
     def online_count(self) -> int:
         return sum(1 for f in self.book.all() if self.presence.state_of(f)[0] in (P.IN_GAME, P.LAUNCHER, P.AWAY, P.DND))
 
     def rows(self) -> list:
-        """Header and friend rows, grouped Favourites / Online / Offline, filtered and sorted."""
-        realm = self.get("friends_realm") or ""
-        shown = self.book.search(self.search, realm)
+        """Header and friend rows: Favourites first, then by presence (in game, online, away, busy),
+        offline last; searched by name. There is no other filter or order."""
+        shown = self.book.search(self.search)
         state_of = lambda f: self.presence.state_of(f)[0]               # noqa: E731
         buckets = {g: [] for g in F.GROUPS}
-        for f in sorted(shown, key=F.sort_key(self.get("friends_sort"), state_of)):
+        for f in sorted(shown, key=F.sort_key(state_of)):
             buckets[F.group_of(f, state_of(f))].append(f)
         out = []
         titles = {"favourites": tr("Favourites"), "online": tr("Online"), "offline": tr("Offline")}
@@ -129,37 +109,31 @@ class SocialService:
             if not buckets[g]:
                 continue
             title = titles[g]
-            if g == "offline" and any(state_of(f) == P.UNKNOWN for f in buckets[g]):
-                title = tr("Offline or unavailable")           # not "offline": nobody said they were
+            if g == "offline" and all(state_of(f) == P.UNKNOWN for f in buckets[g]):
+                title = tr("Unavailable")                      # nobody said they were offline
             out.append({"key": "h:" + g, "kind": "header", "group": g, "title": title, "count": len(buckets[g])})
             for f in buckets[g]:
                 out.append(self._row(f))
         return out
 
     def _row(self, f: F.Friend) -> dict:
+        """Only: the forum user name, the presence, and the realm while in the game."""
         state, stale = self.presence.state_of(f)
         obs = self.presence.observation(f)
-        cls = obs.char_class.lower() if obs else ""
-        sub = []
-        if obs and obs.level:
-            sub.append(tr("Level {n}", n=obs.level))
-        if cls in F.CLASSES:
-            sub.append(tr(F.CLASSES[cls][0]))
-        extra = [x for x in ((obs.guild and f"<{obs.guild}>"), obs.zone) if x] if obs else []
+        realm = ""
+        if state == P.IN_GAME and obs and obs.realm:
+            realm = self.realms.name(obs.realm) if self.realms else obs.realm
         return {"key": "f:" + f.id, "kind": "friend", "group": F.group_of(f, state), "id": f.id,
-                "name": f.label, "realm": f.realm, "realmName": self.realms.name(f.realm) if f.realm else "",
-                "forum": f.forum, "favourite": f.favourite, "state": state, "stateText": P.label(state),
-                "stale": stale, "dot": P.COLOURS[state],
-                "charClass": cls if cls in F.CLASSES else "", "nameColour": F.class_colour(cls) if cls in F.CLASSES else "",
-                "level": obs.level if obs and obs.level else 0, "guild": obs.guild if obs else "",
-                "zone": obs.zone if obs else "", "detail": " · ".join(sub + extra),
+                "name": f.label, "favourite": f.favourite, "state": state, "stale": stale,
+                "dot": P.COLOURS[state], "statusLine": P.status_line(state, realm),
+                "status": P.label(state), "realm": realm,
                 "title": "", "count": 0}
 
     # -- editing -------------------------------------------------------------------------------------------
-    def add_friend(self, name: str, realm: str, forum: str = "") -> str:
+    def add_friend(self, username: str) -> str:
         """"" on success, else the reason."""
         try:
-            self.book.add(name, realm, forum)
+            self.book.add(username)
         except F.FriendError as e:
             return str(e)
         self.on_change()
@@ -175,6 +149,3 @@ class SocialService:
         if f:
             self.book.set_favourite(friend_id, not f.favourite)
             self.on_change()
-
-    def account_friends_supported(self) -> bool:
-        return "account_characters" in self.presence.provider.capabilities

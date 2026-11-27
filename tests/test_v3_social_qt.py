@@ -11,11 +11,10 @@ from unittest import mock
 from tests.test_v3_qt import Base, HAVE_QT, pump, walk
 
 if HAVE_QT:
-    from PySide6.QtCore import QMetaObject, QObject
+    from PySide6.QtCore import Q_ARG, QMetaObject, QObject, Qt
 
 from equpdater.core import account as A
 from equpdater.core import presence as P
-from tests.test_v3_social import FakeProvider, obs
 
 
 def find(win, name):
@@ -39,9 +38,9 @@ class FakeAuth(A.AuthProvider):
 
 
 class Social(Base):
-    def seed(self, p, names=(("Thrall", "nzoth"), ("Jaina", "yshaarj"), ("Arthas", "cthun"))):
-        for n, r in names:
-            self.assertEqual(p["social_service"].add_friend(n, r), "")
+    def seed(self, p, names=("Thrall", "Jaina", "Arthas")):
+        for n in names:
+            self.assertEqual(p["social_service"].add_friend(n), "")
 
     def rows(self, p):
         return [p["social"].lm.item_at(i) for i in range(p["social"].lm.rowCount())]
@@ -98,6 +97,9 @@ class TestAccountChip(Social):
         self.assertEqual(p["account"].status, "dnd")
         self.assertNotEqual(dot.property("color").name(), online)
         self.assertEqual(dot.property("color").name().lower(), P.COLOURS[P.DND].lower())
+        p["account"].setStatus("invisible")
+        pump(150)
+        self.assertEqual(dot.property("color").name().lower(), P.COLOURS[P.OFFLINE].lower())
         p["account"].signOut()
         pump(until=lambda: not p["account"].signedIn, limit=5000)
         self.assertIsNone(svc.store.get(A.SERVICE, A.ACCOUNT))
@@ -153,37 +155,46 @@ class TestAccountChip(Social):
 
 
 class TestSidebar(Social):
-    def test_every_skin_has_a_sidebar_and_it_starts_as_the_skin_wishes(self):
-        for sid, expanded in (("bubbles", False), ("battle-net", True), ("turtle-wow", False)):
-            p = self.start(skin=sid)
-            pump(100)
-            self.assertEqual(p["social"].collapsed, not expanded, sid)
-            side = find(self.win, "socialSidebar")
-            self.assertTrue(side.property("visible"))
-            self.assertEqual(side.property("width"), 46 if not expanded else
-                             self.win.property("layout")["sidebarWidth"], sid)
-            self.stop()
-            shutil.rmtree(self.data, ignore_errors=True)
-            del self.engine
+    PAGES = ("news", "tweaks", "addons", "mods", "mpq")
 
-    def test_collapsing_and_expanding_is_remembered_across_restarts_and_overrides_the_skin(self):
-        data = tempfile.mkdtemp(prefix="equ-soc-")
-        self.addCleanup(shutil.rmtree, data, True)
-        p = self.start(data_dir=data, skin="battle-net")
-        self.assertFalse(p["social"].collapsed)
-        p["social"].toggleCollapsed()
-        pump(200)
-        self.assertTrue(p["social"].collapsed)
-        self.assertEqual(find(self.win, "socialSidebar").property("width"), 46)
-        self.stop()
-        del self.engine
-        p2 = self.start(data_dir=data, skin="battle-net")                                   # a new run
-        self.assertTrue(p2["social"].collapsed)                                              # the player's choice wins
-        p2["social"].toggleCollapsed()
-        self.stop()
-        del self.engine
-        p3 = self.start(data_dir=data, skin="bubbles")
-        self.assertFalse(p3["social"].collapsed)                                             # and holds in another skin
+    def test_the_sidebar_is_visible_on_every_page_in_every_skin(self):
+        p = self.start()
+        for sid in sorted(p["manager"].skins):
+            p["settings_bridge"].setSkin(sid)
+            for page in self.PAGES:
+                p["app"].tab = page
+                pump(60)
+                side = find(self.win, "socialSidebar")
+                self.assertTrue(side.property("visible"), (sid, page))
+                self.assertGreater(side.property("width"), 150, (sid, page))
+        self.assertEqual(self.qml_errors(), [])
+
+    def test_the_removed_controls_do_not_exist(self):
+        p = self.start()
+        self.seed(p)
+        pump(100)
+        for name in ("sidebarCollapse", "sidebarExpand", "sortButton"):
+            self.assertIsNone(find(self.win, name), name)
+        for attr in ("collapsed", "toggleCollapsed", "enabled", "realms", "realmFilter", "setRealmFilter", "sort",
+                     "setSort", "values", "setSetting", "autoAwayChoices", "intervalChoices", "skinDefaultExpanded"):
+            self.assertFalse(hasattr(p["social"], attr), attr)
+        texts = {str(i.property("text")) for i in walk(find(self.win, "socialSidebar")) if i.property("text") is not None}
+        for banned in ("All", "N'Zoth", "Y'Shaarj", "C'Thun", "‹", "›", "Sort: Status", "Sort"):
+            self.assertNotIn(banned, texts, banned)
+        self.assertIn("Add Friend", texts)
+        self.assertIn("FRIENDS", texts)
+
+    def test_the_sidebar_has_a_fixed_width_that_leaves_the_pages_their_room(self):
+        p = self.start()
+        for width in (860, 1000, 1280):
+            self.win.setProperty("width", width)
+            pump(120)
+            side = find(self.win, "socialSidebar")
+            area = find(self.win, "pageArea")
+            self.assertLessEqual(side.property("width"), 260)
+            s = side.mapToScene(side.boundingRect().topLeft()).x()
+            a_right = area.mapToScene(area.boundingRect().topLeft()).x() + area.property("width")
+            self.assertLessEqual(a_right, s, width)                       # the pages end before the sidebar starts
 
     def test_the_friends_list_is_kept_between_runs(self):
         data = tempfile.mkdtemp(prefix="equ-soc-")
@@ -196,105 +207,60 @@ class TestSidebar(Social):
         names = sorted(r["name"] for r in self.rows(p2) if r["kind"] == "friend")
         self.assertEqual(names, ["Arthas", "Jaina", "Thrall"])
 
-    def test_an_open_sidebar_pushes_the_pages_when_there_is_room_and_overlays_them_when_there_is_not(self):
-        p = self.start(skin="battle-net")
-        area = find(self.win, "pageArea")
-        side = find(self.win, "socialSidebar")
-        self.win.setProperty("width", 1100)
-        pump(200)
-        wide = area.property("width")
-        self.assertLessEqual(area.property("x") + area.property("width"), side.property("x") + 1)   # beside it
-        self.win.setProperty("width", 900)
-        pump(200)
-        self.assertGreater(area.property("width"), 900 - 2 * 28 - 5)                         # underneath it
-        p["social"].toggleCollapsed()                                                        # collapse: back to docked
-        pump(200)
-        self.assertLessEqual(area.property("x") + area.property("width"), side.property("x") + 1)
-        self.assertGreater(wide, 600)
-
-    def test_turning_social_off_removes_the_sidebar_and_all_polling(self):
-        p = self.start(skin="battle-net")
-        self.seed(p)
-        p["presence_service"].provider = FakeProvider()
-        p["presence_service"].sidebar_open = True
-        self.assertTrue(p["presence_service"].active())
-        p["social"].setSetting("social_enabled", False)
-        pump(150)
-        self.assertFalse(find(self.win, "socialSidebar").property("visible"))
-        self.assertFalse(p["presence_service"].active())
-        area = find(self.win, "pageArea")
-        self.assertGreater(area.property("width"), 900)
-        p["social"].setSetting("social_enabled", True)
-        pump(150)
-        self.assertTrue(find(self.win, "socialSidebar").property("visible"))
-
-    def test_no_service_means_unavailable_statuses_an_explanation_and_zero_requests(self):
+    def test_no_service_means_unavailable_statuses_and_zero_requests(self):
         p = self.start(skin="battle-net")
         self.seed(p)
         p["social"].start()
         pump(1500)
         friends = [r for r in self.rows(p) if r["kind"] == "friend"]
         self.assertEqual({r["state"] for r in friends}, {"unknown"})
+        self.assertEqual({r["statusLine"] for r in friends}, {"Unavailable"})
         self.assertEqual(p["presence_service"].requests, 0)
-        self.assertIn("no service", p["social"].sourceNote)
         self.assertEqual(p["social"].onlineText, "0 online")
-        heads = [r["title"] for r in self.rows(p) if r["kind"] == "header"]
-        self.assertEqual(heads, ["Offline or unavailable"])                                  # never just "Offline"
+        self.assertEqual([r["title"] for r in self.rows(p) if r["kind"] == "header"], ["Unavailable"])
         self.assertEqual(self.qml_errors(), [])
 
-    def test_the_realm_list_and_filters(self):
+    def test_search_filters_the_list(self):
         p = self.start()
         self.seed(p)
-        ids = [r["id"] for r in p["social"].realms]
-        self.assertEqual(sorted(ids), ["cthun", "nzoth", "yshaarj"])
-        p["social"].setRealmFilter("nzoth")
-        self.assertEqual([r["name"] for r in self.rows(p) if r["kind"] == "friend"], ["Thrall"])
-        p["social"].setRealmFilter("")
         p["social"].setSearch("ja")
         self.assertEqual([r["name"] for r in self.rows(p) if r["kind"] == "friend"], ["Jaina"])
         p["social"].setSearch("")
-        p["social"].setSort("name")
-        self.assertEqual([r["name"] for r in self.rows(p) if r["kind"] == "friend"], ["Arthas", "Jaina", "Thrall"])
+        self.assertEqual(p["social"].friendCount, 3)
+        field = find(self.win, "friendSearch")
+        QMetaObject.invokeMethod(field, "edited", Qt.DirectConnection, Q_ARG(str, "thr"))     # typing in the field
+        pump(60)
+        self.assertEqual([r["name"] for r in self.rows(p) if r["kind"] == "friend"], ["Thrall"])
 
 
 class TestFriendActions(Social):
-    def test_add_dialog_duplicates_and_same_name_on_another_realm(self):
+    def test_add_friend_by_forum_name_with_duplicates_refused(self):
+        p = self.start()
+        self.assertEqual(p["social"].addFriend("Thrall"), "")
+        self.assertIn("already", p["social"].addFriend("thrall"))
+        self.assertNotEqual(p["social"].addFriend("x"), "")
+        self.assertEqual(p["social"].friendCount, 1)
+
+    def test_the_dialog_asks_only_for_a_forum_name_and_reports_errors(self):
         p = self.start()
         p["social"].openAdd()
         pump(150)
-        overlay = find(self.win, "addFriendOverlay")
-        self.assertTrue(overlay.property("visible"))
-        self.assertEqual(p["social"].addFriend("Thrall", "nzoth", ""), "")
-        self.assertIn("already", p["social"].addFriend("thrall", "nzoth", ""))
-        self.assertEqual(p["social"].addFriend("Thrall", "cthun", ""), "")
-        self.assertIn("2 to 12 letters", p["social"].addFriend("T", "nzoth", ""))
-        self.assertIn("realm", p["social"].addFriend("Jaina", "moonbase", ""))
-        self.assertEqual(len([r for r in self.rows(p) if r["kind"] == "friend"]), 2)
-        p["social"].closeAdd()
+        self.assertTrue(find(self.win, "addFriendOverlay").property("visible"))
+        for gone in ("friendForumField", "realm_nzoth"):
+            self.assertIsNone(find(self.win, gone), gone)
+        field, confirm = find(self.win, "friendNameField"), find(self.win, "addFriendConfirm")
+        field.setProperty("text", "x")
+        QMetaObject.invokeMethod(confirm, "clicked")
         pump(100)
-        self.assertFalse(overlay.property("visible"))
+        self.assertTrue(find(self.win, "addFriendError").property("visible"))
+        self.assertTrue(find(self.win, "addFriendOverlay").property("visible"))
+        field.setProperty("text", "Thrall")
+        QMetaObject.invokeMethod(confirm, "clicked")
+        pump(150)
+        self.assertEqual(p["social"].friendCount, 1)
+        self.assertFalse(find(self.win, "addFriendOverlay").property("visible"))
 
-    def test_the_dialog_button_adds_and_reports_errors_in_the_dialog(self):
-        p = self.start()
-        p["social"].openAdd()
-        pump(150)
-        field = find(self.win, "friendNameField")
-        field.setProperty("text", "Jaina")
-        QMetaObject.invokeMethod(find(self.win, "realm_yshaarj"), "clicked")
-        QMetaObject.invokeMethod(find(self.win, "addFriendConfirm"), "clicked")
-        pump(150)
-        self.assertEqual([r["name"] for r in self.rows(p) if r["kind"] == "friend"], ["Jaina"])
-        self.assertFalse(p["social"].addOpen)
-        p["social"].openAdd()
-        pump(150)
-        find(self.win, "friendNameField").setProperty("text", "Jaina")
-        QMetaObject.invokeMethod(find(self.win, "realm_yshaarj"), "clicked")
-        QMetaObject.invokeMethod(find(self.win, "addFriendConfirm"), "clicked")
-        pump(150)
-        self.assertTrue(p["social"].addOpen)
-        self.assertIn("already", find(self.win, "addFriendError").property("text"))
-
-    def test_favourite_moves_to_the_top_group_and_remove_removes(self):
+    def test_favourite_and_unfavourite_and_remove(self):
         p = self.start()
         self.seed(p)
         jaina = next(r for r in self.rows(p) if r.get("name") == "Jaina")
@@ -305,22 +271,26 @@ class TestFriendActions(Social):
         self.assertEqual(rows[1]["name"], "Jaina")
         self.assertTrue(rows[1]["favourite"])
         p["social"].toggleFavourite(jaina["id"])
+        self.assertNotIn("Favourites", [r["title"] for r in self.rows(p) if r["kind"] == "header"])
         p["social"].removeFriend(jaina["id"])
         self.assertEqual(sorted(r["name"] for r in self.rows(p) if r["kind"] == "friend"), ["Arthas", "Thrall"])
-        self.assertEqual(p["social"].friendCount, 2)
         self.assertEqual(p["social"].copyText(next(r["id"] for r in self.rows(p) if r.get("name") == "Arthas")), "Arthas")
 
-    def test_friend_rows_and_the_context_menu_render_in_every_skin(self):
+    def test_the_context_menu_has_exactly_the_conventional_entries(self):
         p = self.start()
         self.seed(p)
-        p["social"].toggleCollapsed() if p["social"].collapsed else None
+        menu = self.win.findChild(QObject, "friendMenu")
+        entries = menu.property("entries")
+        entries = entries.toVariant() if hasattr(entries, "toVariant") else entries
+        self.assertEqual([e.get("label") for e in entries if not e.get("separator")],
+                         ["Favourite", "Copy Name", "Remove Friend"])
+
+    def test_friend_rows_and_dialogs_render_in_every_skin(self):
+        p = self.start()
+        self.seed(p)
         for sid in p["manager"].skins:
             p["settings_bridge"].setSkin(sid)
             pump(120)
-            if p["social"].collapsed:
-                p["social"].toggleCollapsed()
-                pump(120)
-            QMetaObject.invokeMethod(find(self.win, "socialSidebar"), "toString") if False else None
             p["social"].openAdd()
             pump(120)
             p["social"].closeAdd()
@@ -338,32 +308,78 @@ class TestPresenceInTheInterface(Social):
         self.addCleanup(os.environ.pop, "EQU3_PRESENCE_FIXTURE", None)
         return path
 
-    def test_states_colours_class_colours_and_details_from_a_service(self):
-        self.fixture({"thrall@nzoth": {"game": "in_game", "launcher": "online", "class": "shaman", "level": 60,
-                                       "guild": "Horde", "zone": "Orgrimmar"},
-                      "jaina@yshaarj": {"launcher": "away", "class": "mage", "level": 58},
-                      "arthas@cthun": {"game": "offline"}})
+    def click(self, item):
+        from PySide6.QtCore import QPoint, QPointF
+        from PySide6.QtTest import QTest
+        pt = item.mapToScene(QPointF(item.width() / 2, item.height() / 2))
+        QTest.mouseClick(self.win, Qt.LeftButton, Qt.NoModifier, QPoint(int(pt.x()), int(pt.y())))
+
+    def test_states_colours_and_status_lines_from_a_service(self):
+        self.fixture({"thrall": {"game": "in_game", "launcher": "online", "realm": "nzoth"},
+                      "jaina": {"launcher": "away"}, "arthas": {"game": "offline"},
+                      "illidan": {"launcher": "dnd"}, "tyrande": {"launcher": "online"}})
         data = tempfile.mkdtemp(prefix="equ-soc-")
         self.addCleanup(shutil.rmtree, data, True)
         p = self.start(data_dir=data, skin="battle-net")
-        self.seed(p)
+        self.seed(p, ("Thrall", "Jaina", "Arthas", "Illidan", "Tyrande"))
         p["social"].start()
         pump(until=lambda: p["presence_service"].requests > 0, limit=6000)
         pump(300)
         by = {r["name"]: r for r in self.rows(p) if r["kind"] == "friend"}
-        self.assertEqual(by["Thrall"]["state"], "in_game")
+        self.assertEqual(by["Thrall"]["statusLine"], "In Game ・ N'Zoth")
         self.assertEqual(by["Thrall"]["dot"].lower(), "#3ddc84")
-        self.assertEqual(by["Thrall"]["nameColour"].lower(), "#0070de")
-        self.assertIn("Orgrimmar", by["Thrall"]["detail"])
-        self.assertEqual(by["Jaina"]["state"], "away")
-        self.assertEqual(by["Arthas"]["state"], "offline")
-        self.assertEqual(p["social"].onlineText, "2 online")
+        self.assertEqual(by["Jaina"]["dot"].lower(), "#f2c744")
+        self.assertEqual(by["Illidan"]["statusLine"], "Do Not Disturb")
+        self.assertEqual(by["Illidan"]["dot"].lower(), "#ef5350")
+        self.assertEqual(by["Tyrande"]["statusLine"], "Online")
+        self.assertEqual(by["Arthas"]["statusLine"], "Offline")
+        self.assertEqual(p["social"].onlineText, "4 online")
+        for r in by.values():
+            for key in ("charClass", "level", "guild", "zone", "detail", "nameColour"):
+                self.assertNotIn(key, r)
         self.assertEqual(self.qml_errors(), [])
 
-    def test_a_service_outage_keeps_the_last_data_and_says_so(self):
-        path = self.fixture({"thrall@nzoth": {"game": "in_game"}})
+    def test_the_status_dot_menu_has_the_four_choices_with_the_conventional_colours(self):
+        p = self.start()
+        p["account_service"].provider = FakeAuth()
+        p["account"].signIn()
+        pump(until=lambda: p["account"].signedIn, limit=5000)
+        pump(150)
+        choices = list(p["account"].statusChoices)
+        self.assertEqual([c["label"] for c in choices], ["Online", "Away", "Do Not Disturb", "Invisible"])
+        self.assertEqual([c["dot"].lower() for c in choices], ["#3ddc84", "#f2c744", "#ef5350", "#7d8590"])
+        menu = self.win.findChild(QObject, "statusMenu")
+        self.assertIsNotNone(menu)
+        hit = find(self.win, "statusDotButton")
+        self.assertTrue(hit.property("visible"))
+        self.click(hit)
+        pump(250)
+        self.assertTrue(menu.property("visible"))                                          # clicking the dot opens it
+        for choice, colour in (("away", "#f2c744"), ("dnd", "#ef5350"), ("invisible", "#7d8590"), ("online", "#3ddc84")):
+            p["account"].setStatus(choice)
+            pump(100)
+            self.assertEqual(find(self.win, "accountStatusDot").property("color").name().lower(), colour)
+
+    def test_invisible_is_published_as_invisible_and_everything_still_works(self):
+        self.fixture({"thrall": {"launcher": "online"}})
+        data = tempfile.mkdtemp(prefix="equ-soc-")
+        self.addCleanup(shutil.rmtree, data, True)
+        p = self.start(data_dir=data)
+        self.seed(p, ("Thrall",))
+        prov = p["presence_service"].provider
+        type(prov).published.clear()
+        p["social_service"].set_status("invisible")
+        sent = type(prov).published[-1]
+        self.assertEqual((sent.status, sent.share_game, sent.share_realm), ("invisible", False, False))
+        p["presence_service"].poll()                                                       # friends still load
+        pump(100)
+        self.assertEqual(next(r for r in self.rows(p) if r["kind"] == "friend")["statusLine"], "Online")
+        self.assertEqual(p["social_service"].status, "invisible")
+
+    def test_a_service_outage_keeps_the_last_data(self):
+        path = self.fixture({"thrall": {"game": "in_game", "realm": "nzoth"}})
         p = self.start(skin="battle-net")
-        self.seed(p)
+        self.seed(p, ("Thrall",))
         p["social"].start()
         pump(until=lambda: p["presence_service"].last_ok > 0, limit=6000)
         with open(path, "w") as f:
@@ -372,71 +388,42 @@ class TestPresenceInTheInterface(Social):
         pump(100)
         row = next(r for r in self.rows(p) if r.get("name") == "Thrall")
         self.assertEqual(row["state"], "in_game")
-        self.assertIn("last known", p["social"].sourceNote)
-
-    def test_a_friend_coming_online_shows_a_notification_only_if_asked_for(self):
-        path = self.fixture({"thrall@nzoth": {"game": "offline"}})
-        p = self.start(skin="battle-net")
-        self.seed(p, (("Thrall", "nzoth"),))
-        p["social"].setSetting("friend_notifications", True)
-        p["social"].start()
-        pump(until=lambda: p["presence_service"].last_ok > 0, limit=6000)
-        with open(path, "w") as f:
-            json.dump({"thrall@nzoth": {"game": "in_game"}}, f)
-        p["presence_service"].poll()
-        pump(200)
-        toast = find(self.win, "toast")
-        self.assertTrue(toast.property("visible"))
-        self.assertEqual(toast.property("title"), "Thrall")
-        self.assertEqual(self.qml_errors(), [])
 
 
-class TestSocialSettings(Social):
-    def test_the_social_section_is_in_settings_and_every_choice_persists(self):
+class TestNoSocialSettings(Social):
+    def settings_texts(self):
+        ov = find(self.win, "settingsOverlay")
+        return [str(i.property("text")) for i in walk(ov) if i.property("text") not in (None, "")]
+
+    def test_settings_has_no_social_section_or_controls(self):
+        p = self.start()
+        QMetaObject.invokeMethod(self.win, "openSettings")
+        pump(250)
+        texts = self.settings_texts()
+        for banned in ("SOCIAL", "Enable social sidebar", "Show my launcher presence", "Show my in-game presence",
+                       "Show my current character", "Show my realm", "Show my current zone",
+                       "Friend login notifications", "Default presence status",
+                       "Set Away automatically when EqUpdater is idle", "Refresh friends every"):
+            self.assertNotIn(banned, texts, banned)
+        for name in ("socialEnabledToggle", "showLauncherToggle", "showGameToggle", "showCharacterToggle",
+                     "showRealmToggle", "showZoneToggle", "notifyToggle", "settingsSignOut"):
+            self.assertIsNone(find(self.win, name), name)
+
+    def test_old_social_preferences_are_gone_after_start_up_and_change_nothing(self):
         data = tempfile.mkdtemp(prefix="equ-soc-")
         self.addCleanup(shutil.rmtree, data, True)
+        with open(os.path.join(data, "settings.json"), "w") as f:
+            json.dump({"_schema": 1, "imported_from_2x": True, "social_enabled": False, "sidebar_collapsed": True,
+                       "show_character": True, "show_zone": True, "default_status": "dnd", "friends_realm": "nzoth",
+                       "friend_notifications": True, "presence_interval": 900}, f)
         p = self.start(data_dir=data)
-        QMetaObject.invokeMethod(self.win, "openSettings")
-        pump(200)
-        for name in ("socialEnabledToggle", "showLauncherToggle", "showGameToggle", "showCharacterToggle",
-                     "showRealmToggle", "showZoneToggle", "notifyToggle"):
-            self.assertIsNotNone(find(self.win, name), name)
-        vals = p["social"].values
-        self.assertFalse(vals["show_character"])                                             # private by default
-        for key, v in (("show_launcher_presence", True), ("show_game_presence", True), ("show_character", True),
-                       ("show_realm", True), ("show_zone", True), ("friend_notifications", True),
-                       ("auto_away_minutes", 15), ("default_status", "dnd"), ("presence_interval", 120)):
-            p["social"].setSetting(key, v)
-        self.assertEqual(p["social"].values["auto_away_minutes"], 15)
-        p["social"].setSetting("default_status", "bogus")
-        p["social"].setSetting("auto_away_minutes", 7)
-        self.assertEqual(p["social"].values["default_status"], "dnd")
-        self.assertEqual(p["social"].values["auto_away_minutes"], 15)
-        self.stop()
-        del self.engine
-        p2 = self.start(data_dir=data)
-        v2 = p2["social"].values
-        self.assertEqual((v2["show_zone"], v2["friend_notifications"], v2["default_status"], v2["presence_interval"]),
-                         (True, True, "dnd", 120))
-
-    def test_a_toggle_in_the_interface_changes_the_setting(self):
-        p = self.start()
-        QMetaObject.invokeMethod(self.win, "openSettings")
-        pump(200)
-        QMetaObject.invokeMethod(find(self.win, "showZoneToggle"), "toggled")
         pump(100)
-        self.assertTrue(p["social"].values["show_zone"])
-
-    def test_sign_out_is_offered_in_settings_only_when_signed_in(self):
-        p = self.start()
-        p["account_service"].provider = FakeAuth()
-        QMetaObject.invokeMethod(self.win, "openSettings")
-        pump(200)
-        self.assertFalse(find(self.win, "settingsSignOut").property("visible"))
-        p["account"].signIn()
-        pump(until=lambda: p["account"].signedIn, limit=5000)
-        pump(150)
-        self.assertTrue(find(self.win, "settingsSignOut").property("visible"))
+        self.assertTrue(find(self.win, "socialSidebar").property("visible"))            # social_enabled: false is ignored
+        self.assertEqual(p["social_service"].status, "online")                           # default_status ignored
+        self.assertEqual(p["presence_service"].interval, 5.0)
+        for key in ("social_enabled", "sidebar_collapsed", "show_character", "show_zone", "default_status",
+                    "friends_realm", "friend_notifications", "presence_interval"):
+            self.assertNotIn(key, p["settings"].data, key)
 
 
 if __name__ == "__main__":

@@ -29,11 +29,12 @@ def main():
     os.makedirs(a.out, exist_ok=True)
     data = tempfile.mkdtemp(prefix="equ3-matrix-")
     pres = os.path.join(data, "presence.json")
-    json.dump({"thrall@nzoth": {"game": "in_game", "launcher": "online", "class": "shaman", "level": 60,
-                                "guild": "Horde Elite", "zone": "Orgrimmar"},
-               "jaina@yshaarj": {"launcher": "away", "class": "mage", "level": 58, "guild": "Kirin Tor"},
-               "sylvanas@nzoth": {"launcher": "dnd", "class": "hunter", "level": 60, "zone": "Undercity"},
-               "arthas@cthun": {"game": "offline", "class": "paladin", "level": 44}}, open(pres, "w"))
+    json.dump({"thrall": {"game": "in_game", "launcher": "online", "realm": "nzoth"},
+               "jaina": {"game": "in_game", "launcher": "online", "realm": "yshaarj"},
+               "sylvanas": {"launcher": "online"},
+               "arthas": {"launcher": "away"},
+               "illidan": {"launcher": "dnd"},
+               "malfurion": {"game": "offline", "launcher": "offline"}}, open(pres, "w"))
     os.environ.update(EQU3_DATA_DIR=data, EQU3_NO_SETUP="1", EQUPDATER_NO_LANGUAGE_PROMPT="1", EQUPDATER_OFFLINE="1",
                       EQU3_OFFLINE="1", EQU3_PRESENCE_FIXTURE=pres, EQU3_CREDSTORE="memory",
                       QT_QPA_PLATFORM="offscreen", QT_SCALE_FACTOR=str(a.scale), EQU3_ALLOW_MULTI="1")
@@ -67,17 +68,14 @@ def main():
     p["account"].changed.emit()
     p["account"].signIn()
     pump(600)
-    for n, r in (("Thrall", "nzoth"), ("Jaina", "yshaarj"), ("Sylvanas", "nzoth"), ("Arthas", "cthun"),
-                 ("Malfurion", "yshaarj")):
-        p["social_service"].add_friend(n, r)
+    for n in ("Thrall", "Jaina", "Sylvanas", "Arthas", "Illidan", "Malfurion", "Tyrande"):
+        p["social_service"].add_friend(n)
     p["social_service"].toggle_favourite(p["friend_book"].all()[0].id)
     p["social"].start()
     p["app"].tab = a.page
     paths = []
     for sid in sorted(p["manager"].skins):
         p["settings_bridge"].setSkin(sid)
-        if p["social"].collapsed:
-            p["social"].toggleCollapsed()
         p["presence_service"].poll()
         pump(900)
         path = os.path.join(a.out, f"{sid}.png")

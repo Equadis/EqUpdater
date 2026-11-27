@@ -27,6 +27,7 @@ FONT_OVERRIDES = {
     "arial": ("Arial", 1.0),
     "friz": ("Friz Quadrata", 1.0),
     "opendyslexic": ("OpenDyslexic", 0.92),      # 2.x's footprint compromise
+    "objectsans": ("Object Sans", 1.0),          # ships in fonts/ (registered by name at start)
 }
 
 

@@ -178,7 +178,9 @@ class TestNewsPage(Base):
             pump(5)
         self.assertEqual(p["fetcher"].requests, before)
         # one scrolling authority per panel: only the ListView is a Flickable
-        flick = [o for o in walk(self.win.property("contentItem")) if o.isVisible()
+        side = next(o for o in walk(self.win.property("contentItem")) if o.objectName() == "socialSidebar")
+        inside = set(walk(side))                    # the friends list is its own panel, not the news page's
+        flick = [o for o in walk(self.win.property("contentItem")) if o.isVisible() and o not in inside
                  and o.metaObject().className().startswith(("QQuickListView", "QQuickFlickable",
                                                            "QQuickScrollView"))]
         self.assertEqual(len(flick), 2)
@@ -1067,7 +1069,7 @@ class TestBackgroundAnimations(Base):
     def test_a_skin_switch_shows_or_hides_an_animation_and_never_rebuilds_one(self):
         p = self.start()
         for _ in range(4):
-            for sid in ("classic-2004", "minimal", "bubbles", "minimal-dark"):
+            for sid in ("classic-2004", "bubbles", "minimal-dark"):
                 p["settings_bridge"].setSkin(sid)
                 pump(60)
         # two animated skins were visited: two animations exist, however often we switched

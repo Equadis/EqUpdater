@@ -2,7 +2,7 @@
 
 ## New
 * **A new interface** (Qt Quick, GPU-drawn) with the same five pages: News, Tweaks, Addons, Mods, MPQ.
-* **Seven skins**, selected in Settings: Bubbles (default), Classic (2004), Minimal, Minimal Dark, Minimal Light, Turtle WoW, Battle.net (the last two are full skins in the style of those launchers, drawn from scratch). A skin is a folder of JSON and images; players can make their own (`SKINNING.md`, `COMPONENTS.md`, `starter-skin/`). There is no skin editor or marketplace, deliberately.
+* **Six skins**, selected in Settings: Bubbles (default), Classic (2004), Blizzard, Turtle, Minimal (Dark), Minimal (Light) (the last two are full skins in the style of those launchers, drawn from scratch). A skin is a folder of JSON and images; players can make their own (`SKINNING.md`, `COMPONENTS.md`, `starter-skin/`). There is no skin editor or marketplace, deliberately.
 * **Animated background** (WebP) that pauses when minimised or, if you choose, unfocused. Idle CPU about 0.3 % against 47 % in 2.x with the animation on.
 * **News rebuilt**: cached listing and bodies, no request on scroll, NEW marks, Read more / Load more per panel, works offline from cache.
 * **Find your game**: finds the folder 2.x or OctoLauncher uses, or a ZIP/torrent copy, and can extract a ZIP/TAR you downloaded, safely (no path escapes, no links, never overwrites).
@@ -37,3 +37,13 @@ Automated tests: 1,200 (2.x branch: 881), all passing; see `TESTING.md`. Measure
 * Server status: snapshot-first client with static fallback (OctoBot PR 77, not deployed).
 * Social: unavailable services can no longer disturb the launcher; every skin lays out the account chip and sidebar (Turtle WoW `navOffset`); opaque sidebar backing in narrow windows.
 * Linux: AppImage build script, pruned Qt layouts, CI job (never run). New docs: `LINUX.md`, `OCTOWOW_INTEGRATION_PROPOSAL.md`, `QA_REPORT.md`.
+
+## Beta 1 revision after manual testing (2026-11-27)
+* **Friends sidebar simplified**: always visible, no collapse or hide, no realm filters or sort; friends are OctoWoW forum user names; each shows the name, avatar, a presence dot and `Status ・ Realm` (realm only while in game); favourites first, then by presence, offline last; Add / Remove Friend, search, right-click menu, online count. No character, class, level, guild or zone anywhere.
+* **Presence menu** on the dot beside your avatar: Online, Away, Do Not Disturb, Invisible. Invisible is sent to the service as `invisible` (a service must show you as offline).
+* **Settings > Social removed.** Fixed defaults; 10 obsolete keys are deleted from existing settings on start-up. Refresh is one batched request about every five seconds and is not a setting. Friend login notifications are gone.
+* **Language moved** from the Tweaks page to Settings (same stored value, same game patch).
+* **Skins**: six (the standalone Minimal is removed; its users get Minimal (Dark)); names Blizzard, Turtle, Minimal (Dark), Minimal (Light); no "· EqUpdater" suffix; fixed order.
+* **Classic (2004)**: PLAY uses the same steel button texture as the other Classic buttons.
+* **Settings no longer closes** when something is selected (a tap that rebuilt its own button fell through to the scrim). The skin list is only replaced when it really changes.
+* **Font selector**: each option drawn in its own face; **Object Sans** added (licence not confirmed, see `fonts/README.txt`).

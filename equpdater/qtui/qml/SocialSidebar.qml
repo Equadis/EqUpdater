@@ -3,50 +3,24 @@ import QtQuick.Controls.Basic as C
 import Qt.labs.qmlmodels
 import EqUi
 
-// The friends sidebar: available on every page, in every skin (component "sidebar").
-// Collapses to a narrow rail. The list is local; statuses come from a presence
-// service if one exists, and are shown as "unavailable" otherwise: never as
-// "offline" just because a friend is not using EqUpdater.
+// The friends list, on every page and in every skin (component "sidebar"). Always there:
+// no collapse, no filters, no sort. Favourites first, then by presence, offline last.
+// Each friend is the forum user name, a presence dot, and "Status ・ Realm" (the realm only
+// while playing). The list is local; statuses come from a presence service when one exists
+// and read "Unavailable" otherwise: never "Offline" just because a friend is not in EqUpdater.
 Item {
     id: root
     objectName: "socialSidebar"
-    readonly property bool collapsed: social.collapsed
-    readonly property real expandedWidth: Style.theme.layout.sidebarWidth || 260
-    readonly property real railWidth: 46
-    width: collapsed ? railWidth : expandedWidth
-    visible: social.enabled
+    readonly property real fullWidth: Style.theme.layout.sidebarWidth || 260
+    // A little narrower in a small window so the page beside it keeps its room.
+    width: win.width < 1000 ? Math.min(fullWidth, 210) : fullWidth
     clip: true
-
-    // Narrow window: an open sidebar floats over the page, so it needs an opaque backing or the
-    // page's text shows through the translucent panel.
-    Rectangle {
-        anchors.fill: parent
-        visible: !root.collapsed && !win.sidebarDocked
-        color: Style.theme.background.color
-    }
 
     SkinPanel {
         anchors.fill: parent
         kind: "sidebar"
 
-        // ── collapsed rail ──
-        Column {
-            visible: root.collapsed
-            anchors.horizontalCenter: parent.horizontalCenter
-            spacing: 8
-            SkinButton {
-                objectName: "sidebarExpand"
-                kind: "button.small"
-                text: "‹"
-                onClicked: social.toggleCollapsed()
-                SkinToolTipArea { tip: app.t("Show friends") }
-            }
-            SkinText { anchors.horizontalCenter: parent.horizontalCenter; kind: "text.dim"; text: social.friendCount > 0 ? social.onlineText.split(" ")[0] : "" }
-        }
-
-        // ── expanded ──
         Item {
-            visible: !root.collapsed
             anchors.fill: parent
             Row {
                 id: head
@@ -56,44 +30,18 @@ Item {
                 SkinText { kind: "panel.header"; text: app.t("FRIENDS"); anchors.verticalCenter: parent.verticalCenter }
                 SkinText { objectName: "onlineCount"; kind: "text.dim"; text: social.onlineText; anchors.verticalCenter: parent.verticalCenter }
             }
-            SkinButton {
-                objectName: "sidebarCollapse"
-                kind: "button.small"
-                anchors { right: parent.right; top: parent.top }
-                text: "›"
-                onClicked: social.toggleCollapsed()
-                SkinToolTipArea { tip: app.t("Hide friends") }
-            }
             SkinSearchField {
                 id: search
                 objectName: "friendSearch"
-                anchors { left: parent.left; right: parent.right; top: head.bottom; topMargin: 8 }
+                anchors { left: parent.left; right: parent.right; top: head.bottom; topMargin: 6 }
                 placeholder: app.t("Search friends")
                 onEdited: function (t) { social.setSearch(t) }
-            }
-            Flow {
-                id: filters
-                anchors { left: parent.left; right: parent.right; top: search.bottom; topMargin: 6 }
-                spacing: 4
-                SkinButton { kind: "button.small"; text: app.t("All"); selected: social.realmFilter === ""
-                             onClicked: social.setRealmFilter("") }
-                Repeater {
-                    model: social.realms
-                    SkinButton { kind: "button.small"; text: modelData.name; selected: social.realmFilter === modelData.id
-                                 onClicked: social.setRealmFilter(social.realmFilter === modelData.id ? "" : modelData.id) }
-                }
-                SkinButton {
-                    objectName: "sortButton"
-                    kind: "button.small"
-                    text: app.t("Sort") + ": " + (social.sort === "name" ? app.t("Name") : social.sort === "realm" ? app.t("Realm") : app.t("Status"))
-                    onClicked: social.setSort(social.sort === "status" ? "name" : social.sort === "name" ? "realm" : "status")
-                }
             }
 
             ListView {
                 id: list
                 objectName: "friendList"
-                anchors { left: parent.left; right: parent.right; top: filters.bottom; topMargin: 6; bottom: foot.top; bottomMargin: 6 }
+                anchors { left: parent.left; right: parent.right; top: search.bottom; topMargin: 6; bottom: foot.top; bottomMargin: 6 }
                 clip: true
                 model: social.model
                 boundsBehavior: Flickable.StopAtBounds
@@ -116,67 +64,81 @@ Item {
                             id: entry
                             objectName: "friendRow"
                             width: ListView.view.width - 8
-                            height: model.detail !== "" ? 46 : 34
-                            readonly property bool unknown: model.state === "unknown" || model.state === "offline"
+                            height: 40
+                            readonly property bool away: model.state === "unknown" || model.state === "offline"
                             opacity: model.stale ? 0.65 : 1
                             Rectangle {
                                 anchors.fill: parent
                                 color: Style.pick(Style.theme.components["menu.item"].colors, hh.hovered ? "hover" : "normal", "transparent")
                                 radius: 3
                             }
-                            Rectangle {
-                                id: dot
-                                objectName: "friendDot"
-                                x: 6; y: 12
-                                width: 10; height: 10; radius: 5
-                                color: entry.unknown ? "transparent" : model.dot
-                                border.width: entry.unknown ? 2 : 0
-                                border.color: model.dot
-                                SkinText { visible: model.state === "unknown"; anchors.centerIn: parent; text: "?"; font.pixelSize: 8; kind: "text.dim" }
+                            Item {                                   // avatar (the first letter until a service gives one)
+                                id: avatar
+                                x: 6; anchors.verticalCenter: parent.verticalCenter
+                                width: 28; height: 28
+                                opacity: entry.away ? 0.6 : 1
+                                Rectangle {
+                                    anchors.fill: parent; radius: 14
+                                    color: Style.pick(Style.theme.components["button"].colors, "normal", "#333")
+                                    border.width: 1
+                                    border.color: Style.pick(Style.theme.components["button"].borderColors, "normal", "#555")
+                                    SkinText { anchors.centerIn: parent; text: (model.name || "?").charAt(0).toUpperCase(); font.bold: true }
+                                }
+                                Rectangle {
+                                    id: dot
+                                    objectName: "friendDot"
+                                    width: 10; height: 10; radius: 5
+                                    anchors { right: parent.right; bottom: parent.bottom; rightMargin: -2; bottomMargin: -2 }
+                                    color: model.dot
+                                    border.width: 2
+                                    border.color: Style.pick(Style.theme.components["window"].colors, "normal", "#111")
+                                }
                             }
                             Column {
-                                anchors { left: dot.right; leftMargin: 8; right: parent.right; rightMargin: 6; verticalCenter: parent.verticalCenter }
+                                anchors { left: avatar.right; leftMargin: 10; right: parent.right; rightMargin: 6; verticalCenter: parent.verticalCenter }
                                 spacing: 1
-                                Row {
-                                    spacing: 6
-                                    SkinText {
-                                        objectName: "friendName"
-                                        text: (model.favourite ? "★ " : "") + model.name
-                                        font.bold: true
-                                        color: model.nameColour !== "" ? model.nameColour
-                                               : Style.pick(Style.theme.components["text.body"].textColors, "normal", "#fff")
-                                        width: Math.min(implicitWidth, entry.width * 0.58); elide: Text.ElideRight
-                                    }
-                                    SkinText { kind: "text.dim"; text: model.realmName; anchors.baseline: undefined
-                                               width: Math.min(implicitWidth, entry.width * 0.3); elide: Text.ElideRight }
+                                SkinText {
+                                    objectName: "friendName"
+                                    width: parent.width
+                                    text: model.name
+                                    font.bold: true
+                                    elide: Text.ElideRight
                                 }
-                                SkinText { visible: model.detail !== ""; kind: "text.dim"; width: entry.width - 30
-                                           text: model.detail; elide: Text.ElideRight }
+                                Row {                                // "Status ・ Realm", the separator drawn (a font may lack it)
+                                    objectName: "friendStatus"
+                                    width: parent.width
+                                    spacing: 5
+                                    SkinText { id: st; kind: "text.dim"; text: model.status
+                                               width: Math.min(implicitWidth, parent.width) ; elide: Text.ElideRight }
+                                    Rectangle { visible: model.realm !== ""; width: 3; height: 3; radius: 1.5
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                color: Style.pick(Style.theme.components["text.dim"].textColors, "normal", "#888") }
+                                    SkinText { visible: model.realm !== ""; kind: "text.dim"; text: model.realm
+                                               width: Math.max(0, Math.min(implicitWidth, parent.width - st.width - 14)); elide: Text.ElideRight }
+                                }
                             }
                             HoverHandler { id: hh }
                             TapHandler { acceptedButtons: Qt.RightButton
                                          onTapped: { ctx.friendId = model.id; ctx.fav = model.favourite; ctx.label = model.name; ctx.popup() } }
-                            SkinToolTipArea { tip: model.stateText + (model.stale ? " · " + app.t("last update is old") : "")
-                                                   + (model.realmName !== "" ? "\n" + model.realmName : "") }
                             Accessible.role: Accessible.ListItem
-                            Accessible.name: model.name + ", " + model.stateText
+                            Accessible.name: model.name + ", " + model.statusLine
                         }
                     }
                 }
             }
             SkinText {
                 visible: social.friendCount === 0
-                anchors { left: parent.left; right: parent.right; top: filters.bottom; topMargin: 24 }
+                anchors { left: parent.left; right: parent.right; top: search.bottom; topMargin: 24 }
                 kind: "text.dim"; wrapMode: Text.Wrap; horizontalAlignment: Text.AlignHCenter
-                text: app.t("No friends yet. Add a character by name and realm.")
+                text: app.t("No friends yet.")
             }
-            Column {
+            SkinButton {
                 id: foot
+                objectName: "addFriendButton"
+                kind: "button"
                 anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
-                spacing: 6
-                SkinText { visible: social.sourceNote !== ""; width: parent.width; kind: "text.dim"; wrapMode: Text.Wrap
-                           objectName: "sourceNote"; text: social.sourceNote; maximumLineCount: 4; elide: Text.ElideRight }
-                SkinButton { objectName: "addFriendButton"; kind: "button"; width: parent.width; text: app.t("Add Friend"); onClicked: social.openAdd() }
+                text: app.t("Add Friend")
+                onClicked: social.openAdd()
             }
         }
     }
@@ -185,6 +147,7 @@ Item {
 
     SkinActionMenu {
         id: ctx
+        objectName: "friendMenu"
         property string friendId: ""
         property bool fav: false
         property string label: ""
@@ -192,7 +155,7 @@ Item {
         function popup() { x = Math.max(6, root.mapToItem(C.Overlay.overlay, 0, 0).x - 170)
                            y = Math.min(C.Overlay.overlay.height - 130, root.mapToItem(C.Overlay.overlay, 0, 0).y + 120); open() }
         entries: [
-            { id: "fav", label: ctx.fav ? app.t("Remove from Favourites") : app.t("Add to Favourites") },
+            { id: "fav", label: ctx.fav ? app.t("Unfavourite") : app.t("Favourite") },
             { id: "copy", label: app.t("Copy Name") },
             { separator: true },
             { id: "remove", label: app.t("Remove Friend"), tone: "danger" }
@@ -200,7 +163,7 @@ Item {
         onChosen: function (id) {
             if (id === "fav") social.toggleFavourite(friendId)
             else if (id === "remove") social.removeFriend(friendId)
-            else if (id === "copy") { copier.text = label.replace(/^★ /, ""); copier.selectAll(); copier.copy() }
+            else if (id === "copy") { copier.text = label; copier.selectAll(); copier.copy() }
         }
     }
 }

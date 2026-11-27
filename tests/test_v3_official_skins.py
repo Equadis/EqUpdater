@@ -1,4 +1,4 @@
-"""The five official skins: all load cleanly, are complete, readable and light."""
+"""The six official skins: all load cleanly, are complete, readable and light."""
 
 import os
 import unittest
@@ -7,7 +7,7 @@ from equpdater.core import skin as S
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKINS = os.path.join(ROOT, "skins")
-OFFICIAL = {"bubbles", "classic-2004", "minimal", "minimal-dark", "minimal-light", "turtle-wow", "battle-net"}
+OFFICIAL = {"bubbles", "classic-2004", "minimal-dark", "minimal-light", "turtle-wow", "battle-net"}
 
 
 def lum(hex_colour: str) -> float:
@@ -27,8 +27,9 @@ class TestOfficialSkins(unittest.TestCase):
     def setUpClass(cls):
         cls.skins = S.discover(SKINS)
 
-    def test_exactly_the_seven_official_skins_ship(self):
+    def test_exactly_the_six_official_skins_ship(self):
         self.assertEqual(set(self.skins), OFFICIAL)
+        self.assertFalse(os.path.exists(os.path.join(SKINS, "minimal")))              # the standalone Minimal is gone
 
     def test_every_skin_loads_with_no_problems(self):
         for sid, s in self.skins.items():
@@ -56,16 +57,17 @@ class TestOfficialSkins(unittest.TestCase):
 
     def test_names_are_the_ones_players_see(self):
         names = {sid: s.name for sid, s in self.skins.items()}
-        self.assertEqual(names["classic-2004"], "Classic (2004)")
-        self.assertEqual(names["minimal"], "Minimal")
-        self.assertEqual(names["minimal-dark"], "Minimal Dark")
-        self.assertEqual(names["minimal-light"], "Minimal Light")
-        self.assertEqual(names["bubbles"], "Bubbles")
-        self.assertEqual(names["turtle-wow"], "Turtle WoW")
-        self.assertEqual(names["battle-net"], "Battle.net")
+        self.assertEqual(names, {"bubbles": "Bubbles", "classic-2004": "Classic (2004)", "battle-net": "Blizzard",
+                                 "turtle-wow": "Turtle", "minimal-dark": "Minimal (Dark)",
+                                 "minimal-light": "Minimal (Light)"})
+        for name in names.values():
+            self.assertNotIn("EqUpdater", name)                  # no "· EqUpdater" suffix, in the name or the author shown
+
+    def test_the_internal_ids_are_unchanged_so_saved_preferences_keep_working(self):
+        self.assertEqual(set(self.skins), {"bubbles", "classic-2004", "battle-net", "turtle-wow", "minimal-dark", "minimal-light"})
 
     def test_minimal_skins_are_colours_and_icons_only(self):
-        for sid in ("minimal", "minimal-dark", "minimal-light"):
+        for sid in ("minimal-dark", "minimal-light"):
             bg = self.skins[sid].theme["background"]
             self.assertFalse(bg.get("animation"), sid)
             self.assertFalse(bg.get("static"), sid)
@@ -84,7 +86,7 @@ class TestOfficialSkins(unittest.TestCase):
             self.assertLess(os.path.getsize(anim), 12 * 1024 * 1024, sid)
 
     def test_text_is_readable_on_the_panels_of_the_flat_skins(self):
-        for sid in ("minimal", "minimal-dark", "minimal-light"):
+        for sid in ("minimal-dark", "minimal-light"):
             p = self.skins[sid].theme["palette"]
             panel = p["panel"]
             self.assertGreaterEqual(contrast(p["text"], panel), 7.0, f"{sid} body text")
@@ -120,7 +122,7 @@ class TestOfficialSkins(unittest.TestCase):
 
     def test_light_is_light_and_dark_is_dark(self):
         self.assertGreater(lum(self.skins["minimal-light"].theme["palette"]["bg"]), 0.6)
-        for sid in ("minimal", "minimal-dark"):
+        for sid in ("minimal-dark",):
             self.assertLess(lum(self.skins[sid].theme["palette"]["bg"]), 0.05)
 
     def test_classic_gold_text_reads_on_its_dark_frame_and_buttons(self):
@@ -149,10 +151,21 @@ class TestOfficialSkins(unittest.TestCase):
         self.assertGreater(btn.height, 2 * 10 + 4)
 
     def test_every_button_state_exists_for_the_classic_skin(self):
-        for prefix in ("normal", "play"):
-            for state in ("normal", "hover", "pressed", "disabled"):
-                self.assertTrue(os.path.isfile(
-                    os.path.join(SKINS, "classic-2004", "buttons", f"{prefix}-{state}.png")))
+        for state in ("normal", "hover", "pressed", "disabled"):
+            self.assertTrue(os.path.isfile(os.path.join(SKINS, "classic-2004", "buttons", f"normal-{state}.png")))
+
+    def test_the_classic_play_button_uses_the_same_texture_as_the_other_classic_buttons(self):
+        c = self.skins["classic-2004"].theme["components"]
+        self.assertEqual(c["button.play"]["textures"], c["button"]["textures"])
+        self.assertEqual(c["button.play"]["slice"], c["button"]["slice"])             # the same borders, so nothing is stretched
+        self.assertEqual(c["button.play"]["minHeight"], 40)                           # PLAY keeps its size
+        self.assertEqual(c["button.play"]["padding"], [34, 8, 34, 8])
+        for state in ("normal", "hover", "pressed", "disabled"):
+            self.assertIn("buttons/normal-" + state + ".png", c["button.play"]["textures"][state])
+        left = [f for f in os.listdir(os.path.join(SKINS, "classic-2004", "buttons")) if f.startswith("play-")]
+        self.assertEqual(left, [])                                                     # no separate green PLAY art left
+        for other in ("bubbles", "turtle-wow", "battle-net", "minimal-dark"):         # only Classic changed
+            self.assertTrue(self.skins[other].theme["components"]["button.play"])
 
     def test_total_weight_of_the_official_skins_stays_modest(self):
         total = sum(os.path.getsize(os.path.join(d, f)) for d, _s, fs in os.walk(SKINS) for f in fs)

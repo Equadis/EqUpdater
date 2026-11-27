@@ -134,14 +134,15 @@ def server_fixture_fetch(path):
 class FixturePresenceProvider:
     """QA only (``EQU3_PRESENCE_FIXTURE=<file>``): serves friends' presence from a JSON file so the
     sidebar can be seen with data. **Not a real service and never the default.** The file is
-    ``{"<name>@<realm>": {"game": ..., "launcher": ..., "class": ..., "level": ..., "guild": ..., "zone": ...}}``."""
+    ``{"<forum user name, lower case>": {"game": ..., "launcher": ..., "realm": ...}}``. Nothing else about a
+    player exists in the data model (no character, class, level, guild or zone)."""
     from ..core import presence as _p
 
     id = "fixture"
     name = "fixture"
     available = True
     requires_account = False
-    capabilities = frozenset({"game_presence", "launcher_presence", "character_details"})
+    capabilities = frozenset({"game_presence", "launcher_presence", "publish"})
     max_batch = 50
     unavailable_reason = ""
 
@@ -157,15 +158,16 @@ class FixturePresenceProvider:
             raise OSError("fixture says the service is down")
         out = []
         for fr in friends:
-            d = data.get(f"{fr.name.lower()}@{fr.realm}")
+            d = data.get(fr.label.lower())
             if d:
                 out.append(Observation(fr.id, d.get("game", "unknown"), d.get("launcher", "unknown"),
-                                       d.get("as_of") or _t.time(), d.get("class", ""), d.get("level"),
-                                       d.get("guild", ""), d.get("zone", ""), fr.realm, "fixture"))
+                                       d.get("as_of") or _t.time(), d.get("realm", ""), "fixture"))
         return out
 
+    published: list = []
+
     def publish(self, status, token):
-        pass
+        type(self).published.append(status)
 
 
 def auth_config_from_env(path):

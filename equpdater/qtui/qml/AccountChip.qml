@@ -68,6 +68,7 @@ Item {
                                 visible: status === Image.Ready; asynchronous: true; cache: true }
                     }
                     Rectangle {
+                        id: dotMark
                         objectName: "accountStatusDot"
                         width: 10; height: 10; radius: 5
                         anchors { right: parent.right; bottom: parent.bottom; rightMargin: -2; bottomMargin: -2 }
@@ -81,7 +82,23 @@ Item {
                 SkinText { anchors.verticalCenter: parent.verticalCenter; kind: "text.dim"; text: "▾" }
             }
             HoverHandler { cursorShape: Qt.PointingHandCursor }
-            TapHandler { onTapped: menu.open() }
+            TapHandler {
+                onTapped: function (ep) {
+                    var l = dotHit.mapFromItem(null, ep.scenePosition.x, ep.scenePosition.y)
+                    if (l.x < 0 || l.y < 0 || l.x > dotHit.width || l.y > dotHit.height) menu.open()
+                }
+            }
+            // The presence dot is its own, larger click target: it opens the status menu.
+            Item {
+                id: dotHit
+                objectName: "statusDotButton"
+                x: 14; y: 14
+                width: 20; height: 20
+                Accessible.role: Accessible.Button
+                Accessible.name: account.statusText
+                HoverHandler { cursorShape: Qt.PointingHandCursor }
+                TapHandler { onTapped: statusMenu.open() }
+            }
         }
     }
 
@@ -93,11 +110,6 @@ Item {
         entries: [
             { id: "profile", label: app.t("View Profile") },
             { separator: true },
-            { heading: true, label: app.t("Set Status") },
-            { id: "online", label: app.t("Online"), checked: account.status === "online" },
-            { id: "away", label: app.t("Away"), checked: account.status === "away" },
-            { id: "dnd", label: app.t("Do Not Disturb"), checked: account.status === "dnd" },
-            { separator: true },
             { id: "signout", label: app.t("Sign Out"), tone: "danger" }
         ]
         onAboutToShow: {
@@ -108,7 +120,25 @@ Item {
         onChosen: function (id) {
             if (id === "profile") account.viewProfile()
             else if (id === "signout") account.signOut()
-            else account.setStatus(id)
         }
+    }
+
+    // The presence menu: opened from the dot beside the avatar. Four choices, nothing else.
+    SkinActionMenu {
+        id: statusMenu
+        objectName: "statusMenu"
+        parent: C.Overlay.overlay
+        entries: {
+            var out = [], ch = account.statusChoices
+            for (var i = 0; i < ch.length; i++)
+                out.push({ id: ch[i].id, label: ch[i].label, dot: ch[i].dot, checked: account.status === ch[i].id })
+            return out
+        }
+        onAboutToShow: {
+            var o = dotHit.mapToItem(C.Overlay.overlay, 0, dotHit.height + 4)
+            x = Math.max(6, Math.min(o.x - 10, C.Overlay.overlay.width - width - 6))
+            y = o.y
+        }
+        onChosen: function (id) { account.setStatus(id) }
     }
 }

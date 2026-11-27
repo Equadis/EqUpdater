@@ -1,9 +1,9 @@
-"""The friends list: local, private and optional, Qt-free.
+"""The friends list: local, private, Qt-free.
 
-A friend is a *character* (name plus realm), or an account (a forum user
-name) where a service that can resolve one exists. The list lives on this
-computer only (``<app data>/v3/social.json``); EqUpdater sends it nowhere. Two
-characters with the same name on different realms are different friends.
+A friend is an OctoWoW forum user name. The list lives on this computer only
+(``<app data>/v3/social.json``); EqUpdater sends it nowhere. Lists saved by the
+first beta held *characters* (name and realm); those entries are kept and shown
+by their name, but new friends are forum user names only.
 """
 
 from __future__ import annotations
@@ -11,25 +11,15 @@ from __future__ import annotations
 import re
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-from ..i18n import N_, tr
+from ..i18n import tr
 
 MAX_FRIENDS = 200
-NAME_RE = re.compile(r"^[^\W\d_]{2,12}$")                  # letters only, as the game allows
+NAME_RE = re.compile(r"^[^\W\d_]{2,12}$")                  # a first-beta character entry
 FORUM_RE = re.compile(r"^[\w.\- ]{3,32}$")
 
-CLASSES = {      # id: (name, colour). The colours are the game's own class colours.
-    "warrior": ("Warrior", "#C79C6E"), "paladin": ("Paladin", "#F58CBA"), "hunter": ("Hunter", "#ABD473"),
-    "rogue": ("Rogue", "#FFF569"), "priest": ("Priest", "#FFFFFF"), "shaman": ("Shaman", "#0070DE"),
-    "mage": ("Mage", "#69CCF0"), "warlock": ("Warlock", "#9482C9"), "druid": ("Druid", "#FF7D0A"),
-}
-SORTS = ("status", "name", "realm")
 GROUPS = ("favourites", "online", "offline")
-
-
-def class_colour(class_id: str) -> str:
-    return CLASSES.get((class_id or "").lower(), ("", "#B0B0B0"))[1]
 
 
 @dataclass
@@ -90,36 +80,21 @@ class FriendBook:
     def __len__(self):
         return len(self._friends)
 
-    def search(self, text: str = "", realm: str = "") -> list:
+    def search(self, text: str = "") -> list:
         q = (text or "").strip().casefold()
-        return [f for f in self._friends
-                if (not realm or f.realm == realm)
-                and (not q or q in f.name.casefold() or q in f.forum.casefold())]
+        return [f for f in self._friends if not q or q in f.name.casefold() or q in f.forum.casefold()]
 
     # -- changing ----------------------------------------------------------------------------------
     def _save(self):
         self.store.set("friends", [f.to_json() for f in self._friends])
         self.on_change()
 
-    def add(self, name: str = "", realm: str = "", forum: str = "") -> Friend:
-        """Add a character friend (name + realm) or an account friend (forum). Raises FriendError."""
-        name, forum, realm = (name or "").strip(), (forum or "").strip(), (realm or "").strip().lower()
-        if bool(name) == bool(forum):
-            raise FriendError(tr("Enter a character name and realm, or a forum user name."))
-        if name:
-            if not NAME_RE.match(name):
-                raise FriendError(tr("A character name is 2 to 12 letters."))
-            if not realm:
-                raise FriendError(tr("Choose the character's realm."))
-            valid = self.realms() if self.realms else None
-            if valid is not None and realm not in valid:
-                raise FriendError(tr("That realm is not one of OctoWoW's realms."))
-            name = name[:1].upper() + name[1:].lower()
-        elif not FORUM_RE.match(forum):
+    def add(self, username: str) -> Friend:
+        """Add a friend by OctoWoW forum user name. Raises FriendError."""
+        forum = (username or "").strip()
+        if not FORUM_RE.match(forum):
             raise FriendError(tr("A forum user name is 3 to 32 letters, numbers, spaces, dots, dashes or underscores."))
-        else:
-            realm = ""
-        friend = Friend(uuid.uuid4().hex[:12], name, realm, forum, False, self.now())
+        friend = Friend(uuid.uuid4().hex[:12], "", "", forum, False, self.now())
         if friend.key in {f.key for f in self._friends}:
             raise FriendError(tr("{name} is already in your friends list.", name=friend.label))
         if len(self._friends) >= MAX_FRIENDS:
@@ -147,6 +122,7 @@ class FriendBook:
 
 # -- ordering and grouping (pure) ----------------------------------------------------------------
 
+#: Playing first, then in EqUpdater, away, busy; then "unavailable" and last offline.
 STATE_ORDER = {"in_game": 0, "launcher": 1, "away": 2, "dnd": 3, "unknown": 4, "offline": 5}
 
 
@@ -156,10 +132,6 @@ def group_of(friend: Friend, state: str) -> str:
     return "online" if state in ("in_game", "launcher", "away", "dnd") else "offline"
 
 
-def sort_key(sort: str, state_of):
-    """A key function for ``sorted``: by status (online first), name, or realm then name."""
-    if sort == "name":
-        return lambda f: (f.label.casefold(), f.realm)
-    if sort == "realm":
-        return lambda f: (f.realm, f.label.casefold())
-    return lambda f: (STATE_ORDER.get(state_of(f), 9), f.label.casefold(), f.realm)
+def sort_key(state_of):
+    """By presence (the only order there is), then by name."""
+    return lambda f: (STATE_ORDER.get(state_of(f), 9), f.label.casefold())

@@ -1,6 +1,6 @@
 # QA checklist for the beta (what the automated suite cannot prove)
 
-Automated: 1,190+ tests (core logic, every page and overlay in all seven skins, installer logic, packaged self-test). This list is what a person must see. Tick on a **clean Windows user profile** with a real OctoWoW client, then once on Linux/Wine once the AppImage has been built (`LINUX.md`). Results so far: `QA_REPORT.md`. Note the build (`3.0.0-beta.1`), Windows version and GPU.
+Automated: 1,190+ tests (core logic, every page and overlay in all six skins, installer logic, packaged self-test). This list is what a person must see. Tick on a **clean Windows user profile** with a real OctoWoW client, then once on Linux/Wine once the AppImage has been built (`LINUX.md`). Results so far: `QA_REPORT.md`. Note the build (`3.0.0-beta.1`), Windows version and GPU.
 
 ## 0. Install
 - [ ] Run the installer exe with 2.x *closed*: it installs, starts, and "EqUpdater 3 Beta" is in the Start menu. 2.x's shortcuts still start 2.x.
@@ -54,9 +54,9 @@ Automated: 1,190+ tests (core logic, every page and overlay in all seven skins, 
 - [ ] Sign In (no service yet): the explanation appears; nothing pretends to sign in; "Create account" opens octowow.st in the browser.
 - [ ] Sidebar: collapse and expand (remembered after a restart); add a friend by name and realm; the same name on another realm is a separate friend; duplicates refused; favourite, search, realm filter, sort; remove.
 - [ ] Every friend shows the hollow "?" and the note explaining why; the online count is 0; nothing is requested (watch the network).
-- [ ] Settings > Social: every choice survives a restart; turning the sidebar off removes it and the page area widens.
+- [ ] There is no Social section in Settings. The friends list is on every page in every skin, with no collapse arrow, realm filter or sort button; Add Friend by forum name, search, favourite and remove work; the presence dot beside your avatar opens a four-entry menu (Online, Away, Do Not Disturb, Invisible).
 - [ ] Narrow the window below 940 px with the sidebar open: it overlays the page instead of squeezing it.
-- [ ] Turtle WoW and Battle.net: every page, dialog, menu and tooltip looks like the skin; switching skins and restarting keep the choice.
+- [ ] Turtle and Blizzard: every page, dialog, menu and tooltip looks like the skin; switching skins and restarting keep the choice.
 - [ ] When OctoWoW provides sign-in and presence (`SOCIAL.md` section 4): repeat with a real account, a rate limit and an outage.
 
 ## 7. Endurance
@@ -66,3 +66,6 @@ Automated: 1,190+ tests (core logic, every page and overlay in all seven skins, 
 ## 8. Not breaking 2.x
 - [ ] After using 3, 2.x starts, shows the same game folder, mods and addons, and works.
 - [ ] Uninstalling the beta (delete its folder) leaves 2.x untouched.
+- [ ] Settings stays open when a skin, font, language or checkbox is chosen and when the default skin is restored; the scroll position is kept; each font button is drawn in its own face (Arial, Friz Quadrata, OpenDyslexic, Object Sans); Language is in Settings and not on the Tweaks page.
+- [ ] Classic (2004): PLAY has the same steel button as Add Friend (hover, pressed, disabled).
+- [ ] The skin list reads Bubbles, Classic (2004), Blizzard, Turtle, Minimal (Dark), Minimal (Light); a profile that had the removed Minimal skin now has Minimal (Dark).

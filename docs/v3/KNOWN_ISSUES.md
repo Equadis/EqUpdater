@@ -50,4 +50,6 @@ See `BETA.md`. Please include the support ZIP (Settings > Troubleshooting) and y
 * The OctoBot snapshot endpoint is not deployed; the footer chip uses the static feed, which is often hours old, and says so.
 * The Linux AppImage has never been built or run. Starting the game through Wine, UMU or Proton is untested.
 * The installer is unsigned (SmartScreen may warn).
-* In a window narrower than 940 px an open friends sidebar covers the page edge; collapse it to see the page.
+* **Object Sans** was supplied without a licence file; it is in the local beta build only. Confirm its redistribution terms before any public installer (`tools/beta_check.py` warns).
+* At the smallest window (860 px) the friends list is 210 px wide and long status lines are cut with an ellipsis.
+* Friends are added by forum user name only and are not confirmed with the other person: there is no service to ask.

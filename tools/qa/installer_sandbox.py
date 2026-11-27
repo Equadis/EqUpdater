@@ -136,7 +136,7 @@ def main():
          text.strip())
     step("2b. Apps & features entry written for this user", bool(entry) and entry["InstallLocation"] == prog and "--uninstall" in entry["UninstallString"], entry)
     skins = sorted(n for n in os.listdir(os.path.join(prog, "_internal", "skins")) if os.path.isfile(os.path.join(prog, "_internal", "skins", n, "manifest.json")))
-    step("2c. all seven skins are in the package", len(skins) == 7, skins)
+    step("2c. all six skins are in the package", len(skins) == 6, skins)
 
     # 3. self test of the installed program
     st = os.path.join(box, "selftest.json")

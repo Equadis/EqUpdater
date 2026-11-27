@@ -1,0 +1,30 @@
+{
+ "Do Not Disturb": {
+  "de": "Bitte nicht stören",
+  "es": "No molestar",
+  "pt_br": "Não perturbe",
+  "ru": "Не беспокоить",
+  "zh_cn": "请勿打扰"
+ },
+ "In Game": {
+  "de": "Im Spiel",
+  "es": "En el juego",
+  "pt_br": "No jogo",
+  "ru": "В игре",
+  "zh_cn": "游戏中"
+ },
+ "Invisible": {
+  "de": "Unsichtbar",
+  "es": "Invisible",
+  "pt_br": "Invisível",
+  "ru": "Невидимый",
+  "zh_cn": "隐身"
+ },
+ "Unavailable": {
+  "de": "Nicht verfügbar",
+  "es": "No disponible",
+  "pt_br": "Indisponível",
+  "ru": "Недоступно",
+  "zh_cn": "不可用"
+ }
+}

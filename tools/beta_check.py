@@ -111,6 +111,8 @@ def check_secrets():
     hits = []
     for rel in git("ls-files").splitlines():
         p = os.path.join(ROOT, rel)
+        if not os.path.isfile(p):                           # deleted in the working tree, not committed yet
+            continue
         if os.path.getsize(p) > 2_000_000 or rel.lower().endswith((".png", ".webp", ".gif", ".ico", ".ttf", ".otf",
                                                                    ".mpq", ".jpg", ".zip", ".pyc")):
             continue
@@ -132,6 +134,9 @@ def check_skins():
         m = json.load(open(os.path.join(ROOT, "skins", sid, "manifest.json"), encoding="utf-8"))
         if "confirm" in m.get("license", "").lower():
             add("WARN", f"skin {sid}: artwork rights unconfirmed", m["license"])
+    fonts = os.path.join(ROOT, "fonts")
+    if any(n.startswith("ObjectSans") for n in os.listdir(fonts)) and not os.path.isfile(os.path.join(fonts, "ObjectSans-LICENSE.txt")):
+        add("WARN", "font Object Sans: redistribution terms unconfirmed", "no ObjectSans-LICENSE.txt beside the font files; fonts/README.txt")
 
 
 def check_package():

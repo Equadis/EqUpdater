@@ -2,13 +2,14 @@
 
 Two *different* things are called presence and they are never merged:
 
-* **launcher** presence: the person is using EqUpdater (online / away / do not disturb);
-* **game** presence: the *character* is in the world (in game / offline).
+* **launcher** presence: the person has EqUpdater open (online / away / do not disturb);
+* **game** presence: the person is playing OctoWoW (in game / offline). Only the **realm** is
+  ever carried with it: never the character, class, level, guild or zone.
 
 The six states a player sees (``Presence``) are derived from those by ``resolve``.
-The one rule that matters: **not being in EqUpdater says nothing about whether a
-character is in the game**. A friend is only shown *offline* when a service has
-told us the *character* is offline; with no information they are *unknown*.
+The one rule that matters: **not having EqUpdater open says nothing about whether
+someone is in the game**. A friend is only shown *offline* when a service has
+told us so; with no information they are *unavailable* (``unknown``).
 Aggregate census numbers are never used as an individual's presence.
 
 ``PresenceProvider`` is the data source and is replaceable. None exists today
@@ -29,15 +30,21 @@ from ..i18n import tr
 IN_GAME, LAUNCHER, AWAY, DND, OFFLINE, UNKNOWN = "in_game", "launcher", "away", "dnd", "offline", "unknown"
 STATES = (IN_GAME, LAUNCHER, AWAY, DND, OFFLINE, UNKNOWN)
 
-COLOURS = {IN_GAME: "#3ddc84", LAUNCHER: "#3b9cff", AWAY: "#f2c744", DND: "#ef5350",
+COLOURS = {IN_GAME: "#3ddc84", LAUNCHER: "#3ddc84", AWAY: "#f2c744", DND: "#ef5350",
            OFFLINE: "#7d8590", UNKNOWN: "#7d8590"}
 GAME_CHANNEL = ("in_game", "offline", "unknown")
 LAUNCHER_CHANNEL = ("online", "away", "dnd", "offline", "unknown")
 
 
 def label(state: str) -> str:
-    return {IN_GAME: tr("In game"), LAUNCHER: tr("Online in EqUpdater"), AWAY: tr("Away"),
-            DND: tr("Do not disturb"), OFFLINE: tr("Offline"), UNKNOWN: tr("Status unavailable")}.get(state, "")
+    return {IN_GAME: tr("In Game"), LAUNCHER: tr("Online"), AWAY: tr("Away"),
+            DND: tr("Do Not Disturb"), OFFLINE: tr("Offline"), UNKNOWN: tr("Unavailable")}.get(state, "")
+
+
+def status_line(state: str, realm: str = "") -> str:
+    """"In Game ・ N'Zoth", "Online", ...: the realm only while in the game, never an empty separator."""
+    text = label(state)
+    return f"{text} ・ {realm}" if state == IN_GAME and realm else text
 
 
 @dataclass
@@ -47,20 +54,16 @@ class Observation:
     game: str = "unknown"                 # in_game | offline | unknown
     launcher: str = "unknown"             # online | away | dnd | offline | unknown
     as_of: float | None = None
-    char_class: str = ""
-    level: int | None = None
-    guild: str = ""
-    zone: str = ""
-    realm: str = ""
+    realm: str = ""                       # the realm being played on, only while in game
     source: str = ""
 
     def clean(self) -> "Observation":
         """Values from a service are not trusted: unknown words become unknown."""
         self.game = self.game if self.game in GAME_CHANNEL else "unknown"
+        if self.launcher == "invisible":                   # a service should mask it; never show it if it did not
+            self.launcher = "offline"
         self.launcher = self.launcher if self.launcher in LAUNCHER_CHANNEL else "unknown"
-        self.level = self.level if isinstance(self.level, int) and not isinstance(self.level, bool) \
-            and 1 <= self.level <= 70 else None
-        for k in ("guild", "zone", "char_class", "realm", "source"):
+        for k in ("realm", "source"):
             v = getattr(self, k)
             setattr(self, k, v.strip()[:48] if isinstance(v, str) else "")
         return self
@@ -92,13 +95,12 @@ class RateLimited(ProviderError):
 
 @dataclass
 class OwnStatus:
-    """What this player allows to be shown to others."""
-    status: str = "online"                # online | away | dnd
-    show_launcher: bool = False
-    show_game: bool = False
-    show_character: bool = False
-    show_realm: bool = False
-    show_zone: bool = False
+    """What this player shows to others. ``invisible`` means: appear offline, share nothing
+    (the player stays signed in and everything works locally). The realm is shared only while
+    playing; the character and the zone are never shared."""
+    status: str = "online"                # online | away | dnd | invisible
+    share_game: bool = True               # that I am in the game, and on which realm
+    share_realm: bool = True
 
 
 class PresenceProvider:
@@ -133,7 +135,9 @@ class UnavailablePresenceProvider(PresenceProvider):
 
 # ── the service ──────────────────────────────────────────────────────────────────────────
 
-MIN_INTERVAL, DEFAULT_INTERVAL, MAX_INTERVAL = 30.0, 60.0, 900.0
+#: One batched request about every five seconds, only while signed in with a service available
+#: and a friend to ask about. Not a setting. (A service that can push changes replaces polling.)
+INTERVAL = 5.0
 BACKOFF_FIRST, BACKOFF_MAX = 30.0, 600.0
 
 
@@ -141,38 +145,31 @@ class PresenceService:
     """Polls a provider politely and caches what it says.
 
     Nothing is requested unless **all** of these hold: a real provider is configured, the
-    social sidebar is enabled and open, the window is not minimised, there is at least one
-    friend, and (if the provider needs an account) the player is signed in."""
+    window is not minimised, there is at least one friend, and (if the provider needs an
+    account) the player is signed in. One request per round carries up to ``max_batch`` friends."""
 
     def __init__(self, book, provider: PresenceProvider, account=None, now=time.time, settings=None):
         self.book, self.provider, self.account, self.now = book, provider, account, now
         self.settings = settings
         self.on_change = lambda: None
-        self.on_friend_online = lambda friend, obs: None
         self.cache: dict = {}                       # friend id -> Observation
-        self.interval = DEFAULT_INTERVAL
+        self.interval = INTERVAL
         self.not_before = 0.0
         self.failures = 0
         self.rate_limited = False
         self.error = ""
         self.last_ok = 0.0
-        self.sidebar_open = False
         self.minimized = False
-        self.enabled = True
         self.requests = 0
         self.last_try = 0.0
-        self._baseline = False                      # first successful poll sets the baseline; no "came online" flood
 
     # -- when to poll --------------------------------------------------------------------------
-    def set_interval(self, seconds: float):
-        self.interval = min(MAX_INTERVAL, max(MIN_INTERVAL, float(seconds)))
-
     @property
     def stale_after(self) -> float:
-        return 3 * self.interval
+        return 6 * self.interval
 
     def active(self) -> bool:
-        if not (self.provider.available and self.enabled and self.sidebar_open and not self.minimized):
+        if not (self.provider.available and not self.minimized):
             return False
         if not len(self.book):
             return False
@@ -232,21 +229,13 @@ class PresenceService:
             return changed
         self.failures, self.rate_limited, self.error = 0, False, ""
         self.last_ok = self.now()
-        self._baseline = True
         self.on_change()
         return changed
 
     def _store(self, obs: Observation) -> bool:
         old = self.cache.get(obs.friend_id)
-        before = resolve(old, self.now(), self.stale_after)[0] if old else UNKNOWN
         self.cache[obs.friend_id] = obs
-        after = resolve(obs, self.now(), self.stale_after)[0]
-        if self._baseline and after in (IN_GAME, LAUNCHER) and before in (OFFLINE, UNKNOWN):
-            friend = self.book.get(obs.friend_id)
-            if friend:
-                self.on_friend_online(friend, obs)
-        return (old is None) or (old.game, old.launcher, old.zone, old.level, old.guild) != (
-            obs.game, obs.launcher, obs.zone, obs.level, obs.guild)
+        return (old is None) or (old.game, old.launcher, old.realm) != (obs.game, obs.launcher, obs.realm)
 
     # -- reading ---------------------------------------------------------------------------------
     def state_of(self, friend) -> tuple:

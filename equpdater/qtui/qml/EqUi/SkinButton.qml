@@ -10,6 +10,7 @@ Item {
     property bool selected: false
     property string iconKind: ""
     property int iconSize: 14
+    property string fontFamily: ""         // a label drawn in one fixed face (the font selector's previews)
     readonly property var spec: Style.theme.components[kind]
     readonly property bool hovered: hover.hovered
     readonly property bool pressed: tap.pressed
@@ -68,7 +69,7 @@ Item {
             visible: root.text !== ""
             text: root.text
             color: Style.pick(root.spec.textColors, root.vstate, "#fff")
-            font.family: root.spec.font.family
+            font.family: root.fontFamily !== "" ? root.fontFamily : root.spec.font.family
             font.pixelSize: root.spec.font.size
             font.bold: !!root.spec.font.bold
             anchors.verticalCenter: parent.verticalCenter

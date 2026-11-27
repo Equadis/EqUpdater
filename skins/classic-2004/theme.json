@@ -124,11 +124,11 @@
     },
     "button.play": {
       "textures": {
-        "normal": "buttons/play-normal.png",
-        "hover": "buttons/play-hover.png",
-        "pressed": "buttons/play-pressed.png",
-        "disabled": "buttons/play-disabled.png",
-        "selected": "buttons/play-hover.png"
+        "normal": "buttons/normal-normal.png",
+        "hover": "buttons/normal-hover.png",
+        "pressed": "buttons/normal-pressed.png",
+        "disabled": "buttons/normal-disabled.png",
+        "selected": "buttons/normal-hover.png"
       },
       "slice": [
         10,
@@ -140,7 +140,8 @@
         "normal": "#ffd100",
         "hover": "#ffffff",
         "pressed": "#e6c25a",
-        "disabled": "#7d7a6e"
+        "disabled": "#7d7a6e",
+        "selected": "#ffffff"
       },
       "minHeight": 40,
       "padding": [

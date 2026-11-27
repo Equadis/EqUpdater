@@ -62,7 +62,7 @@ class TestUnavailableServicesNeverGetInTheWay(Social):
         p = self.start(data_dir=data)
         self.assertEqual(p["social"].friendCount, 0)
         self.assertTrue([n for n in os.listdir(data) if n.startswith("social.json.corrupt-")])
-        self.assertEqual(p["social_service"].add_friend("Thrall", "nzoth"), "")
+        self.assertEqual(p["social_service"].add_friend("Thrall"), "")
         self.assertEqual(self.qml_errors(), [])
 
     def test_a_presence_service_that_misbehaves_in_any_way_is_contained(self):
@@ -77,7 +77,6 @@ class TestUnavailableServicesNeverGetInTheWay(Social):
             def lookup(self, friends, token):
                 raise self.error
         pres.provider = Bad()
-        pres.sidebar_open = True
         for exc in (ValueError("x"), KeyError("y"), RuntimeError("z"), TypeError("t"), OSError("o"), P.ProviderError("p")):
             Bad.error = exc
             self.assertFalse(pres.poll())                              # never raises
@@ -145,7 +144,7 @@ class TestUnavailableServicesNeverGetInTheWay(Social):
 class TestEverySkinHasTheAccountChipAndTheSidebar(Social):
     WIDTHS = (860, 1000, 1280)
 
-    def geometry_ok(self, p, sid, width, expanded, signed_in):
+    def geometry_ok(self, p, sid, width, signed_in):
         problems = []
         win = self.win
         win.setProperty("width", width)
@@ -155,7 +154,7 @@ class TestEverySkinHasTheAccountChipAndTheSidebar(Social):
         chip, nav, gear = find(win, "accountChip"), find(win, "navRow"), find(win, "settingsGear")
         side = find(win, "socialSidebar")
         area = find(win, "pageArea")
-        where = f"{sid} {width}px {'expanded' if expanded else 'collapsed'} {'in' if signed_in else 'out'}"
+        where = f"{sid} {width}px {'in' if signed_in else 'out'}"
         h, f, c, n, g, s = (rect(x) for x in (header, footer, chip, nav, gear, side))
         if not (c[0] >= 0 and c[2] <= width and c[1] >= h[1] - 0.5 and c[3] <= h[3] + 0.5):
             problems.append(f"{where}: the account chip leaves the header {c} {h}")
@@ -167,33 +166,37 @@ class TestEverySkinHasTheAccountChipAndTheSidebar(Social):
         if s[1] < h[3] - 0.5 or s[3] > f[1] + 0.5:
             problems.append(f"{where}: the sidebar overlaps the header or the footer {s} {h} {f}")
         a = rect(area)
-        docked = (not expanded) or width >= 940
-        if docked and overlap(a, s):
-            problems.append(f"{where}: the page area runs under a docked sidebar {a} {s}")
-        margin = p["skin"].theme["layout"].get("contentMargin", 48)
-        if not docked and a[2] < width - margin - 1:
-            problems.append(f"{where}: the page area shrank although the sidebar overlays it")
+        if overlap(a, s):
+            problems.append(f"{where}: the page area runs under the sidebar {a} {s}")
+        if a[2] - a[0] < 500:
+            problems.append(f"{where}: the page area is only {a[2] - a[0]:.0f}px wide")
         return problems
 
-    def test_geometry_in_every_skin_at_every_width_collapsed_or_expanded_signed_out_or_in(self):
+    def test_geometry_in_every_skin_at_every_width_signed_out_or_in(self):
         p = self.start()
         svc = p["account_service"]
         svc.provider = FakeAuth()
         svc.profile = A.Profile("A" * 24 + "Longname", "1", "")
+        self.seed(p, ("Thrall", "Jaina", "A" * 30))
         problems = []
         for sid in sorted(p["manager"].skins):
             p["settings_bridge"].setSkin(sid)
             for signed_in in (False, True):
                 svc.state = A.SIGNED_IN if signed_in else A.SIGNED_OUT
                 p["account"].changed.emit()
-                for expanded in (False, True):
-                    if p["social"].collapsed == expanded:
-                        p["social"].toggleCollapsed()
-                    for width in self.WIDTHS:
-                        problems += self.geometry_ok(p, sid, width, expanded, signed_in)
+                for width in self.WIDTHS:
+                    problems += self.geometry_ok(p, sid, width, signed_in)
         self.maxDiff = None
-        self.assertEqual(problems, [], "\n".join(problems[:40]))
+        self.assertEqual(problems, [], "; ".join(problems[:40]))
         self.assertEqual(self.qml_errors(), [])
+
+    def test_hidpi_scale_keeps_the_layout_usable(self):
+        # QT_SCALE_FACTOR changes device pixels, not logical ones; what must hold is that the logical
+        # layout at the smallest window is unchanged. (Real rendering at 200% is in bench-results/shots.)
+        p = self.start()
+        for sid in sorted(p["manager"].skins):
+            p["settings_bridge"].setSkin(sid)
+            self.assertEqual(self.geometry_ok(p, sid, 860, False), [])
 
     def test_the_sidebar_and_chip_use_the_skins_own_look(self):
         p = self.start()
@@ -202,13 +205,10 @@ class TestEverySkinHasTheAccountChipAndTheSidebar(Social):
         for sid in sorted(p["manager"].skins):
             p["settings_bridge"].setSkin(sid)
             pump(80)
-            if p["social"].collapsed:
-                p["social"].toggleCollapsed()
-                pump(80)
             theme = p["skin"].theme["components"]
             self.assertTrue(theme["sidebar"]["textures"] or theme["sidebar"]["colors"], sid)
             looks[sid] = (json.dumps(theme["sidebar"], sort_keys=True), json.dumps(theme["menu"], sort_keys=True))
-        self.assertEqual(len(set(looks.values())) >= 5, True)           # the skins differ, they are not one shared style
+        self.assertGreaterEqual(len(set(looks.values())), 5)              # the skins differ, they are not one shared style
 
 
 if __name__ == "__main__":

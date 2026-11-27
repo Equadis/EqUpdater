@@ -967,24 +967,12 @@ STRINGS = {
         'vor {n} Std.',
     '{n} min ago':
         'vor {n} Min.',
-    'A character name is 2 to 12 letters.':
-        'Ein Charaktername hat 2 bis 12 Buchstaben.',
     'A forum user name is 3 to 32 letters, numbers, spaces, dots, dashes or underscores.':
         'Ein Forum-Benutzername hat 3 bis 32 Buchstaben, Ziffern, Leerzeichen, Punkte, Bindestriche oder Unterstriche.',
     'Away':
         'Abwesend',
-    "Choose the character's realm.":
-        'Wähle den Realm des Charakters.',
-    'Do not disturb':
-        'Bitte nicht stören',
-    'Enter a character name and realm, or a forum user name.':
-        'Gib einen Charakternamen und Realm oder einen Forum-Benutzernamen ein.',
     'Favourites':
         'Favoriten',
-    'In game':
-        'Im Spiel',
-    'Level {n}':
-        'Stufe {n}',
     'OctoWoW could not be reached: {error}':
         'OctoWoW ist nicht erreichbar: {error}',
     'OctoWoW has not published a sign-in service that EqUpdater can use yet, and EqUpdater will not ask for your forum password. Everything else works without an account.':
@@ -993,12 +981,8 @@ STRINGS = {
         'OctoWoW bietet keinen Dienst, der zeigt, ob ein Charakter online ist; Freunde werden daher mit nicht verfügbarem Status angezeigt. Deine Freundesliste bleibt auf diesem Computer.',
     'Offline':
         'Offline',
-    'Offline or unavailable':
-        'Offline oder nicht verfügbar',
     'Online':
         'Online',
-    'Online in EqUpdater':
-        'In EqUpdater online',
     'Showing the last known information.':
         'Zuletzt bekannte Informationen werden angezeigt.',
     'Sign in to OctoWoW':
@@ -1007,10 +991,6 @@ STRINGS = {
         'Die Anmeldung dauerte zu lange und wurde abgebrochen.',
     'Sign-in was cancelled.':
         'Die Anmeldung wurde abgebrochen.',
-    'Status unavailable':
-        'Status nicht verfügbar',
-    "That realm is not one of OctoWoW's realms.":
-        'Dieser Realm gehört nicht zu OctoWoW.',
     'The friends list is full ({count}).':
         'Die Freundesliste ist voll ({count}).',
     'The presence service asked EqUpdater to slow down.':
@@ -1029,14 +1009,12 @@ STRINGS = {
         'Die Anmeldung wurde nicht bestätigt.',
     'Your sign-in has expired. Please sign in again.':
         'Deine Anmeldung ist abgelaufen. Bitte melde dich erneut an.',
-    'in EqUpdater':
-        'in EqUpdater',
-    'in game':
-        'im Spiel',
-    'is online {where}':
-        'ist online {where}',
     '{name} is already in your friends list.':
         '{name} ist bereits in deiner Freundesliste.',
     '{n} online':
         '{n} online',
+    "Do Not Disturb": "Bitte nicht stören",
+    "In Game": "Im Spiel",
+    "Invisible": "Unsichtbar",
+    "Unavailable": "Nicht verfügbar",
 }

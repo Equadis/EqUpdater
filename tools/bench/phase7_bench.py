@@ -22,7 +22,7 @@ import psutil
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
-SKINS = ("bubbles", "classic-2004", "minimal", "minimal-dark", "minimal-light")
+SKINS = ("bubbles", "classic-2004", "minimal-dark", "minimal-light")
 PAGES = ("news", "tweaks", "addons", "mods", "mpq")
 
 

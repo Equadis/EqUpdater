@@ -76,6 +76,6 @@ Settings → Skin shows ⚠ and the list of problems for the selected skin. Typi
 
 ## More
 * `COMPONENTS.md`: every component id, its keys, states and what uses it.
-* `SKIN_ASSETS.md`: the five official skins, how their art is made, sizes and limits.
+* `SKIN_ASSETS.md`: the six official skins, how their art is made, sizes and limits.
 * `starter-skin/`: a complete colours-only skin to copy.
-* The seven official skins: Bubbles (default), Classic (2004), Minimal, Minimal Dark, Minimal Light, Turtle WoW, Battle.net. Settings → Skin lists them first, then yours.
+* The six official skins, in this order: Bubbles (default), Classic (2004), Blizzard, Turtle, Minimal (Dark), Minimal (Light) (ids `bubbles`, `classic-2004`, `battle-net`, `turtle-wow`, `minimal-dark`, `minimal-light`; the ids did not change when the names did, and the removed `minimal` becomes `minimal-dark`). Settings → Skin lists them first, then yours.

@@ -229,7 +229,7 @@ def build_turtle():
               "footerHeight": 84, "navRight": 44, "navOffset": 10, "sidebarWidth": 244}
     theme["layout"] = layout
     off.write_skin(folder, {
-        "id": "turtle-wow", "name": "Turtle WoW", "license": "Artwork: EqUpdater project (drawn for this skin)",
+        "id": "turtle-wow", "name": "Turtle", "license": "Artwork: EqUpdater project (drawn for this skin)",
         "description": "Dark translucent panels, an olive and gold frame, gold type, olive buttons and a green PLAY button over a twilight fantasy scene. Compact."},
         theme)
 
@@ -339,7 +339,7 @@ def build_battlenet():
                        "footerHeight": 108, "navAlign": "left", "navLeftMargin": 40, "navRight": 90,
                        "sidebarWidth": 272, "sidebarDefault": "expanded"}
     off.write_skin(folder, {
-        "id": "battle-net", "name": "Battle.net", "license": "Artwork: EqUpdater project (drawn for this skin)",
+        "id": "battle-net", "name": "Blizzard", "license": "Artwork: EqUpdater project (drawn for this skin)",
         "description": "Navy and charcoal with an electric-blue accent: modern type, navigation beside the logo, a large blue PLAY button, soft lighting and the social sidebar open."},
         theme)
 

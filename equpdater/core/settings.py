@@ -19,7 +19,7 @@ DEFAULTS = {
     "pause_when_unfocused": False,
     "game_dir": "",
     "launch_default": None,
-    "font_override": "",           # "", "arial", "friz", "opendyslexic"
+    "font_override": "",           # "", "arial", "friz", "opendyslexic", "objectsans"
     "game_launcher": None,           # Linux launch command / env, as in 2.x
     "news_seen": {},
     "renderer": "auto",             # "auto" (GPU) or "software": ~30 MB less memory, a little more CPU
@@ -28,24 +28,19 @@ DEFAULTS = {
 }
 
 
+#: The only social preferences left. Everything else about the sidebar and presence is fixed in
+#: ``core/social_service.py`` (sidebar always on; launcher and in-game presence on, subject to the
+#: chosen status; realm shown while in game; character and zone never; Away after 15 minutes idle).
 SOCIAL_DEFAULTS = {
-    "social_enabled": True,
-    "sidebar_collapsed": None,          # None: the skin's own default
-    "show_launcher_presence": False,
-    "show_game_presence": False,
-    "show_character": False,
-    "show_realm": False,
-    "show_zone": False,
-    "friend_notifications": False,
-    "auto_away_minutes": 0,
-    "default_status": "online",
-    "own_status": "online",
-    "friends_sort": "status",
-    "friends_realm": "",
-    "presence_interval": 60,
+    "own_status": "online",             # the player's own choice: online | away | dnd | invisible
     "account_username": "",
     "account_avatar_url": "",
 }
+#: Social settings the first beta stored. They no longer exist and are removed on load, so an old
+#: file can never change the behaviour (for example "show_character": true).
+OBSOLETE_SOCIAL_KEYS = ("social_enabled", "sidebar_collapsed", "show_launcher_presence", "show_game_presence",
+                        "show_character", "show_realm", "show_zone", "friend_notifications", "auto_away_minutes",
+                        "default_status", "friends_sort", "friends_realm", "presence_interval")
 DEFAULTS.update(SOCIAL_DEFAULTS)
 
 
@@ -98,9 +93,23 @@ def open_social_store(directory: str | None = None):
                             schema=1, delay=0.5)
 
 
+def migrate_social(s) -> None:
+    """Drop the preferences of the removed Social section; keep (or repair) the player's own status."""
+    with s._lock:
+        gone = [k for k in OBSOLETE_SOCIAL_KEYS if k in s.data]
+        for k in gone:
+            del s.data[k]
+        if s.data.get("own_status") not in ("online", "away", "dnd", "invisible"):
+            s.data["own_status"] = "online"
+            gone.append("own_status")
+        if gone:
+            s._schedule()
+
+
 def open_settings(directory: str | None = None, legacy: dict | None = None):
     d = directory or data_dir()
     s = SettingsStore(os.path.join(d, "settings.json"), DEFAULTS, schema=1)
+    migrate_social(s)
     if not s.get("imported_from_2x"):
         if legacy is None:
             try:

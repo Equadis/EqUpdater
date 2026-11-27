@@ -19,9 +19,10 @@ Conclusion: **there is no official authentication endpoint, no presence API and 
 ## 2. What exists in the product
 
 * **Account chip** (upper right, beside Settings, in every skin): *Sign In* and *Create account* (opens `https://octowow.st/login` in the browser, the official site). *Sign In* today explains, in a dialog, that OctoWoW has published no sign-in service and that EqUpdater will not ask for the forum password; it never reports a sign-in. When a provider exists the chip becomes avatar, forum name, status dot and a menu: *View Profile*, *Set Status* (Online / Away / Do Not Disturb), *Sign Out*.
-* **Friends sidebar** (every page, every skin, collapsible to a rail; Battle.net opens it by default): search, realm filter, sort by status / name / realm, groups Favourites / Online / Offline, online count, add and remove, favourites, right-click menu, optional login notifications, remembered state. Realms come from OctoBot's list.
-* **Presence states**: green *In game*, blue *Online in EqUpdater*, yellow *Away*, red *Do not disturb*, grey *Offline*, and a hollow *?* *Status unavailable*. Launcher presence and character (in-game) presence are separate channels; **not using EqUpdater never makes a character "offline"**: *Offline* is shown only when a service says the *character* is offline, otherwise the friend is *unavailable*, and a group containing such friends is titled "Offline or unavailable". Aggregate census data is never used as an individual's presence (a test checks the presence code does not use it).
-* **Settings > Social**: enable the sidebar; show my launcher presence / in-game presence / current character / realm / zone (**all off by default**: nothing is shared unless the player opts in, and today there is nothing to share it with); friend login notifications (off by default); default status; automatic Away after 5-30 minutes of the window being unfocused; refresh interval; Sign Out.
+* **Friends sidebar** (every page, every skin, always visible; no collapse, filters or sorting): the player's friends by **OctoWoW forum user name**, with search, Add Friend, Remove Friend, Favourite / Unfavourite, Copy Name (right-click), and the online count. Favourites first, then by presence (in game, online, away, busy), offline and unavailable last. Each row: avatar (the first letter until a service gives one), name, presence dot, and `Status ・ Realm` (the realm only while in game). Never a character, class, level, guild or zone.
+* **Presence strings and dots**: `In Game ・ N'Zoth`, `Online`, `Away`, `Do Not Disturb`, `Offline` (green, green, yellow, red, grey), and `Unavailable` while there is no service. Having EqUpdater open (`Online`) and playing (`In Game`) are different channels; **not using EqUpdater never makes someone "offline"**.
+* **Your own status**: click the dot beside your avatar: Online, Away, Do Not Disturb, Invisible (green, yellow, red, grey). Invisible is published as `invisible` so a service can show you as offline to others; you stay signed in and everything works. A manual status wins over the automatic one; Online becomes Away after 15 minutes without keyboard or mouse use. The choice is remembered.
+* **No social settings.** There is no Social section in Settings. Fixed behaviour: sidebar always on; launcher and in-game presence on for a signed-in player, as the chosen status allows; realm shown while in game; character and zone never; Away after 15 minutes; refresh one batched request about every five seconds, only when signed in with a service available. Settings written by the first beta for these (`social_enabled`, `show_character`, ...) are deleted on start-up and never read.
 
 ## 3. Architecture (all Qt-free except the bridges)
 
@@ -29,13 +30,13 @@ Conclusion: **there is no official authentication endpoint, no presence API and 
 |---|---|
 | `core/credstore.py` | secrets in the OS credential manager: Windows Credential Manager (real, `ctypes`, long values split across entries), Linux keyring or `secret-tool` (secret on stdin), else memory only. **Never a file.** |
 | `core/account.py` | `AuthProvider` interface; `UnavailableProvider` (the default, `PROVIDER_CONFIG = None`); `OAuthProvider` (authorization code + PKCE S256 with a loopback redirect per RFC 8252, public client with no secret, refresh, revocation; https endpoints only; configured, not coded); `AccountService` (restore at start, early refresh, rejected session dropped, offline keeps the session unverified, sign-out always clears locally). Tokens in the credential store, only the name and avatar address in the settings. |
-| `core/friends.py` | `FriendBook`: local list (`social.json`), duplicate prevention on (name, realm, forum), same name on another realm allowed, validation, favourites, search, grouping, sorting, limit 200. |
+| `core/friends.py` | `FriendBook`: local list (`social.json`) of forum user names, duplicate prevention, validation (first-beta character entries are kept and shown by name), favourites, search, grouping, sorting, limit 200. |
 | `core/presence.py` | the two channels, `resolve()`, `PresenceProvider` interface, `UnavailablePresenceProvider` (the default; no requests), `PresenceService`: batches of up to 50, cache, staleness (3 x interval), rate-limit handling (`Retry-After`, capped at 1 hour, not a failure), exponential backoff 30 s to 10 min, polls **only** while a real provider exists, social is on, the sidebar is open, the window is not minimised, there are friends, and (if required) the player is signed in. |
 | `core/realms.py` | the realm list from OctoBot, with a marked fallback. |
-| `core/social_service.py` | rows, own status, auto-away, notifications, privacy-first defaults, publish gating. |
+| `core/social_service.py` | rows, own status (Online, Away, Do Not Disturb, Invisible), the 15-minute Away rule, publish gating. No settings, no notifications. |
 | `qtui/social_bridge.py`, `SocialSidebar.qml`, `AccountChip.qml`, `AddFriendOverlay.qml`, `EqUi/SkinActionMenu.qml` | the views. Nothing blocks the GUI thread (sign-in, restore and polls run through the task manager). |
 
-Skins style the sidebar through the `sidebar` component (extends `panel`); layout keys `sidebarWidth` and `sidebarDefault`.
+Skins style the sidebar through the `sidebar` component (extends `panel`); layout key `sidebarWidth` (the sidebar is always shown; `sidebarDefault` is no longer used).
 
 ## 4. What OctoWoW would need to provide
 
@@ -49,10 +50,7 @@ Everything below is a *request*, written so a small server-side change can switc
 * Laravel Passport or Socialite-style OAuth server, or an OIDC bridge in front of the forum, would do; the forum's own user name must be the `preferred_username`.
 * To enable: fill in `account.PROVIDER_CONFIG` (authorize/token/userinfo/revoke URLs, `client_id`, scopes, `avatar_hosts`, `profile_url`).
 
-**B. Presence (replaces "status unavailable")**
-* `POST /presence/lookup` with up to 50 `{name, realm}` (or account ids) per request, returning per friend `{game: in_game|offline, launcher: online|away|dnd|offline, class, level, guild, zone, as_of}`; **only for players who allowed it**; `429` with `Retry-After`; a `Cache-Control` the client can honour. One batched request per refresh is all EqUpdater sends.
-* `PUT /presence/me` to publish the player's own status with exactly the visibility flags they chose in Settings > Social (launcher, in-game, character, realm, zone).
-* Character data (class, level, guild, zone) comes from the game server; if OctoWoW would rather not expose it, "in game / offline" alone is useful.
+**B. Presence (replaces "Unavailable")**: see `OCTOWOW_INTEGRATION_PROPOSAL.md` section 5 for the exact requests: a batched lookup by forum user name (`launcher`, `game`, and `realm` only while in game), `PUT /me` with `online | away | dnd | invisible`, and the rule that **an invisible player is returned as offline**. No character, class, level, guild or zone is requested.
 
 **C. Account-to-character association** (only with the owner's permission, as an opt-in): list a signed-in player's public characters, to support "add friend by forum name" and "show characters under an account".
 

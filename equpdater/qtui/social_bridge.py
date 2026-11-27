@@ -14,13 +14,11 @@ from PySide6.QtGui import QDesktopServices
 
 from ..core import account as A
 from ..core import presence as P
-from ..core.friends import CLASSES, SORTS
-from ..core.social_service import AUTO_AWAY_CHOICES, INTERVAL_CHOICES, STATUS_CHOICES, SocialService
+from ..core.social_service import SocialService
 from ..i18n import tr
 from .models import KeyedListModel
 
-_ROLES = ["key", "kind", "group", "title", "count", "id", "name", "realm", "realmName", "forum", "favourite",
-          "state", "stateText", "stale", "dot", "charClass", "nameColour", "level", "guild", "zone", "detail"]
+_ROLES = ["key", "kind", "group", "title", "count", "id", "name", "favourite", "state", "stale", "dot", "statusLine", "status", "realm"]
 
 
 def _open_url(url: str) -> bool:
@@ -100,11 +98,21 @@ class AccountBridge(QObject):
 
     @Property(str, notify=changed)
     def statusDot(self):
-        return {"online": P.COLOURS[P.LAUNCHER], "away": P.COLOURS[P.AWAY], "dnd": P.COLOURS[P.DND]}[self.social.status]
+        return {"online": P.COLOURS[P.LAUNCHER], "away": P.COLOURS[P.AWAY], "dnd": P.COLOURS[P.DND],
+                "invisible": P.COLOURS[P.OFFLINE]}[self.social.status]
 
     @Property(str, notify=changed)
     def statusText(self):
-        return {"online": tr("Online"), "away": tr("Away"), "dnd": tr("Do not disturb")}[self.social.status]
+        return {"online": tr("Online"), "away": tr("Away"), "dnd": tr("Do Not Disturb"),
+                "invisible": tr("Invisible")}[self.social.status]
+
+    @Property("QVariantList", constant=True)
+    def statusChoices(self):
+        """The four choices of the presence menu, with their dot colours."""
+        return [{"id": "online", "label": tr("Online"), "dot": P.COLOURS[P.LAUNCHER]},
+                {"id": "away", "label": tr("Away"), "dot": P.COLOURS[P.AWAY]},
+                {"id": "dnd", "label": tr("Do Not Disturb"), "dot": P.COLOURS[P.DND]},
+                {"id": "invisible", "label": tr("Invisible"), "dot": P.COLOURS[P.OFFLINE]}]
 
     # -- actions ----------------------------------------------------------------------------------
     @Slot()
@@ -157,25 +165,24 @@ class AccountBridge(QObject):
 class SocialBridge(QObject):
     changed = Signal()
     settingsChanged = Signal()
-    toast = Signal(str, str)
 
     def __init__(self, service: SocialService, tasks, realm_fetch=None):
         super().__init__()
         self.service, self.tasks = service, tasks
         self.lm = KeyedListModel(_ROLES)
-        self._skin_expanded = False
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
         self._timer.timeout.connect(self._tick)
-        self._idle = QTimer(self)
-        self._idle.setSingleShot(True)
-        self._idle.timeout.connect(lambda: service.window_idle(True))
+        self._idle = QTimer(self)              # the 15-minute Away rule: checked twice a minute, not per event
+        self._idle.setInterval(30_000)
+        self._idle.timeout.connect(self._check_idle)
         self._busy = False
         self._started = False
         service.on_change = self._refresh
         service.presence.on_change = self._refresh
         service.book.on_change = self._refresh
-        service.realms.on_change = lambda: self.settingsChanged.emit()
+        if service.realms:
+            service.realms.on_change = lambda: self.settingsChanged.emit()
         self._refresh()
 
     # -- model ---------------------------------------------------------------------------------------
@@ -184,8 +191,6 @@ class SocialBridge(QObject):
         try:
             full = [{**{k: None for k in _ROLES}, **row} for row in self.service.rows()]
             self.lm.set_items(full)
-            for title, text in self.service.take_toasts():
-                self.toast.emit(title, text)
         except Exception as e:                                          # noqa: BLE001
             from ..core.logsink import log
             log(f"Friends list could not be refreshed: {e}", "dim")
@@ -196,37 +201,6 @@ class SocialBridge(QObject):
         return self.lm
 
     # -- state for the view -------------------------------------------------------------------------------
-    @Property(bool, notify=settingsChanged)
-    def enabled(self):
-        return bool(self.service.get("social_enabled"))
-
-    @Property(bool, notify=settingsChanged)
-    def skinDefaultExpanded(self):
-        return self._skin_expanded
-
-    @skinDefaultExpanded.setter
-    def skinDefaultExpanded(self, v):
-        if bool(v) != self._skin_expanded:
-            self._skin_expanded = bool(v)
-            self.settingsChanged.emit()
-            self._sidebar_changed()
-
-    @Property(bool, notify=settingsChanged)
-    def collapsed(self):
-        saved = self.service.get("sidebar_collapsed")
-        return (not self._skin_expanded) if saved is None else bool(saved)
-
-    @Slot()
-    def toggleCollapsed(self):
-        self.service.set("sidebar_collapsed", not self.collapsed)
-        self.settingsChanged.emit()
-        self._sidebar_changed()
-
-    def _sidebar_changed(self):
-        self.service.presence.sidebar_open = self.enabled and not self.collapsed
-        self._schedule(0.4 if self.service.presence.sidebar_open else None)
-        self.changed.emit()
-
     @Property(str, notify=changed)
     def onlineText(self):
         n = self.service.online_count()
@@ -245,45 +219,6 @@ class SocialBridge(QObject):
     def presenceAvailable(self):
         return self.service.presence.provider.available
 
-    @Property("QVariantList", notify=settingsChanged)
-    def realms(self):
-        return [{"id": r.id, "name": r.name, "kind": r.kind} for r in self.service.realms.all()]
-
-    @Property(bool, notify=settingsChanged)
-    def realmsAuthoritative(self):
-        return self.service.realms.authoritative
-
-    @Property(bool, constant=True)
-    def accountFriends(self):
-        return self.service.account_friends_supported()
-
-    @Property(str, notify=settingsChanged)
-    def sort(self):
-        return self.service.get("friends_sort")
-
-    @Property(str, notify=settingsChanged)
-    def realmFilter(self):
-        return self.service.get("friends_realm") or ""
-
-    @Property("QVariantMap", notify=settingsChanged)
-    def values(self):
-        return {k: self.service.get(k) for k in ("social_enabled", "show_launcher_presence", "show_game_presence",
-                                                  "show_character", "show_realm", "show_zone",
-                                                  "friend_notifications", "auto_away_minutes", "default_status",
-                                                  "presence_interval")}
-
-    @Property("QVariantList", constant=True)
-    def autoAwayChoices(self):
-        return list(AUTO_AWAY_CHOICES)
-
-    @Property("QVariantList", constant=True)
-    def statusChoices(self):
-        return list(STATUS_CHOICES)
-
-    @Property("QVariantList", constant=True)
-    def intervalChoices(self):
-        return list(INTERVAL_CHOICES)
-
     # -- actions --------------------------------------------------------------------------------------------
     _add_open = False
 
@@ -301,39 +236,14 @@ class SocialBridge(QObject):
         self._add_open = False
         self.settingsChanged.emit()
 
-    @Slot(str, "QVariant")
-    def setSetting(self, key, value):
-        try:
-            self.service.set(key, value)
-        except KeyError:
-            return
-        self.settingsChanged.emit()
-        if key in ("social_enabled", "presence_interval"):
-            self._sidebar_changed()
-        if key == "auto_away_minutes":
-            self.service.window_idle(False)
-
     @Slot(str)
     def setSearch(self, text):
         self.service.search = text or ""
         self._refresh()
 
-    @Slot(str)
-    def setSort(self, sort):
-        if sort in SORTS:
-            self.service.set("friends_sort", sort)
-            self.settingsChanged.emit()
-            self._refresh()
-
-    @Slot(str)
-    def setRealmFilter(self, realm):
-        self.service.set("friends_realm", realm or "")
-        self.settingsChanged.emit()
-        self._refresh()
-
-    @Slot(str, str, str, result=str)
-    def addFriend(self, name, realm, forum):
-        err = self.service.add_friend(name, realm, forum)
+    @Slot(str, result=str)
+    def addFriend(self, username):
+        err = self.service.add_friend(username)
         if not err:
             self._schedule(0.4)
         return err
@@ -356,8 +266,9 @@ class SocialBridge(QObject):
         if self._started:
             return
         self._started = True
-        self.service.presence.sidebar_open = self.enabled and not self.collapsed
-        if self.service.realms.due():
+        self._idle.start()
+        self.service.note_activity()
+        if self.service.realms and self.service.realms.due():
             self.tasks.submit("realms:refresh", self.service.realms.refresh, on_done=lambda _r: self.settingsChanged.emit(),
                               on_error=lambda e: None)
         self._schedule()
@@ -387,15 +298,30 @@ class SocialBridge(QObject):
         pres = self.service.presence
         was = pres.minimized
         pres.minimized = minimized
-        mins = self.service.get("auto_away_minutes")
-        if active and not minimized:
-            self._idle.stop()
-            self.service.window_idle(False)
-        elif mins:
-            self._idle.start(int(mins * 60 * 1000))
         if not self._started:
             return
         if minimized:
             self._timer.stop()
         elif was:
             self._schedule(0.5)
+
+    # -- the 15-minute Away rule -----------------------------------------------------------------------------
+    _INPUT = None
+
+    def eventFilter(self, obj, event):
+        """Any key, click, wheel or mouse movement is activity. Only a timestamp is stored."""
+        if self._INPUT is None:
+            from PySide6.QtCore import QEvent
+            SocialBridge._INPUT = {QEvent.Type.MouseMove, QEvent.Type.MouseButtonPress, QEvent.Type.KeyPress,
+                                   QEvent.Type.Wheel, QEvent.Type.TouchBegin}
+        if event.type() in self._INPUT:
+            self.service.note_activity()
+        return False
+
+    def _check_idle(self):
+        try:
+            if self.service.check_idle():
+                self.changed.emit()
+                self.tasks.submit("social:publish", self.service.publish, on_done=lambda _r: None, on_error=lambda e: None)
+        except Exception:                                              # noqa: BLE001 - never reaches the launcher
+            pass

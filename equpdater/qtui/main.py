@@ -174,6 +174,7 @@ def build(argv=None):
     social_bridge = SocialBridge(social_service, tasks)
     account_bridge = AccountBridge(account_service, social_service, tasks, dialog_bridge, dispatcher)
     app_bridge.window_hooks.append(social_bridge.window_state)
+    app.installEventFilter(social_bridge)             # any input is activity, for the 15-minute Away rule
     host, holder = ops_bridge.make_host(settings, dialog_bridge, app_bridge, dispatcher)
     mods_service = ModsService(host, tasks)
     mods_bridge = ops_bridge.ModsBridge(mods_service, host, app_bridge)
