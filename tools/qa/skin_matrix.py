@@ -25,6 +25,8 @@ def main():
     ap.add_argument("--height", type=int, default=700)
     ap.add_argument("--scale", default="1")
     ap.add_argument("--page", default="mods")
+    ap.add_argument("--open", default="", help="settings: open Settings before each shot")
+    ap.add_argument("--skins", default="", help="comma separated skin ids (default: all)")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     data = tempfile.mkdtemp(prefix="equ3-matrix-")
@@ -74,8 +76,10 @@ def main():
     p["social"].start()
     p["app"].tab = a.page
     paths = []
-    for sid in sorted(p["manager"].skins):
+    for sid in (a.skins.split(",") if a.skins else sorted(p["manager"].skins)):
         p["settings_bridge"].setSkin(sid)
+        if a.open:
+            p["app"].debugAction.emit(a.open)
         p["presence_service"].poll()
         pump(900)
         path = os.path.join(a.out, f"{sid}.png")

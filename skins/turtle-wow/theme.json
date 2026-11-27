@@ -28,7 +28,7 @@
     },
     "dim": {
       "family": "Friz Quadrata",
-      "size": 10
+      "size": 11
     },
     "heading": {
       "family": "Friz Quadrata",
@@ -325,6 +325,12 @@
     },
     "icon.update": {
       "icon": "icons/swap.png"
+    },
+    "icon.folder": {
+      "icon": "icons/folder.png"
+    },
+    "icon.close": {
+      "icon": "icons/close.png"
     }
   },
   "layout": {

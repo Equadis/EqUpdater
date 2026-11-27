@@ -128,6 +128,20 @@ def icon_link(color):
     return finish(im)
 
 
+def icon_folder(color):
+    im, d = canvas()
+    d.polygon([(6 * K, 16 * K), (26 * K, 16 * K), (32 * K, 24 * K), (58 * K, 24 * K),
+               (58 * K, 52 * K), (6 * K, 52 * K)], fill=color)
+    return finish(im)
+
+
+def icon_close(color):
+    im, d = canvas()
+    d.line((16 * K, 16 * K, 48 * K, 48 * K), fill=color, width=8 * K)
+    d.line((48 * K, 16 * K, 16 * K, 48 * K), fill=color, width=8 * K)
+    return finish(im)
+
+
 def icon_check(color):
     im, d = canvas()
     d.line((12 * K, 34 * K, 26 * K, 48 * K), fill=color, width=8 * K)
@@ -148,7 +162,8 @@ def write_icons(skin, color, extra=True):
     icons = {"refresh": icon_refresh, "settings": icon_settings,
              "arrow-down": icon_arrow_down, "download": icon_download,
              "remove": icon_remove, "release": icon_release, "link": icon_link,
-             "check": icon_check, "swap": icon_swap}
+             "check": icon_check, "swap": icon_swap,
+             "folder": icon_folder, "close": icon_close}
     if extra:
         icons.update({"support": icon_support, "discord": icon_chat})
     for name, fn in icons.items():

@@ -25,7 +25,7 @@
     },
     "dim": {
       "family": "Segoe UI",
-      "size": 11
+      "size": 12
     },
     "heading": {
       "family": "Segoe UI",
@@ -87,6 +87,12 @@
     },
     "icon.update": {
       "icon": "icons/swap.png"
+    },
+    "icon.folder": {
+      "icon": "icons/folder.png"
+    },
+    "icon.close": {
+      "icon": "icons/close.png"
     }
   }
 }

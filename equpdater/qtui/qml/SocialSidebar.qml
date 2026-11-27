@@ -104,7 +104,7 @@ Item {
                                     font.bold: true
                                     elide: Text.ElideRight
                                 }
-                                Row {                                // "Status ・ Realm", the separator drawn (a font may lack it)
+                                Row {                                // "In-game · Realm": the separator is drawn, not typed
                                     objectName: "friendStatus"
                                     width: parent.width
                                     spacing: 5
@@ -118,6 +118,7 @@ Item {
                                 }
                             }
                             HoverHandler { id: hh }
+                            SkinToolTipArea { tip: model.statusName }
                             TapHandler { acceptedButtons: Qt.RightButton
                                          onTapped: { ctx.friendId = model.id; ctx.fav = model.favourite; ctx.label = model.name; ctx.popup() } }
                             Accessible.role: Accessible.ListItem

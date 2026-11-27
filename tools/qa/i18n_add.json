@@ -1,30 +1,65 @@
 {
- "Do Not Disturb": {
-  "de": "Bitte nicht stören",
-  "es": "No molestar",
-  "pt_br": "Não perturbe",
-  "ru": "Не беспокоить",
-  "zh_cn": "请勿打扰"
+ "A username is 3 to 20 letters, numbers, dashes or underscores.": {
+  "de": "Ein Benutzername hat 3 bis 20 Buchstaben, Ziffern, Bindestriche oder Unterstriche.",
+  "es": "Un nombre de usuario tiene de 3 a 20 letras, números, guiones o guiones bajos.",
+  "pt_br": "Um nome de usuário tem de 3 a 20 letras, números, hifens ou sublinhados.",
+  "ru": "Имя пользователя — от 3 до 20 букв, цифр, дефисов или подчёркиваний.",
+  "zh_cn": "用户名为 3 到 20 个字母、数字、连字符或下划线。"
  },
- "In Game": {
+ "In-game": {
   "de": "Im Spiel",
   "es": "En el juego",
   "pt_br": "No jogo",
   "ru": "В игре",
   "zh_cn": "游戏中"
  },
- "Invisible": {
-  "de": "Unsichtbar",
-  "es": "Invisible",
-  "pt_br": "Invisível",
-  "ru": "Невидимый",
-  "zh_cn": "隐身"
+ "Launcher open": {
+  "de": "Launcher geöffnet",
+  "es": "Launcher abierto",
+  "pt_br": "Launcher aberto",
+  "ru": "Лаунчер открыт",
+  "zh_cn": "启动器已打开"
  },
- "Unavailable": {
-  "de": "Nicht verfügbar",
-  "es": "No disponible",
-  "pt_br": "Indisponível",
-  "ru": "Недоступно",
-  "zh_cn": "不可用"
+ "No user has that name.": {
+  "de": "Kein Benutzer hat diesen Namen.",
+  "es": "Ningún usuario tiene ese nombre.",
+  "pt_br": "Nenhum usuário tem esse nome.",
+  "ru": "Пользователя с таким именем нет.",
+  "zh_cn": "没有该名称的用户。"
+ },
+ "Sign in to add friends.": {
+  "de": "Melde dich an, um Freunde hinzuzufügen.",
+  "es": "Inicia sesión para añadir amigos.",
+  "pt_br": "Entre para adicionar amigos.",
+  "ru": "Войдите, чтобы добавлять друзей.",
+  "zh_cn": "登录后才能添加好友。"
+ },
+ "Sign in to change your friends.": {
+  "de": "Melde dich an, um deine Freunde zu ändern.",
+  "es": "Inicia sesión para cambiar tus amigos.",
+  "pt_br": "Entre para alterar seus amigos.",
+  "ru": "Войдите, чтобы изменять список друзей.",
+  "zh_cn": "登录后才能修改好友。"
+ },
+ "That username is in use right now.": {
+  "de": "Dieser Benutzername wird gerade verwendet.",
+  "es": "Ese nombre de usuario está en uso ahora mismo.",
+  "pt_br": "Esse nome de usuário está em uso agora.",
+  "ru": "Это имя пользователя сейчас занято.",
+  "zh_cn": "该用户名目前正被使用。"
+ },
+ "The test service answered unexpectedly ({status}).": {
+  "de": "Der Testdienst hat unerwartet geantwortet ({status}).",
+  "es": "El servicio de prueba respondió de forma inesperada ({status}).",
+  "pt_br": "O serviço de teste respondeu de forma inesperada ({status}).",
+  "ru": "Тестовый сервис ответил неожиданно ({status}).",
+  "zh_cn": "测试服务返回了意外的响应（{status}）。"
+ },
+ "The test service could not be reached.": {
+  "de": "Der Testdienst ist nicht erreichbar.",
+  "es": "No se pudo contactar con el servicio de prueba.",
+  "pt_br": "Não foi possível acessar o serviço de teste.",
+  "ru": "Не удалось связаться с тестовым сервисом.",
+  "zh_cn": "无法连接到测试服务。"
  }
 }

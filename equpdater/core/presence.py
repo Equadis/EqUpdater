@@ -37,14 +37,22 @@ LAUNCHER_CHANNEL = ("online", "away", "dnd", "offline", "unknown")
 
 
 def label(state: str) -> str:
-    return {IN_GAME: tr("In Game"), LAUNCHER: tr("Online"), AWAY: tr("Away"),
-            DND: tr("Do Not Disturb"), OFFLINE: tr("Offline"), UNKNOWN: tr("Unavailable")}.get(state, "")
+    """The second line of a friend: what they are doing. The dot colour carries Away and Do Not Disturb."""
+    return {IN_GAME: tr("In-game"), LAUNCHER: tr("Launcher open"), AWAY: tr("Launcher open"),
+            DND: tr("Launcher open"), OFFLINE: tr("Offline"), UNKNOWN: tr("Unavailable")}.get(state, "")
+
+
+def status_name(state: str) -> str:
+    """The status word, for a tooltip."""
+    return {IN_GAME: tr("Online"), LAUNCHER: tr("Online"), AWAY: tr("Away"), DND: tr("Do Not Disturb"),
+            OFFLINE: tr("Offline"), UNKNOWN: tr("Unavailable")}.get(state, "")
 
 
 def status_line(state: str, realm: str = "") -> str:
-    """"In Game ・ N'Zoth", "Online", ...: the realm only while in the game, never an empty separator."""
+    """"In-game · N'Zoth", "In-game", "Launcher open", "Offline", ...: the realm only while in the game,
+    never an empty separator."""
     text = label(state)
-    return f"{text} ・ {realm}" if state == IN_GAME and realm else text
+    return f"{text} · {realm}" if state == IN_GAME and realm else text
 
 
 @dataclass
@@ -95,12 +103,12 @@ class RateLimited(ProviderError):
 
 @dataclass
 class OwnStatus:
-    """What this player shows to others. ``invisible`` means: appear offline, share nothing
-    (the player stays signed in and everything works locally). The realm is shared only while
-    playing; the character and the zone are never shared."""
+    """What this player shows to others: a status, whether the launcher is all that is open or the game is
+    running, and the realm while it is. ``invisible`` means: appear offline; nothing else is sent (the player
+    stays signed in and everything works locally). The character and the zone are never sent."""
     status: str = "online"                # online | away | dnd | invisible
-    share_game: bool = True               # that I am in the game, and on which realm
-    share_realm: bool = True
+    activity: str = "launcher"            # launcher | in_game
+    realm: str = ""                       # only while in_game
 
 
 class PresenceProvider:
@@ -108,6 +116,7 @@ class PresenceProvider:
     name = ""
     available = False
     requires_account = False
+    syncs_friends = False                   # True: the service holds the friends list and returns it with the presence
     capabilities: frozenset = frozenset()   # game_presence launcher_presence character_details account_characters publish
     max_batch = 50
 
@@ -160,6 +169,7 @@ class PresenceService:
         self.error = ""
         self.last_ok = 0.0
         self.minimized = False
+        self.before_poll = lambda: None             # e.g. read what the player is doing, so the heartbeat carries it
         self.requests = 0
         self.last_try = 0.0
 
@@ -171,7 +181,7 @@ class PresenceService:
     def active(self) -> bool:
         if not (self.provider.available and not self.minimized):
             return False
-        if not len(self.book):
+        if not len(self.book) and not self.provider.syncs_friends:
             return False
         if self.provider.requires_account and not (self.account and self.account.state == "signed_in"):
             return False
@@ -194,6 +204,10 @@ class PresenceService:
         if not self.active():
             return False
         self.last_try = self.now()
+        try:
+            self.before_poll()
+        except Exception:                                            # noqa: BLE001 - detection must never stop presence
+            pass
         token = None
         if self.provider.requires_account:
             token = self.account.valid_access()
@@ -202,12 +216,13 @@ class PresenceService:
         friends = self.book.all()
         changed = False
         try:
-            for i in range(0, len(friends), self.provider.max_batch):
+            for i in range(0, max(1, len(friends)), self.provider.max_batch):
                 batch = friends[i:i + self.provider.max_batch]
                 self.requests += 1
                 for obs in self.provider.lookup(batch, token):
                     obs.clean()
-                    if obs.friend_id in {f.id for f in batch}:
+                    known = {f.id for f in self.book.all()} if self.provider.syncs_friends else {f.id for f in batch}
+                    if obs.friend_id in known:
                         if obs.as_of is None:
                             obs.as_of = self.now()
                         changed |= self._store(obs)

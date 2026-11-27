@@ -922,16 +922,10 @@ STRINGS = {
         '请先选择游戏文件夹。',
     'Windows Defender is not used on this system.':
         '此系统不使用 Windows Defender。',
-    'Could not refresh just now; showing the last known values.':
-        '暂时无法刷新；显示的是最近一次已知的数值。',
-    'Data from OctoBot. Server status is not checked by EqUpdater.':
-        '数据来自 OctoBot。EqUpdater 不会自行检查服务器状态。',
     'Login response':
         '登录响应',
     'No server information yet':
         '暂无服务器信息',
-    'Player count: {source}':
-        '玩家数量：{source}',
     'Players online':
         '在线玩家',
     'Server offline':
@@ -940,14 +934,8 @@ STRINGS = {
         '服务器在线',
     'Server partly available':
         '服务器部分可用',
-    'Server status checked {when}; it may have changed.':
-        '服务器状态检查于{when}；之后可能已有变化。',
     'Server status unknown':
         '服务器状态未知',
-    'This is out of date; the source has not been updated.':
-        '这些数据已过时；数据源尚未更新。',
-    'Updated {when}':
-        '更新于{when}',
     'Waiting for the first update.':
         '正在等待首次更新。',
     'Website':
@@ -1015,7 +1003,15 @@ STRINGS = {
     '{n} online':
         '{n} 在线',
     "Do Not Disturb": "请勿打扰",
-    "In Game": "游戏中",
     "Invisible": "隐身",
     "Unavailable": "不可用",
+    "A username is 3 to 20 letters, numbers, dashes or underscores.": "用户名为 3 到 20 个字母、数字、连字符或下划线。",
+    "In-game": "游戏中",
+    "Launcher open": "启动器已打开",
+    "No user has that name.": "没有该名称的用户。",
+    "Sign in to add friends.": "登录后才能添加好友。",
+    "Sign in to change your friends.": "登录后才能修改好友。",
+    "That username is in use right now.": "该用户名目前正被使用。",
+    "The test service answered unexpectedly ({status}).": "测试服务返回了意外的响应（{status}）。",
+    "The test service could not be reached.": "无法连接到测试服务。",
 }

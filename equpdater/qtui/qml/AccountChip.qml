@@ -22,12 +22,13 @@ Item {
             kind: "button.small"
             text: app.t("Sign In")
             onClicked: account.signIn()
-            SkinToolTipArea { tip: account.available ? app.t("Sign in with your OctoWoW forum account in your browser. Optional: nothing needs it.")
+            SkinToolTipArea { tip: account.usernameLogin ? app.t("Choose a username (test login)")
+                                                     : account.available ? app.t("Sign in with your OctoWoW forum account in your browser. Optional: nothing needs it.")
                                                      : app.t("Sign-in is not available yet. Click to see why.") }
         }
         SkinText {
             objectName: "createAccountLink"
-            visible: !account.signedIn && !account.busy
+            visible: !account.signedIn && !account.busy && !account.usernameLogin       // the test login has no accounts to create
             kind: "text.link"
             anchors.verticalCenter: parent.verticalCenter
             text: app.t("Create account")
@@ -107,11 +108,13 @@ Item {
     SkinActionMenu {
         id: menu
         parent: C.Overlay.overlay
-        entries: [
-            { id: "profile", label: app.t("View Profile") },
-            { separator: true },
-            { id: "signout", label: app.t("Sign Out"), tone: "danger" }
-        ]
+        entries: account.usernameLogin
+                 ? [ { id: "switch", label: app.t("Switch account") },
+                     { separator: true },
+                     { id: "signout", label: app.t("Sign Out"), tone: "danger" } ]
+                 : [ { id: "profile", label: app.t("View Profile") },
+                     { separator: true },
+                     { id: "signout", label: app.t("Sign Out"), tone: "danger" } ]
         onAboutToShow: {
             var o = me.mapToItem(C.Overlay.overlay, 0, me.height + 4)
             x = Math.max(6, Math.min(o.x + me.width - width, C.Overlay.overlay.width - width - 6))
@@ -119,6 +122,7 @@ Item {
         }
         onChosen: function (id) {
             if (id === "profile") account.viewProfile()
+            else if (id === "switch") account.openLogin()
             else if (id === "signout") account.signOut()
         }
     }

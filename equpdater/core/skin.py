@@ -67,6 +67,7 @@ COMPONENTS = (
     "icon.refresh", "icon.settings", "icon.arrow-down", "icon.discord",
     "icon.support", "icon.logo", "icon.external", "icon.update",
     "icon.download", "icon.remove", "icon.release", "icon.link", "icon.check",
+    "icon.folder", "icon.close",
 )
 
 #: Implicit parents (``extends`` in a theme overrides these).
@@ -88,7 +89,7 @@ BUILTIN_THEME = {
     },
     "fonts": {
         "body": {"family": "Segoe UI", "size": 13},
-        "dim": {"family": "Segoe UI", "size": 11},
+        "dim": {"family": "Segoe UI", "size": 12},
         "heading": {"family": "Segoe UI", "size": 15, "bold": True},
         "title": {"family": "Segoe UI", "size": 22, "bold": True},
         "button": {"family": "Segoe UI", "size": 13, "bold": True},

@@ -921,16 +921,10 @@ STRINGS = {
         'Сначала выберите папку игры.',
     'Windows Defender is not used on this system.':
         'Windows Defender в этой системе не используется.',
-    'Could not refresh just now; showing the last known values.':
-        'Сейчас не удалось обновить; показаны последние известные значения.',
-    'Data from OctoBot. Server status is not checked by EqUpdater.':
-        'Данные OctoBot. EqUpdater сам состояние сервера не проверяет.',
     'Login response':
         'Ответ при входе',
     'No server information yet':
         'Данных о сервере пока нет',
-    'Player count: {source}':
-        'Число игроков: {source}',
     'Players online':
         'Игроков онлайн',
     'Server offline':
@@ -939,14 +933,8 @@ STRINGS = {
         'Сервер в сети',
     'Server partly available':
         'Сервер доступен частично',
-    'Server status checked {when}; it may have changed.':
-        'Состояние сервера проверено {when}; оно могло измениться.',
     'Server status unknown':
         'Состояние сервера неизвестно',
-    'This is out of date; the source has not been updated.':
-        'Данные устарели: источник не обновлялся.',
-    'Updated {when}':
-        'Обновлено {when}',
     'Waiting for the first update.':
         'Ожидание первого обновления.',
     'Website':
@@ -1014,7 +1002,15 @@ STRINGS = {
     '{n} online':
         '{n} в сети',
     "Do Not Disturb": "Не беспокоить",
-    "In Game": "В игре",
     "Invisible": "Невидимый",
     "Unavailable": "Недоступно",
+    "A username is 3 to 20 letters, numbers, dashes or underscores.": "Имя пользователя — от 3 до 20 букв, цифр, дефисов или подчёркиваний.",
+    "In-game": "В игре",
+    "Launcher open": "Лаунчер открыт",
+    "No user has that name.": "Пользователя с таким именем нет.",
+    "Sign in to add friends.": "Войдите, чтобы добавлять друзей.",
+    "Sign in to change your friends.": "Войдите, чтобы изменять список друзей.",
+    "That username is in use right now.": "Это имя пользователя сейчас занято.",
+    "The test service answered unexpectedly ({status}).": "Тестовый сервис ответил неожиданно ({status}).",
+    "The test service could not be reached.": "Не удалось связаться с тестовым сервисом.",
 }

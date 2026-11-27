@@ -55,17 +55,22 @@ Item {
                 }
                 SkinIconButton { visible: model.switch; kind: "icon.update"
                                  tip: model.switchTip; onClicked: addons.switchSource(model.id) }
-                SkinIconButton { visible: model.repoUrl !== ""; kind: "icon.link"
-                                 tip: app.t("Open repository in browser")
-                                 onClicked: addons.openUrl(model.repoUrl) }
-                SkinIconButton { visible: !model.installed; kind: "icon.download"
-                                 tip: app.t("Download from repository")
-                                 onClicked: addons.install(model.id) }
-                SkinIconButton { visible: model.installed; kind: "icon.remove"
-                                 tip: app.t("Uninstall"); onClicked: addons.remove(model.id) }
-                SkinIconButton { visible: model.canRelease; kind: "icon.release"
-                                 tip: app.t("Stop managing. Your files are kept.")
-                                 onClicked: addons.release(model.id) }
+                Item {                                              // the Download slot keeps its width
+                    implicitWidth: 28; implicitHeight: 28
+                    SkinIconButton { visible: !model.installed; anchors.centerIn: parent; kind: "icon.download"
+                                     tip: app.t("Download from repository")
+                                     onClicked: addons.install(model.id) }
+                }
+                SkinRowActions {
+                    folderEnabled: model.installed
+                    linkEnabled: model.repoUrl !== ""
+                    uninstallEnabled: model.installed
+                    releaseEnabled: model.canRelease
+                    onFolder: addons.openFolder(model.id)
+                    onLink: addons.openUrl(model.repoUrl)
+                    onUninstall: addons.remove(model.id)
+                    onRelease: addons.release(model.id)
+                }
             }
         }
         SkinText {

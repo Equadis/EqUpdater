@@ -20,6 +20,12 @@ Window {
     Component.onCompleted: app.windowShown()
 
     readonly property var layout: Style.theme.layout
+    // One set of spacing constants for the whole shell (the skin's own numbers, read once here):
+    // `gap` separates the navigation tabs, the two News panels and the pages from the friends list;
+    // `margin` is the outer margin on both sides, so Announcements and Friends sit the same
+    // distance from the window's left and right edges.
+    readonly property real gap: layout.panelGap
+    readonly property real margin: layout.contentMargin
     readonly property var pages: [
         { id: "news", label: "NEWS" }, { id: "tweaks", label: "TWEAKS" },
         { id: "addons", label: "ADDONS" }, { id: "mods", label: "MODS" },
@@ -51,7 +57,7 @@ Window {
         height: win.layout.headerHeight
         Row {
             id: logoRow
-            anchors { left: parent.left; leftMargin: win.layout.contentMargin
+            anchors { left: parent.left; leftMargin: win.margin
                       verticalCenter: parent.verticalCenter }
             spacing: 14
             SkinIcon { kind: "icon.logo"; size: win.layout.logoSize
@@ -67,7 +73,7 @@ Window {
             x: alignLeft ? logoRow.x + logoRow.width + (win.layout.navLeftMargin || 40)
                     : parent.width - width - win.layout.navRight
             anchors { verticalCenter: parent.verticalCenter; verticalCenterOffset: win.layout.navOffset !== undefined ? win.layout.navOffset : 4 }
-            spacing: win.layout.navSpacing
+            spacing: win.gap                       // the same gap as between the News panels
             Repeater {
                 model: win.pages
                 SkinNavTab {
@@ -106,14 +112,14 @@ Window {
         id: sidebar
         z: 20
         anchors { right: parent.right; top: header.bottom; bottom: footer.top; bottomMargin: 8
-                  rightMargin: 14 }
+                  rightMargin: win.margin }
     }
     Item {
         id: content
         objectName: "pageArea"
         anchors { left: parent.left; right: parent.right; top: header.bottom; bottom: footer.top
-                  leftMargin: win.layout.contentMargin
-                  rightMargin: win.layout.contentMargin + sidebar.width + 10
+                  leftMargin: win.margin
+                  rightMargin: win.margin + sidebar.width + win.gap
                   bottomMargin: 8 }
         Repeater {
             model: win.pages
@@ -139,7 +145,7 @@ Window {
         anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
         height: win.layout.footerHeight
         Column {
-            anchors { left: parent.left; leftMargin: win.layout.contentMargin
+            anchors { left: parent.left; leftMargin: win.margin
                       verticalCenter: parent.verticalCenter }
             spacing: 8
             SkinText {
@@ -176,7 +182,7 @@ Window {
             }
         }
         Row {
-            anchors { right: parent.right; rightMargin: win.layout.contentMargin
+            anchors { right: parent.right; rightMargin: win.margin
                       bottom: parent.bottom; bottomMargin: 14 }
             spacing: 14
             SkinIcon {
@@ -236,7 +242,7 @@ Window {
     }
 
     // Overlays are built the first time they are wanted, not at start-up.
-    LazyOverlay { id: settingsL; source: "SettingsOverlay.qml" }
+    LazyOverlay { id: settingsL; z: 90; source: "SettingsOverlay.qml" }      // above the friends list (z 20)
     LazyOverlay { z: 90; source: "DiagnosticsOverlay.qml"; wanted: diag.isOpen }
     LazyOverlay { z: 90; source: "CustomOverlay.qml"; wanted: customSrc.isOpen }
     LazyOverlay { z: 90; source: "SetupOverlay.qml"; wanted: setup.isOpen }
@@ -244,6 +250,7 @@ Window {
     LazyOverlay { z: 100; source: "DialogHost.qml"; wanted: dialog.open }
 
     LazyOverlay { z: 92; source: "AddFriendOverlay.qml"; wanted: social.addOpen }
+    LazyOverlay { z: 93; source: "LoginOverlay.qml"; wanted: account.loginOpen }
 
     function openSettings() {
         settingsL.seen = true

@@ -21,7 +21,7 @@
     },
     "dim": {
       "family": "Arial",
-      "size": 11
+      "size": 12
     },
     "heading": {
       "family": "Arial",
@@ -170,6 +170,12 @@
     },
     "icon.update": {
       "icon": "icons/swap.png"
+    },
+    "icon.folder": {
+      "icon": "icons/folder.png"
+    },
+    "icon.close": {
+      "icon": "icons/close.png"
     }
   }
 }

@@ -91,11 +91,16 @@ SkinPanel {
                                     text: model.actionText
                                     onClicked: mpq.click(model.file, model.action)
                                 }
-                                SkinIconButton { visible: model.installed; kind: "icon.remove"
-                                                 tip: app.t("Uninstall"); onClicked: mpq.uninstall(model.file) }
-                                SkinIconButton { visible: model.linked; kind: "icon.release"
-                                                 tip: app.t("Stop managing. Your files are kept.")
-                                                 onClicked: mpq.unlink(model.file) }
+                                SkinRowActions {
+                                    folderEnabled: model.installed
+                                    linkEnabled: model.homepage !== ""
+                                    uninstallEnabled: model.installed
+                                    releaseEnabled: model.linked
+                                    onFolder: mpq.openFolder(model.file)
+                                    onLink: mpq.openUrl(model.homepage)
+                                    onUninstall: mpq.uninstall(model.file)
+                                    onRelease: mpq.unlink(model.file)
+                                }
                             }
                         }
                         SkinText { visible: model.description !== ""; kind: "text.dim"
@@ -105,9 +110,6 @@ SkinPanel {
                             spacing: 6
                             SkinText { kind: "text.dim"; visible: model.author !== ""
                                        text: app.t("By {author}").replace("{author}", model.author) }
-                            SkinButton { visible: model.homepage !== ""; kind: "button.link"
-                                         text: app.t("Project page")
-                                         onClicked: mpq.openUrl(model.homepage) }
                         }
                         Row {
                             visible: model.sourceText !== ""

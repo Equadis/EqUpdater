@@ -84,7 +84,7 @@ Item {
                     SkinButton { kind: "button.small"; text: app.t("Find…")
                                  onClicked: { root.close(); setup.open() }
                                  SkinToolTipArea { tip: app.t("Looks for a game already on this computer, or extracts an archive you downloaded.") } }
-                    SkinIconButton { kind: "icon.link"; tip: app.t("Open folder"); onClicked: general.openGameDir() }
+                    SkinIconButton { kind: "icon.folder"; tip: app.t("Open folder"); onClicked: general.openGameDir() }
                 }
                 SkinText { visible: root.folderError !== ""; kind: "text.error"; text: app.t(root.folderError) }
                 FolderDialog {
@@ -122,7 +122,8 @@ Item {
                     width: parent.width
                     spacing: 6
                     SkinText { kind: "text.heading"; text: app.t("GAME LAUNCHER") }
-                    SkinText { kind: "text.body"; text: app.t("Launch command") }
+                    SkinText { kind: "text.body"; text: app.t("Launch command")
+                               SkinToolTipArea { tip: app.t("Leave empty to use Wine, or UMU if Wine is not installed. {exe} stands for the game's path; without it, the path is added at the end.") } }
                     SkinSearchField {
                         objectName: "launchCommandField"
                         width: parent.width
@@ -130,8 +131,6 @@ Item {
                         placeholder: "umu-run {exe}"
                         onEdited: function (t) { general.setLauncher("launch_command", t) }
                     }
-                    SkinText { width: parent.width; kind: "text.dim"; wrapMode: Text.Wrap
-                               text: app.t("Leave empty to use Wine, or UMU if Wine is not installed. {exe} stands for the game's path; without it, the path is added at the end.") }
                     SkinText { kind: "text.body"; text: app.t("Wine prefix") }
                     SkinSearchField {
                         objectName: "winePrefixField"
@@ -140,7 +139,8 @@ Item {
                         onEdited: function (t) { general.setLauncher("wine_prefix", t) }
                     }
                     SkinText { width: parent.width; kind: "text.dim"; text: general.runnerText; wrapMode: Text.Wrap }
-                    SkinText { kind: "text.body"; text: app.t("Environment variables") }
+                    SkinText { kind: "text.body"; text: app.t("Environment variables")
+                               SkinToolTipArea { tip: app.t("Optional. One NAME=value per line, given only to the game when PLAY starts it – for example DXVK_HUD=fps.") } }
                     Rectangle {
                         width: parent.width; height: 70
                         color: Style.pick(Style.theme.components["input"].colors, "normal", "#222")
@@ -155,8 +155,6 @@ Item {
                             onTextChanged: if (text !== general.launcher.env_vars) general.setLauncher("env_vars", text)
                         }
                     }
-                    SkinText { width: parent.width; kind: "text.dim"; wrapMode: Text.Wrap
-                               text: app.t("Optional. One NAME=value per line, given only to the game when PLAY starts it – for example DXVK_HUD=fps.") }
                     SkinText { visible: general.envProblems !== ""; width: parent.width; kind: "text.error"
                                wrapMode: Text.Wrap; text: general.envProblems }
                     Rectangle { width: parent.width; height: 1
@@ -181,96 +179,49 @@ Item {
                 SkinCheckBox { text: app.t("Animated background")
                                checked: settings.animatedBackground
                                onToggled: settings.animatedBackground = !settings.animatedBackground }
-                SkinCheckBox { text: app.t("Low-memory rendering")
-                               objectName: "softwareRenderingToggle"
-                               checked: settings.softwareRendering
-                               onToggled: settings.softwareRendering = !settings.softwareRendering
-                               SkinToolTipArea { tip: app.t("Draws with the processor instead of the graphics card: about 30 MB less memory and a safe choice without a working graphics driver, at the cost of a little more processor use. Takes effect after a restart.") } }
-                Row {
-                    visible: settings.rendererNeedsRestart
-                    spacing: 10
-                    SkinText { kind: "text.dim"; anchors.verticalCenter: parent.verticalCenter
-                               text: app.t("Restart EqUpdater to change the rendering.") }
-                    SkinButton { kind: "button.small"; text: app.t("Restart now"); onClicked: app.restartNow() }
-                }
                 SkinCheckBox { text: app.t("Pause animation when the window is not focused")
                                checked: settings.pauseWhenUnfocused
                                onToggled: settings.pauseWhenUnfocused = !settings.pauseWhenUnfocused }
                 Rectangle { width: parent.width; height: 1
                             color: Style.pick(Style.theme.components["divider"].colors, "normal", "#444") }
 
-                // ── LANGUAGE ───────────────────────────────────────────
-                SkinText { kind: "text.heading"; text: app.t("LANGUAGE") }
-                SkinButton {
-                    id: langBtn
-                    objectName: "languageButton"
-                    width: 220
-                    iconKind: "icon.arrow-down"
-                    iconSize: 10
-                    enabled: !tweaks.busy
-                    text: { var ch = tweaks.languageChoices
-                            for (var i = 0; i < ch.length; i++) if (ch[i].current) return ch[i].label
-                            return "" }
-                    onClicked: langMenu.open()
-                    SkinMenu {
-                        id: langMenu
-                        parent: langBtn
-                        y: langBtn.height + 2
-                        entries: { var ch = tweaks.languageChoices, out = []
+                // ── APPEARANCE ─────────────────────────────────────────
+                SkinText { kind: "text.heading"; text: app.t("APPEARANCE") }
+                Grid {
+                    columns: 2
+                    columnSpacing: 12; rowSpacing: 8
+                    verticalItemAlignment: Grid.AlignVCenter
+                    SkinText { kind: "text.body"; text: app.t("Skin"); width: 60 }
+                    Row {
+                        spacing: 6
+                        SkinSelect {
+                            objectName: "skinSelect"
+                            controlWidth: 200
+                            options: { var out = []
+                                       for (var i = 0; i < settings.skins.length; i++)
+                                           out.push({ id: settings.skins[i].id, label: settings.skins[i].name })
+                                       return out }
+                            current: settings.currentSkin
+                            onChosen: function (id) { settings.setSkin(id) }
+                        }
+                        SkinIconButton { objectName: "skinsFolderButton"; kind: "icon.folder"; tip: app.t("Open skins folder")
+                                         onClicked: settings.openSkinsFolder() }
+                        SkinIconButton { objectName: "restoreSkinButton"; kind: "icon.refresh"; tip: app.t("Restore default skin")
+                                         onClicked: settings.restoreDefaultSkin() }
+                    }
+                    SkinText { kind: "text.body"; text: app.t("Font"); width: 60 }
+                    SkinSelect {
+                        objectName: "fontSelect"
+                        controlWidth: 200
+                        options: { var out = [], ch = general.fontChoices
                                    for (var i = 0; i < ch.length; i++)
-                                       out.push({ label: ch[i].label, checked: ch[i].current })
+                                       // each option is drawn in its own typeface, whatever font is in use now
+                                       out.push({ id: ch[i].id, enabled: !ch[i].locked,
+                                                  label: ch[i].id === "" ? app.t("Skin default") : ch[i].family,
+                                                  family: ch[i].id === "" ? skin.nativeFont : ch[i].family })
                                    return out }
-                        onChosen: function (label) {
-                            var ch = tweaks.languageChoices
-                            for (var i = 0; i < ch.length; i++)
-                                if (ch[i].label === label && !ch[i].current) tweaks.setLanguage(ch[i].code)
-                            close()
-                        }
-                    }
-                }
-                SkinText { kind: "text.dim"; width: parent.width; wrapMode: Text.Wrap
-                           text: app.t("The language of EqUpdater and of the game. The game's language is written to WoW.exe, and EqUpdater offers to restart to show the change.") }
-                Rectangle { width: parent.width; height: 1
-                            color: Style.pick(Style.theme.components["divider"].colors, "normal", "#444") }
-
-                // ── FONT ───────────────────────────────────────────────
-                SkinText { kind: "text.heading"; text: app.t("FONT") }
-                Flow {
-                    id: fontFlow
-                    objectName: "fontChoices"
-                    width: parent.width
-                    spacing: 6
-                    Repeater {
-                        model: general.fontChoices
-                        SkinButton {
-                            objectName: "font_" + (modelData.id === "" ? "default" : modelData.id)
-                            width: 140; height: 30                         // one size, whatever the face
-                            enabled: !modelData.locked
-                            selected: general.fontOverride === modelData.id
-                            // Each label is drawn in its own face, whatever font is in use now.
-                            fontFamily: modelData.id === "" ? skin.nativeFont : modelData.family
-                            text: modelData.id === "" ? app.t("Skin default") : modelData.family
-                            onClicked: general.setFontOverride(modelData.id)
-                        }
-                    }
-                }
-                Rectangle { width: parent.width; height: 1
-                            color: Style.pick(Style.theme.components["divider"].colors, "normal", "#444") }
-
-                // ── SKIN ────────────────────────────────────────────────
-                SkinText { kind: "text.heading"; text: app.t("Skin") }
-                Column {
-                    width: parent.width
-                    spacing: 4
-                    Repeater {
-                        model: settings.skins
-                        SkinButton {
-                            width: parent.width
-                            selected: modelData.id === settings.currentSkin
-                            text: modelData.name + (modelData.author !== "" ? "  ·  " + modelData.author : "")
-                                  + (modelData.problems.length > 0 ? "   ⚠" : "")
-                            onClicked: settings.setSkin(modelData.id)
-                        }
+                        current: general.fontOverride
+                        onChosen: function (id) { general.setFontOverride(id) }
                     }
                 }
                 SkinText {
@@ -278,16 +229,26 @@ Item {
                     width: parent.width
                     kind: "text.dim"
                     wrapMode: Text.Wrap
-                    text: settings.skinProblems.join("\n")
+                    text: settings.skinProblems.join("
+")
                     maximumLineCount: 6
                     elide: Text.ElideRight
                 }
-                Row {
-                    spacing: 10
-                    SkinButton { kind: "button.small"; text: app.t("Open skins folder")
-                                 onClicked: settings.openSkinsFolder() }
-                    SkinButton { kind: "button.small"; text: app.t("Restore default skin")
-                                 onClicked: settings.restoreDefaultSkin() }
+                Rectangle { width: parent.width; height: 1
+                            color: Style.pick(Style.theme.components["divider"].colors, "normal", "#444") }
+
+                // ── LANGUAGE ───────────────────────────────────────────
+                SkinText { kind: "text.heading"; text: app.t("LANGUAGE") }
+                SkinSelect {
+                    objectName: "languageSelect"
+                    controlWidth: 200
+                    enabled: !tweaks.busy
+                    options: tweaks.languageChoices
+                    current: { var ch = tweaks.languageChoices
+                               for (var i = 0; i < ch.length; i++) if (ch[i].current) return ch[i].id
+                               return "" }
+                    onChosen: function (id) { tweaks.setLanguage(id) }
+                    SkinToolTipArea { tip: app.t("The language of EqUpdater and of the game. EqUpdater offers to restart to show the change.") }
                 }
                 Rectangle { width: parent.width; height: 1
                             color: Style.pick(Style.theme.components["divider"].colors, "normal", "#444") }

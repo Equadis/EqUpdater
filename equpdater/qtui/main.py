@@ -89,9 +89,10 @@ def build(argv=None):
     server_cache = core_settings.open_server_cache(data)
     social_store = core_settings.open_social_store(data)
 
-    if (os.environ.get("EQU3_RENDERER") or settings.get("renderer")) == "software":
-        # No GPU device or swap chain: about 30 MB less memory, and a safe
-        # choice on a machine (or Wine/VM) without a usable graphics driver.
+    if os.environ.get("EQU3_RENDERER") == "software":
+        # A diagnostic switch for the launcher's own window only (it is not a setting and has no
+        # effect on the game): no GPU device or swap chain, for a machine, Wine or VM without a
+        # usable graphics driver. Used by the offscreen tests and screenshot tools.
         from PySide6.QtQuick import QQuickWindow, QSGRendererInterface
         QQuickWindow.setGraphicsApi(QSGRendererInterface.GraphicsApi.Software)
 
@@ -160,19 +161,37 @@ def build(argv=None):
     if os.environ.get("EQU3_AUTH_CONFIG"):
         from .testing import auth_config_from_env
         auth_cfg = auth_config_from_env(os.environ["EQU3_AUTH_CONFIG"])
-    account_service = _account.AccountService(_account.make_provider(auth_cfg), credstore.open_store(), settings)
     realm_list = _realms.RealmList(social_store, fetch=None if (
         os.environ.get("EQU3_OFFLINE") == "1" or os.environ.get("EQUPDATER_OFFLINE")) else http_fetch)
     friend_book = FriendBook(social_store, realms=realm_list.ids)
-    if os.environ.get("EQU3_PRESENCE_FIXTURE"):
+    auth_provider = _account.make_provider(auth_cfg)
+    presence_provider = None
+    # The temporary username login and shared test backend: only when a test backend address is configured
+    # and OctoWoW's real sign-in is not (core/devsocial.py is the one module that knows about it).
+    from ..core import devsocial
+    test_url = devsocial.backend_url()
+    if test_url and not _account.PROVIDER_CONFIG and not auth_cfg:
+        backend = devsocial.Backend(test_url)
+        auth_provider = devsocial.DevAuthProvider(backend, settings.get("dev_tokens") or {},
+                                                  remember=lambda tokens: settings.set("dev_tokens", tokens))
+        presence_provider = devsocial.DevPresenceProvider(backend, friend_book)
+    if presence_provider is None and os.environ.get("EQU3_PRESENCE_FIXTURE"):
         from .testing import FixturePresenceProvider
         presence_provider = FixturePresenceProvider(os.environ["EQU3_PRESENCE_FIXTURE"])
-    else:
+    if presence_provider is None:
         presence_provider = _presence.UnavailablePresenceProvider()
+    account_service = _account.AccountService(auth_provider, credstore.open_store(), settings)
     presence_service = _presence.PresenceService(friend_book, presence_provider, account_service)
-    social_service = SocialService(settings, friend_book, presence_service, account_service, realm_list)
+    if getattr(presence_provider, "syncs_friends", False):
+        presence_provider.on_friends = friend_book.sync_from
+    from ..core import gamewatch
+    activity = gamewatch.make_source(lambda: settings.get("game_dir") or "", realm_list.all)
+    social_service = SocialService(settings, friend_book, presence_service, account_service, realm_list, activity=activity)
     social_bridge = SocialBridge(social_service, tasks)
     account_bridge = AccountBridge(account_service, social_service, tasks, dialog_bridge, dispatcher)
+    if os.environ.get("EQU3_DEV_LOGIN") and not getattr(sys, "frozen", False):
+        account_bridge.dev_login = os.environ["EQU3_DEV_LOGIN"]       # development runs only: never in a packaged build
+    account_bridge.changed.connect(social_bridge.kick)          # a sign-in or sign-out changes whether to ask
     app_bridge.window_hooks.append(social_bridge.window_state)
     app.installEventFilter(social_bridge)             # any input is activity, for the 15-minute Away rule
     host, holder = ops_bridge.make_host(settings, dialog_bridge, app_bridge, dispatcher)

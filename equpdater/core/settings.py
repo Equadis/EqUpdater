@@ -22,7 +22,6 @@ DEFAULTS = {
     "font_override": "",           # "", "arial", "friz", "opendyslexic", "objectsans"
     "game_launcher": None,           # Linux launch command / env, as in 2.x
     "news_seen": {},
-    "renderer": "auto",             # "auto" (GPU) or "software": ~30 MB less memory, a little more CPU
     "show_server_status": True,     # the footer chip (reads OctoBot's static status files)
     "imported_from_2x": False,
 }
@@ -40,7 +39,8 @@ SOCIAL_DEFAULTS = {
 #: file can never change the behaviour (for example "show_character": true).
 OBSOLETE_SOCIAL_KEYS = ("social_enabled", "sidebar_collapsed", "show_launcher_presence", "show_game_presence",
                         "show_character", "show_realm", "show_zone", "friend_notifications", "auto_away_minutes",
-                        "default_status", "friends_sort", "friends_realm", "presence_interval")
+                        "default_status", "friends_sort", "friends_realm", "presence_interval",
+                        "renderer")        # "Low-memory rendering": only changed how the launcher itself draws; removed
 DEFAULTS.update(SOCIAL_DEFAULTS)
 
 

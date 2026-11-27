@@ -10,7 +10,12 @@ Item {
     focus: visible
     Keys.onEscapePressed: social.closeAdd()
     property string error: ""
-    onVisibleChanged: if (visible) { nameField.text = ""; error = ""; nameField.forceActiveFocus() }
+    property bool busy: false
+    Connections {
+        target: social
+        function onAddFinished(err) { root.busy = false; if (err === "") social.closeAdd(); else root.error = err }
+    }
+    onVisibleChanged: if (visible) { nameField.text = ""; error = ""; busy = false; nameField.forceActiveFocus() }
 
     Rectangle {
         anchors.fill: parent
@@ -48,10 +53,8 @@ Item {
                     id: confirm
                     objectName: "addFriendConfirm"
                     kind: "button.primary"; text: app.t("Add Friend")
-                    onClicked: {
-                        var err = social.addFriend(nameField.text)
-                        if (err === "") social.closeAdd(); else root.error = err
-                    }
+                    enabled: !root.busy
+                    onClicked: { root.error = ""; root.busy = true; social.addFriendAsync(nameField.text) }
                 }
                 SkinButton { kind: "button.small"; text: app.t("Cancel"); onClicked: social.closeAdd() }
             }

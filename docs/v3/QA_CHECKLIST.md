@@ -69,3 +69,9 @@ Automated: 1,190+ tests (core logic, every page and overlay in all six skins, in
 - [ ] Settings stays open when a skin, font, language or checkbox is chosen and when the default skin is restored; the scroll position is kept; each font button is drawn in its own face (Arial, Friz Quadrata, OpenDyslexic, Object Sans); Language is in Settings and not on the Tweaks page.
 - [ ] Classic (2004): PLAY has the same steel button as Add Friend (hover, pressed, disabled).
 - [ ] The skin list reads Bubbles, Classic (2004), Blizzard, Turtle, Minimal (Dark), Minimal (Light); a profile that had the removed Minimal skin now has Minimal (Dark).
+
+- [ ] Settings shows APPEARANCE (Skin over Font, both compact) and LANGUAGE with flags; there is no Low-memory switch; the friends list never covers Settings.
+- [ ] Announcements and Friends are the same distance from the window edges; the tabs are the same distance apart as the two news columns; resize and switch skins to check.
+- [ ] Addons, Mods and MPQ rows show folder, link, trash, X in that order; an unavailable one is dimmed in place; Uninstall deletes the files, X leaves them.
+- [ ] Footer server dot: green all online, yellow partial/unknown/old, red all offline; the popover ends with "Open source" and opens OctoBot's status page.
+- [ ] Test login (needs `EQU3_SOCIAL_URL` and a running `tools/socialserver/server.py`): sign in by username, a taken name is refused, switch account, add a friend by name, favourites and search, click your dot for the four statuses, Invisible reads offline to a friend, close a launcher and watch it go offline within 30 s.

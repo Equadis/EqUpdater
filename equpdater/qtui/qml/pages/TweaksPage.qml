@@ -34,7 +34,7 @@ SkinPanel {
         delegate: Item {
             id: d
             width: ListView.view.width - 16
-            height: model.kind === "section" ? 38 : Math.max(46, rowCol.implicitHeight + 12)
+            height: model.kind === "section" ? 38 : Math.max(40, rowCol.implicitHeight + 12)
             SkinText {
                 visible: model.kind === "section"
                 kind: "text.heading"
@@ -53,15 +53,14 @@ SkinPanel {
                         kind: "text.body"
                         text: app.t(model.label) + (model.changed ? "  •" : "")
                         font.bold: true
+                        // the explanation is a tooltip, not a permanent paragraph under every row
+                        SkinToolTipArea { tip: model.tip !== "" ? app.t(model.tip) : "" }
                     }
                     SkinText {
                         kind: "text.dim"
                         width: parent.width
-                        wrapMode: Text.Wrap
-                        visible: text !== ""
-                        text: (model.tip !== "" ? app.t(model.tip) : "")
-                              + (model.id === "fieldOfView"
-                                 ? "  " + app.t("Suggested for this display:") + " " + tweaks.fovHint : "")
+                        visible: model.id === "fieldOfView"
+                        text: app.t("Suggested for this display:") + " " + tweaks.fovHint
                     }
                 }
                 Item {
@@ -87,39 +86,6 @@ SkinPanel {
                         enabled: !tweaks.busy
                         text: checked ? app.t("On") : app.t("Off")
                         onToggled: tweaks.setValue(model.id, !checked)
-                    }
-                    SkinButton {
-                        id: langBtn
-                        visible: model.kind === "dropdown"
-                        anchors.fill: parent
-                        iconKind: "icon.arrow-down"
-                        iconSize: 10
-                        enabled: !tweaks.busy
-                        text: {
-                            if (model.kind !== "dropdown") return ""
-                            var ch = model.choices || []
-                            for (var i = 0; i < ch.length; i++)
-                                if (ch[i].code === model.value) return ch[i].label
-                            return model.value
-                        }
-                        onClicked: langMenu.open()
-                        SkinMenu {
-                            id: langMenu
-                            parent: langBtn
-                            y: langBtn.height + 2
-                            entries: {
-                                var ch = model.choices || [], out = []
-                                for (var i = 0; i < ch.length; i++)
-                                    out.push({ label: ch[i].label, checked: ch[i].code === model.value })
-                                return out
-                            }
-                            onChosen: function (label) {
-                                var ch = model.choices || []
-                                for (var i = 0; i < ch.length; i++)
-                                    if (ch[i].label === label) tweaks.setValue(model.id, ch[i].code)
-                                close()
-                            }
-                        }
                     }
                 }
                 Rectangle {

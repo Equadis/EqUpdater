@@ -103,6 +103,28 @@ class FriendBook:
         self._save()
         return friend
 
+    def sync_from(self, entries: list) -> bool:
+        """Make the list equal to what the service holds (it is the source of truth when it keeps the list).
+        ``entries``: [{"username", "favourite"}]. Ids of friends that stay are kept. Returns whether anything changed."""
+        by_key = {(f.forum or f.name).casefold(): f for f in self._friends}
+        new = []
+        for e in entries:
+            name = str(e.get("username") or "")
+            if not FORUM_RE.match(name):
+                continue
+            f = by_key.get(name.casefold())
+            if f is None:
+                f = Friend(uuid.uuid4().hex[:12], "", "", name, False, self.now())
+            else:
+                f = Friend(f.id, "", "", name, f.favourite, f.added)           # a first-beta character entry becomes the account
+            f.favourite = bool(e.get("favourite"))
+            new.append(f)
+        if [f.to_json() for f in new] == [f.to_json() for f in self._friends]:
+            return False
+        self._friends = new
+        self._save()
+        return True
+
     def remove(self, friend_id: str) -> bool:
         before = len(self._friends)
         self._friends = [f for f in self._friends if f.id != friend_id]

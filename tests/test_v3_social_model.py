@@ -153,22 +153,26 @@ class TestRowsAndPresenceText(Tmp):
                              Sylvanas=dict(launcher="online"), Illidan=dict(launcher="away"),
                              Tyrande=dict(launcher="dnd"), Malfurion=dict(game="offline", launcher="offline"))
         lines = {r["name"]: r["statusLine"] for r in svc.rows() if r["kind"] == "friend"}
-        self.assertEqual(lines["Thrall"], "In Game ・ N'Zoth")
-        self.assertEqual(lines["Jaina"], "In Game ・ Y'Shaarj")
-        self.assertEqual(lines["Arthas"], "In Game ・ C'Thun")
-        self.assertEqual(lines["Sylvanas"], "Online")
-        self.assertEqual(lines["Illidan"], "Away")
-        self.assertEqual(lines["Tyrande"], "Do Not Disturb")
+        self.assertEqual(lines["Thrall"], "In-game \u00b7 N'Zoth")
+        self.assertEqual(lines["Jaina"], "In-game \u00b7 Y'Shaarj")
+        self.assertEqual(lines["Arthas"], "In-game \u00b7 C'Thun")
+        for who in ("Sylvanas", "Illidan", "Tyrande"):                    # launcher open, whatever the status
+            self.assertEqual(lines[who], "Launcher open")
         self.assertEqual(lines["Malfurion"], "Offline")
+        dots = {r["name"]: r["dot"].lower() for r in svc.rows() if r["kind"] == "friend"}
+        self.assertEqual((dots["Sylvanas"], dots["Illidan"], dots["Tyrande"], dots["Malfurion"]),
+                         ("#3ddc84", "#f2c744", "#ef5350", "#7d8590"))             # online, away, do not disturb, offline
+        names = {r["name"]: r["statusName"] for r in svc.rows() if r["kind"] == "friend"}
+        self.assertEqual((names["Illidan"], names["Tyrande"]), ("Away", "Do Not Disturb"))
 
     def test_no_empty_separator_and_no_placeholder_realm(self):
         svc, fr = self.serve(self.d, Thrall=dict(game="in_game"), Jaina=dict(launcher="online", realm="nzoth"))
         rows = {r["name"]: r for r in svc.rows() if r["kind"] == "friend"}
-        self.assertEqual(rows["Thrall"]["statusLine"], "In Game")          # in game, realm not given: no separator
-        self.assertEqual(rows["Jaina"]["statusLine"], "Online")            # a realm is only shown while in game
+        self.assertEqual(rows["Thrall"]["statusLine"], "In-game")          # in game, realm not given: no separator
+        self.assertEqual(rows["Jaina"]["statusLine"], "Launcher open")     # a realm is only shown while in game
         for r in rows.values():
-            self.assertNotIn("・", r["statusLine"] if not r["realm"] else "")
-            self.assertFalse(r["statusLine"].endswith(("・", " ")))
+            self.assertNotIn("\u00b7", r["statusLine"] if not r["realm"] else "")
+            self.assertFalse(r["statusLine"].endswith(("\u00b7", " ")))
 
     def test_having_the_launcher_open_is_not_the_same_as_playing(self):
         svc, fr = self.serve(self.d, Open=dict(launcher="online"), Playing=dict(game="in_game", launcher="online", realm="nzoth"))
@@ -249,7 +253,7 @@ class TestOwnStatus(Tmp):
         svc, book, pres, _p, clock = make(self.d, prov)
         svc.set_status("invisible")
         sent = prov.published[-1]
-        self.assertEqual((sent.status, sent.share_game, sent.share_realm), ("invisible", False, False))
+        self.assertEqual((sent.status, sent.activity, sent.realm), ("invisible", "launcher", ""))
         # still signed in and fully working locally: friends are still looked up, the list still works
         svc.add_friend("Thrall")
         prov.data[book.all()[0].id] = obs(book.all()[0].id, launcher="online")
@@ -262,8 +266,8 @@ class TestOwnStatus(Tmp):
         svc, *_ = make(self.d, prov)
         svc.publish()
         sent = prov.published[-1]
-        self.assertEqual((sent.status, sent.share_game, sent.share_realm), ("online", True, True))
-        self.assertEqual({f.name for f in fields(P.OwnStatus)}, {"status", "share_game", "share_realm"})
+        self.assertEqual((sent.status, sent.activity, sent.realm), ("online", "launcher", ""))
+        self.assertEqual({f.name for f in fields(P.OwnStatus)}, {"status", "activity", "realm"})
 
     def test_a_change_is_published_once_and_nothing_goes_out_without_a_service_or_sign_in(self):
         prov = FakeProvider()
@@ -432,7 +436,7 @@ class TestSettingsMigration(Tmp):
         sent = FakeProvider()
         svc2 = make(self.d, sent, settings=s)[0]
         svc2.set_status("online")
-        self.assertTrue(sent.published[-1].share_game and sent.published[-1].share_realm)   # show_* ignored
+        self.assertEqual(sent.published[-1].status, "online")                              # show_* ignored
         pres = svc2.presence
         self.assertEqual(pres.interval, 5.0)                           # presence_interval ignored
 

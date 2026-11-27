@@ -47,3 +47,11 @@ Automated tests: 1,200 (2.x branch: 881), all passing; see `TESTING.md`. Measure
 * **Classic (2004)**: PLAY uses the same steel button texture as the other Classic buttons.
 * **Settings no longer closes** when something is selected (a tap that rebuilt its own button fell through to the scrim). The skin list is only replaced when it really changes.
 * **Font selector**: each option drawn in its own face; **Object Sans** added (licence not confirmed, see `fonts/README.txt`).
+
+## Beta 1 revision 2 (2026-11-27)
+* **Layout**: the friends list no longer draws over Settings (Settings is above it); one set of spacing constants (`gap`, `margin`): the navigation tabs, the News panels and the pages-to-friends gap are the same distance apart, and Announcements and Friends are the same distance from the window's left and right edges, in every skin and size.
+* **Settings**: an **Appearance** group (Skin, Font: compact drop-downs, each font drawn in its own face); the **Language** drop-down shows the country flag (bundled images) for the selected language and each option; **Low-memory rendering removed** (it only changed the launcher's own window).
+* **Server status**: the dot is green (every realm online), yellow (partial, degraded, unknown or old data) or red (every realm offline, never from old data); the popover keeps the overall status, players, each realm, website and login response, shows age beside a stale value, and ends with one link, **Open source ↗** (OctoBot's status page).
+* **One set of row actions** on Addons, Mods and MPQ: open folder, open repository, uninstall (trash), stop managing (X), always in that order and place, from one shared component.
+* **Simplification**: explanatory paragraphs moved into tooltips (Tweaks rows, Linux launcher settings), dim text enlarged by 1 px.
+* **Temporary username login and a shared test backend** (development only, see `SOCIAL_TEST_BACKEND.md`): friends are kept on the server, presence is a five-second heartbeat that expires, Invisible reads as offline to others, launcher-open versus in-game and the realm are detected (`core/gamewatch.py`), and a development-only simulation and multi-launcher tool allow testing without a game or several PCs.

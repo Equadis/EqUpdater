@@ -190,6 +190,11 @@ class ModsBridge(QObject):
     def release(self, mod_id):
         self.service.release(mod_id)
 
+    @Slot(str)
+    def openFolder(self, mod_id):
+        """Mods are files in the game folder (DLLs, dlls.txt): that is the folder to show."""
+        self.app.openFolder(self.host._game_path.get())
+
     @Slot(str, str)
     def clickAction(self, mod_id, mode):
         self.service.click_action(mod_id, mode)
@@ -294,6 +299,11 @@ class AddonsBridge(QObject):
         self.service.release(folder)
 
     @Slot(str)
+    def openFolder(self, folder):
+        if folder and folder == os.path.basename(folder):             # a plain folder name, never a path
+            self.app.openFolder(os.path.join(self.host._game_path.get(), "Interface", "AddOns", folder))
+
+    @Slot(str)
     def switchSource(self, folder):
         self.service.switch_source(folder)
 
@@ -388,6 +398,10 @@ class MpqBridge(QObject):
     @Slot(str)
     def unlink(self, file):
         self.service.unlink(file)
+
+    @Slot(str)
+    def openFolder(self, file):
+        self.app.openFolder(os.path.join(self.host._game_path.get(), "Data"))
 
     @Slot(str)
     def openLink(self, file):

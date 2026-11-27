@@ -10,6 +10,7 @@ import EqUi
 // Delegates are virtualised: only visible posts exist as items.
 SkinPanel {
     id: root
+    objectName: "newsPanel"
     property var section            // NewsSectionBridge (Python)
     readonly property int previewLines: 14
 

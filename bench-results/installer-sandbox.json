@@ -1,7 +1,7 @@
 {
  "setup": "D:\\EqUpdater\\dist\\EqUpdater3-v3.0.0-beta.1-Windows-Installer.exe",
- "setup_mb": 68.1,
- "sandbox": "C:\\Users\\OLIVER~1\\AppData\\Local\\Temp\\equ3-sandbox-egn38wy_",
+ "setup_mb": 68.2,
+ "sandbox": "C:\\Users\\OLIVER~1\\AppData\\Local\\Temp\\equ3-sandbox-kh0aywi_",
  "steps": [
   {
    "step": "1. (skipped: EqUpdater 2 is not running on this machine)",
@@ -11,12 +11,12 @@
   {
    "step": "2. silent install",
    "pass": true,
-   "detail": "installed: C:\\Users\\OLIVER~1\\AppData\\Local\\Temp\\equ3-sandbox-egn38wy_\\Local\\Programs\\EqUpdater3\\EqUpdater3.exe"
+   "detail": "installed: C:\\Users\\OLIVER~1\\AppData\\Local\\Temp\\equ3-sandbox-kh0aywi_\\Local\\Programs\\EqUpdater3\\EqUpdater3.exe"
   },
   {
    "step": "2b. Apps & features entry written for this user",
    "pass": true,
-   "detail": "{'DisplayName': 'EqUpdater 3 Beta', 'DisplayVersion': '3.0.0-beta.1', 'InstallLocation': 'C:\\\\Users\\\\OLIVER~1\\\\AppData\\\\Local\\\\Temp\\\\equ3-sandbox-egn38wy_\\\\Local\\\\Programs\\\\EqUpdater3', 'UninstallString': '\"C:\\\\Users\\\\OLIVER~1\\\\AppData\\\\Local\\\\Temp\\\\equ3-sandbox-egn38wy_\\\\Local\\\\Programs\\\\EqUpdater3\\\\EqUpdater3.exe\" --uninstall'}"
+   "detail": "{'DisplayName': 'EqUpdater 3 Beta', 'DisplayVersion': '3.0.0-beta.1', 'InstallLocation': 'C:\\\\Users\\\\OLIVER~1\\\\AppData\\\\Local\\\\Temp\\\\equ3-sandbox-kh0aywi_\\\\Local\\\\Programs\\\\EqUpdater3', 'UninstallString': '\"C:\\\\Users\\\\OLIVER~1\\\\AppData\\\\Local\\\\Temp\\\\equ3-sandbox-kh0aywi_\\\\Local\\\\Programs\\\\EqUpdater3\\\\EqUpdater3.exe\" --uninstall'}"
   },
   {
    "step": "2c. all six skins are in the package",
@@ -31,7 +31,7 @@
   {
    "step": "4. installing again (upgrade path)",
    "pass": true,
-   "detail": "installed: C:\\Users\\OLIVER~1\\AppData\\Local\\Temp\\equ3-sandbox-egn38wy_\\Local\\Programs\\EqUpdater3\\EqUpdater3.exe"
+   "detail": "installed: C:\\Users\\OLIVER~1\\AppData\\Local\\Temp\\equ3-sandbox-kh0aywi_\\Local\\Programs\\EqUpdater3\\EqUpdater3.exe"
   },
   {
    "step": "6a. settings, game and protected folders unchanged after install and upgrade",
@@ -51,12 +51,12 @@
   {
    "step": "7. uninstall refuses a folder it did not make (OctoWoW)",
    "pass": true,
-   "detail": "error: C:\\Users\\OLIVER~1\\AppData\\Local\\Temp\\equ3-sandbox-egn38wy_\\Games\\OctoWoW was not made by the EqUpdater 3 Beta installer; nothing was removed."
+   "detail": "error: C:\\Users\\OLIVER~1\\AppData\\Local\\Temp\\equ3-sandbox-kh0aywi_\\Games\\OctoWoW was not made by the EqUpdater 3 Beta installer; nothing was removed."
   },
   {
    "step": "7. uninstall refuses a folder it did not make (EqUpdater)",
    "pass": true,
-   "detail": "error: C:\\Users\\OLIVER~1\\AppData\\Local\\Temp\\equ3-sandbox-egn38wy_\\Local\\EqUpdater was not made by the EqUpdater 3 Beta installer; nothing was removed."
+   "detail": "error: C:\\Users\\OLIVER~1\\AppData\\Local\\Temp\\equ3-sandbox-kh0aywi_\\Local\\EqUpdater was not made by the EqUpdater 3 Beta installer; nothing was removed."
   },
   {
    "step": "8. uninstall from the installed program: folder gone, entry gone",
@@ -71,7 +71,7 @@
   {
    "step": "9. uninstall through the setup program",
    "pass": true,
-   "detail": "removed: Apps & features entry\nremoved: C:\\Users\\OLIVER~1\\AppData\\Local\\Temp\\equ3-sandbox-egn38wy_\\Local\\Programs\\EqUpdater3"
+   "detail": "removed: Apps & features entry\nremoved: C:\\Users\\OLIVER~1\\AppData\\Local\\Temp\\equ3-sandbox-kh0aywi_\\Local\\Programs\\EqUpdater3"
   },
   {
    "step": "9b. settings and game still unchanged",
@@ -82,11 +82,11 @@
  "passed": true,
  "protected_folders_checked": [
   {
-   "path": "C:\\Users\\OLIVER~1\\AppData\\Local\\Temp\\equ3-sandbox-egn38wy_\\Local\\EqUpdater",
+   "path": "C:\\Users\\OLIVER~1\\AppData\\Local\\Temp\\equ3-sandbox-kh0aywi_\\Local\\EqUpdater",
    "files": 3
   },
   {
-   "path": "C:\\Users\\OLIVER~1\\AppData\\Local\\Temp\\equ3-sandbox-egn38wy_\\Games\\OctoWoW",
+   "path": "C:\\Users\\OLIVER~1\\AppData\\Local\\Temp\\equ3-sandbox-kh0aywi_\\Games\\OctoWoW",
    "files": 6
   },
   {

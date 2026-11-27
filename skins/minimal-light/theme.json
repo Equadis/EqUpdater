@@ -28,7 +28,7 @@
     },
     "dim": {
       "family": "Segoe UI",
-      "size": 11
+      "size": 12
     },
     "heading": {
       "family": "Segoe UI",
@@ -97,6 +97,12 @@
         "hover": "#ffffff",
         "disabled": "#8a919c"
       }
+    },
+    "icon.folder": {
+      "icon": "icons/folder.png"
+    },
+    "icon.close": {
+      "icon": "icons/close.png"
     }
   }
 }

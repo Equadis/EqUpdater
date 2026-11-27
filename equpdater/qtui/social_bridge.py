@@ -18,7 +18,7 @@ from ..core.social_service import SocialService
 from ..i18n import tr
 from .models import KeyedListModel
 
-_ROLES = ["key", "kind", "group", "title", "count", "id", "name", "favourite", "state", "stale", "dot", "statusLine", "status", "realm"]
+_ROLES = ["key", "kind", "group", "title", "count", "id", "name", "favourite", "state", "stale", "dot", "statusLine", "statusName", "status", "realm"]
 
 
 def _open_url(url: str) -> bool:
@@ -117,6 +117,9 @@ class AccountBridge(QObject):
     # -- actions ----------------------------------------------------------------------------------
     @Slot()
     def signIn(self):
+        if self.usernameLogin:
+            self.openLogin()
+            return
         if not self.service.provider.available:
             self.dialog.ask("info", tr("Sign in to OctoWoW"), self.service.provider.unavailable_reason)
             return
@@ -126,10 +129,55 @@ class AccountBridge(QObject):
         self.tasks.submit("account:signin", lambda: self.service.sign_in(open_browser),
                           on_done=lambda ok: self._signed_in(ok), on_error=lambda e: self.changed.emit())
 
+    def _publish_later(self):
+        self.tasks.submit("social:publish", self.social.publish, on_done=lambda _r: None, on_error=lambda e: None)
+
     def _signed_in(self, ok):
         self.changed.emit()
         if ok:
-            self.social.publish()
+            self._publish_later()
+
+    @Property(bool, constant=True)
+    def usernameLogin(self):
+        """The temporary test login: a username instead of a browser sign-in."""
+        return bool(getattr(self.service.provider, "username_login", False))
+
+    @Property(bool, notify=changed)
+    def loginOpen(self):
+        return self._login_open
+
+    _login_open = False
+
+    @Slot()
+    def openLogin(self):
+        self._login_open = True
+        self.changed.emit()
+
+    @Slot()
+    def closeLogin(self):
+        self._login_open = False
+        self.changed.emit()
+
+    @Slot(str)
+    def signInAs(self, username):
+        """Test login. The answer (a refusal, say a name in use) arrives as ``message``; the dialog stays open then."""
+        self.service.provider.username = (username or "").strip()
+        prev = self.service.username
+
+        def done(ok):
+            self.changed.emit()
+            if ok:
+                self._login_open = False
+                self.changed.emit()
+                self._publish_later()
+        if self.service.state == A.SIGNED_IN:                      # switching accounts: end this session first
+            def work():
+                self.service.sign_out()
+                return self.service.sign_in(lambda url: None)
+        else:
+            def work():
+                return self.service.sign_in(lambda url: None)
+        self.tasks.submit("account:signin", work, on_done=done, on_error=lambda e: self.changed.emit())
 
     @Slot()
     def cancelSignIn(self):
@@ -137,7 +185,12 @@ class AccountBridge(QObject):
 
     @Slot()
     def signOut(self):
-        self.tasks.submit("account:signout", self.service.sign_out, on_done=lambda _r: self.changed.emit(),
+        def done(_r):
+            self.social.presence.cache.clear()              # what was known about friends belonged to that session
+            self.social.presence.failures, self.social.presence.error = 0, ""
+            self.social.on_change()
+            self.changed.emit()
+        self.tasks.submit("account:signout", self.service.sign_out, on_done=done,
                           on_error=lambda e: self.changed.emit())
 
     @Slot()
@@ -155,16 +208,24 @@ class AccountBridge(QObject):
         self.changed.emit()
         self.tasks.submit("social:publish", self.social.publish, on_done=lambda _r: None, on_error=lambda e: None)
 
+    dev_login = ""                  # development only (EQU3_DEV_LOGIN): sign in under this name if no session came back
+
     def restore(self):
         """At start, off the GUI thread."""
+        def done(_r):
+            self.changed.emit()
+            if self.dev_login and self.usernameLogin and self.service.state != A.SIGNED_IN:
+                self.signInAs(self.dev_login)
         if self.service.provider.available:
-            self.tasks.submit("account:restore", self.service.restore, on_done=lambda _r: self.changed.emit(),
+            self.tasks.submit("account:restore", self.service.restore, on_done=done,
                               on_error=lambda e: self.changed.emit())
 
 
 class SocialBridge(QObject):
     changed = Signal()
     settingsChanged = Signal()
+    refreshRequested = Signal()          # emitted from any thread; handled on the GUI thread
+    addFinished = Signal(str)            # "" or the reason a friend was not added
 
     def __init__(self, service: SocialService, tasks, realm_fetch=None):
         super().__init__()
@@ -178,9 +239,11 @@ class SocialBridge(QObject):
         self._idle.timeout.connect(self._check_idle)
         self._busy = False
         self._started = False
-        service.on_change = self._refresh
-        service.presence.on_change = self._refresh
-        service.book.on_change = self._refresh
+        self.refreshRequested.connect(self._refresh)
+        service.on_change = self.refreshRequested.emit
+        service.presence.on_change = self.refreshRequested.emit
+        service.book.on_change = self.refreshRequested.emit
+        service.presence.before_poll = service.refresh_activity
         if service.realms:
             service.realms.on_change = lambda: self.settingsChanged.emit()
         self._refresh()
@@ -208,7 +271,7 @@ class SocialBridge(QObject):
 
     @Property(int, notify=changed)
     def friendCount(self):
-        return len(self.service.book)
+        return self.service.friend_count()
 
     @Property(str, notify=changed)
     def sourceNote(self):
@@ -243,18 +306,36 @@ class SocialBridge(QObject):
 
     @Slot(str, result=str)
     def addFriend(self, username):
+        """Blocking when the service keeps the list: the interface uses addFriendAsync."""
         err = self.service.add_friend(username)
         if not err:
             self._schedule(0.4)
         return err
 
     @Slot(str)
+    def addFriendAsync(self, username):
+        def done(err):
+            self.addFinished.emit(err)
+            if not err:
+                self._schedule(0.2)
+        self.tasks.submit("social:add", lambda: self.service.add_friend(username), on_done=done,
+                          on_error=lambda e: self.addFinished.emit(tr("The test service could not be reached.")))
+
+    def _edit(self, key, fn):
+        """Remove / favourite: instant for a local list, a worker when the service holds the list."""
+        if not self.service._held():
+            fn()
+            return
+        self.tasks.submit(key, fn, on_done=lambda err: (self._refresh(), self._schedule(0.2)),
+                          on_error=lambda e: None)
+
+    @Slot(str)
     def removeFriend(self, friend_id):
-        self.service.remove_friend(friend_id)
+        self._edit("social:remove", lambda: self.service.remove_friend(friend_id))
 
     @Slot(str)
     def toggleFavourite(self, friend_id):
-        self.service.toggle_favourite(friend_id)
+        self._edit("social:favourite", lambda: self.service.toggle_favourite(friend_id))
 
     @Slot(str, result=str)
     def copyText(self, friend_id):
@@ -293,6 +374,12 @@ class SocialBridge(QObject):
             self._refresh()
             self._schedule()
         self.tasks.submit("presence:poll", self.service.presence.poll, on_done=done, on_error=lambda e: done(False))
+
+    @Slot()
+    def kick(self):
+        """Something changed that decides whether presence is asked for (sign-in, sign-out): look again."""
+        if self._started and not self._busy:
+            self._schedule(0.3 if self.service.presence.delay() is not None else None)
 
     def window_state(self, minimized: bool, active: bool):
         pres = self.service.presence

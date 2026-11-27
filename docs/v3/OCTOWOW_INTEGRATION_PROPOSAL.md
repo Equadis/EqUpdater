@@ -110,7 +110,7 @@ Field meanings (EqUpdater treats anything else as `unknown`):
 | `realm` | a realm id from `realms.json` | **only when `game` is `in_game`** (and the player is not invisible). Omit it otherwise |
 | `as_of` | ISO 8601 | when this was true |
 
-What EqUpdater shows: `In Game ・ N'Zoth` when `game` is `in_game` and a realm is given (just `In Game` if not), otherwise `Online`, `Away`, `Do Not Disturb` or `Offline`. Nothing is shown that is not in this table.
+What EqUpdater shows for a friend: the forum user name, a dot (green Online, yellow Away, red Do Not Disturb, grey Offline) and one line: `In-game · N'Zoth` when `game` is `in_game` (just `In-game` if no realm is given), `Launcher open` for any other online player, `Offline`, or `Unavailable` when you have said nothing. Nothing is shown that is not in this table.
 
 Rules we ask you to apply:
 * **Invisible means offline to everyone else**, in both `launcher` and `game`, and no `realm`. The player stays signed in and everything works for them locally; only other people's view changes. This is the one behaviour EqUpdater cannot provide by itself.

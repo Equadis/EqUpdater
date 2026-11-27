@@ -922,16 +922,10 @@ STRINGS = {
         'Escolha primeiro a pasta do jogo.',
     'Windows Defender is not used on this system.':
         'O Windows Defender não é usado neste sistema.',
-    'Could not refresh just now; showing the last known values.':
-        'Não foi possível atualizar agora; exibindo os últimos valores conhecidos.',
-    'Data from OctoBot. Server status is not checked by EqUpdater.':
-        'Dados do OctoBot. O EqUpdater não verifica o status do servidor.',
     'Login response':
         'Resposta de login',
     'No server information yet':
         'Ainda não há informações do servidor',
-    'Player count: {source}':
-        'Contagem de jogadores: {source}',
     'Players online':
         'Jogadores online',
     'Server offline':
@@ -940,14 +934,8 @@ STRINGS = {
         'Servidor online',
     'Server partly available':
         'Servidor parcialmente disponível',
-    'Server status checked {when}; it may have changed.':
-        'Status do servidor verificado {when}; pode ter mudado.',
     'Server status unknown':
         'Status do servidor desconhecido',
-    'This is out of date; the source has not been updated.':
-        'Isto está desatualizado; a fonte não foi atualizada.',
-    'Updated {when}':
-        'Atualizado {when}',
     'Waiting for the first update.':
         'Aguardando a primeira atualização.',
     'Website':
@@ -1015,7 +1003,15 @@ STRINGS = {
     '{n} online':
         '{n} online',
     "Do Not Disturb": "Não perturbe",
-    "In Game": "No jogo",
     "Invisible": "Invisível",
     "Unavailable": "Indisponível",
+    "A username is 3 to 20 letters, numbers, dashes or underscores.": "Um nome de usuário tem de 3 a 20 letras, números, hifens ou sublinhados.",
+    "In-game": "No jogo",
+    "Launcher open": "Launcher aberto",
+    "No user has that name.": "Nenhum usuário tem esse nome.",
+    "Sign in to add friends.": "Entre para adicionar amigos.",
+    "Sign in to change your friends.": "Entre para alterar seus amigos.",
+    "That username is in use right now.": "Esse nome de usuário está em uso agora.",
+    "The test service answered unexpectedly ({status}).": "O serviço de teste respondeu de forma inesperada ({status}).",
+    "The test service could not be reached.": "Não foi possível acessar o serviço de teste.",
 }

@@ -949,7 +949,7 @@ class TestServerChip(Base):
         self.assertIn("Server online", p["server"].summary)
         labels = [r["label"] for r in p["server"].lines]
         self.assertEqual(labels[:4], ["Players online", "N'Zoth", "Y'Shaarj", "C'Thun"])
-        self.assertIn("Data from OctoBot", p["server"].footnote)
+        self.assertFalse(hasattr(p["server"], "footnote"))              # no explanatory paragraph at the bottom
         self.assertEqual(self.qml_errors(), [])
 
     def test_the_popover_opens_in_every_skin_without_errors(self):
@@ -967,7 +967,26 @@ class TestServerChip(Base):
             pump(80)
         self.assertEqual(self.qml_errors(), [])
 
-    def test_old_data_is_dim_not_red_and_says_so(self):
+    def test_the_popover_has_one_link_and_it_opens_the_octobot_status_page(self):
+        from unittest import mock
+        from equpdater.core.server import STATUS_PAGE_URL
+        self.fixture()
+        p = self.start()
+        p["server"].start()
+        pump(until=lambda: p["server"].hasData, limit=6000)
+        p["app"].debugAction.emit("server")
+        pump(250)
+        link = next(i for i in walk(self.win.property("contentItem")) if i.objectName() == "serverSourceLink")
+        self.assertEqual(link.property("text"), "Open source \u2197")
+        texts = [str(i.property("text")) for i in walk(self.win.findChild(QObject, "serverPopover")) if i.property("text")]
+        for gone in ("Player count", "Updated", "out of date", "Data from OctoBot", "not checked by EqUpdater"):
+            self.assertFalse([t for t in texts if gone in t], gone)
+        self.assertEqual(STATUS_PAGE_URL, "https://equadis.github.io/OctoBot/status/")
+        with mock.patch("equpdater.qtui.social_bridge._open_url") as opened:
+            p["server"].openSource()
+        opened.assert_called_once_with(STATUS_PAGE_URL)
+
+    def test_old_data_is_yellow_not_red_and_says_so_beside_the_value(self):
         import datetime
         old = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=8)).strftime("%Y-%m-%dT%H:%M:%SZ")
         self.fixture(status={"schema": 1, "sample": {"timestamp": old, "website": "available",
@@ -975,9 +994,10 @@ class TestServerChip(Base):
         p = self.start()
         p["server"].start()
         pump(until=lambda: p["server"].hasData, limit=6000)
-        self.assertEqual(p["server"].dot, "unknown")              # stale: never a red "offline"
+        self.assertEqual(p["server"].dot, "degraded")             # stale: yellow, never a red "offline"
         self.assertIn("unknown", p["server"].summary)
-        self.assertIn("may have changed", p["server"].footnote)
+        values = [r["value"] for r in p["server"].lines if r["label"] in ("Website", "Login response")]
+        self.assertTrue(values and all("ago" in v for v in values), values)   # the age sits beside the value
 
     def test_a_failed_fetch_keeps_the_last_numbers_and_says_it_could_not_refresh(self):
         path = self.fixture()
@@ -994,7 +1014,38 @@ class TestServerChip(Base):
         pump(60)
         self.assertEqual(p["server"].chipText, "1,381")
         self.assertEqual(p["server"].dot, "online")
-        self.assertIn("Could not refresh", p["server"].footnote)
+
+    def test_the_dot_is_green_only_when_every_realm_is_online_and_red_only_when_every_realm_is_offline(self):
+        from equpdater.qtui.bridge import ServerBridge
+
+        class Feed:
+            def __init__(self, view):
+                self.v = view
+
+            def view(self):
+                return self.v
+
+        def view(realms, state="online", stale=False, status_stale=False, has_data=True):
+            return {"has_data": has_data, "state": state, "stale": stale, "status_stale": status_stale, "unavailable": False,
+                    "total": 5, "age": 7200.0 if stale else 10.0, "status_age": 30000.0 if status_stale else 10.0,
+                    "website": "available", "latency_ms": 90, "total_source": "census",
+                    "realms": [{"id": i, "name": i, "online": None, "state": st} for i, st in zip(("a", "b", "c"), realms)]}
+        cases = [
+            (view(("online", "online", "online")), "online"),
+            (view(("offline", "offline", "offline"), "offline"), "offline"),
+            (view(("online", "offline", "online")), "degraded"),                 # a partial outage
+            (view(("online", "online", "")), "degraded"),                        # one realm unknown: not "all"
+            (view(("", "", ""), "online"), "online"),                            # no per-realm data, the login server is fine
+            (view(("", "", ""), "offline"), "offline"),
+            (view(("", "", ""), "degraded"), "degraded"),
+            (view(("", "", ""), "unknown"), "degraded"),                         # unknown is yellow
+            (view(("online", "online", "online"), status_stale=True), "degraded"),   # stale data is yellow
+            (view(("offline", "offline", "offline"), "offline", status_stale=True), "degraded"),   # never a red outage from old data
+            (view((), has_data=False), "degraded"),                              # nothing known yet
+        ]
+        for v, expect in cases:
+            b = ServerBridge(Feed(v), None, None, offline=True)
+            self.assertEqual(b.dot, expect, v)
 
     def test_the_switch_hides_the_chip_and_stops_all_requests(self):
         self.fixture()
@@ -1100,24 +1151,26 @@ class TestBackgroundAnimations(Base):
         self.assertTrue(anim.property("visible"))
 
 
-class TestLowMemoryRendering(Base):
-    def test_the_setting_is_saved_and_asks_for_a_restart_only_when_it_differs(self):
-        p = self.start()
-        sb = p["settings_bridge"]
-        self.assertFalse(sb.softwareRendering)
-        self.assertFalse(sb.rendererNeedsRestart)
-        sb.softwareRendering = True
-        self.assertTrue(sb.rendererNeedsRestart)
-        self.assertEqual(p["settings"].get("renderer"), "software")
-        sb.softwareRendering = False
-        self.assertFalse(sb.rendererNeedsRestart)
-        self.assertEqual(p["settings"].get("renderer"), "auto")
+class TestLowMemoryRenderingIsGone(Base):
+    """It only changed how the launcher's own window draws (software instead of the GPU); it never
+    touched the game, so it is not a player's setting. Investigated in docs/v3/PERFORMANCE.md."""
 
-    def test_the_settings_page_has_the_switch_and_the_restart_button_works(self):
+    def test_the_preference_and_its_properties_no_longer_exist(self):
+        data = tempfile.mkdtemp(prefix="equ-q-")
+        self.addCleanup(shutil.rmtree, data, True)
+        with open(os.path.join(data, "settings.json"), "w") as f:
+            json.dump({"_schema": 1, "imported_from_2x": True, "renderer": "software"}, f)
+        p = self.start(data_dir=data)
+        sb = p["settings_bridge"]
+        self.assertFalse(hasattr(sb, "softwareRendering"))
+        self.assertFalse(hasattr(sb, "rendererNeedsRestart"))
+        self.assertNotIn("renderer", p["settings"].data)                         # an old value is dropped, not honoured
+
+    def test_the_settings_page_has_no_switch_and_the_restart_button_still_works(self):
         p = self.start()
         QMetaObject.invokeMethod(self.win, "openSettings")
         pump(150)
-        self.assertIsNotNone(self.win.findChild(QObject, "softwareRenderingToggle"))
+        self.assertIsNone(self.win.findChild(QObject, "softwareRenderingToggle"))
         calls = []
         p["app"].restart_hook = lambda: calls.append(1)
         p["app"].restartNow()

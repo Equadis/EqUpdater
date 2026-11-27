@@ -56,6 +56,10 @@ REALMS = (("nzoth", "N'Zoth"), ("yshaarj", "Y'Shaarj"), ("cthun", "C'Thun"))
 ONLINE, OFFLINE, DEGRADED, UNKNOWN = "online", "offline", "degraded", "unknown"
 
 
+#: OctoBot's own server status page (what "Open source" in the footer chip opens).
+STATUS_PAGE_URL = "https://equadis.github.io/OctoBot/status/"
+
+
 def parse_time(value) -> float | None:
     """Epoch seconds from an ISO-8601 string or a number (ms or s), else None."""
     if isinstance(value, (int, float)) and not isinstance(value, bool):

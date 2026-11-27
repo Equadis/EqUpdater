@@ -921,16 +921,10 @@ STRINGS = {
         'Wähle zuerst den Spielordner.',
     'Windows Defender is not used on this system.':
         'Windows Defender wird auf diesem System nicht verwendet.',
-    'Could not refresh just now; showing the last known values.':
-        'Aktualisierung gerade nicht möglich; die zuletzt bekannten Werte werden angezeigt.',
-    'Data from OctoBot. Server status is not checked by EqUpdater.':
-        'Daten von OctoBot. EqUpdater prüft den Serverstatus nicht selbst.',
     'Login response':
         'Login-Antwort',
     'No server information yet':
         'Noch keine Serverinformationen',
-    'Player count: {source}':
-        'Spielerzahl: {source}',
     'Players online':
         'Spieler online',
     'Server offline':
@@ -939,14 +933,8 @@ STRINGS = {
         'Server online',
     'Server partly available':
         'Server teilweise verfügbar',
-    'Server status checked {when}; it may have changed.':
-        'Serverstatus geprüft {when}; er kann sich geändert haben.',
     'Server status unknown':
         'Serverstatus unbekannt',
-    'This is out of date; the source has not been updated.':
-        'Das ist veraltet; die Quelle wurde nicht aktualisiert.',
-    'Updated {when}':
-        'Aktualisiert {when}',
     'Waiting for the first update.':
         'Warte auf die erste Aktualisierung.',
     'Website':
@@ -1014,7 +1002,15 @@ STRINGS = {
     '{n} online':
         '{n} online',
     "Do Not Disturb": "Bitte nicht stören",
-    "In Game": "Im Spiel",
     "Invisible": "Unsichtbar",
     "Unavailable": "Nicht verfügbar",
+    "A username is 3 to 20 letters, numbers, dashes or underscores.": "Ein Benutzername hat 3 bis 20 Buchstaben, Ziffern, Bindestriche oder Unterstriche.",
+    "In-game": "Im Spiel",
+    "Launcher open": "Launcher geöffnet",
+    "No user has that name.": "Kein Benutzer hat diesen Namen.",
+    "Sign in to add friends.": "Melde dich an, um Freunde hinzuzufügen.",
+    "Sign in to change your friends.": "Melde dich an, um deine Freunde zu ändern.",
+    "That username is in use right now.": "Dieser Benutzername wird gerade verwendet.",
+    "The test service answered unexpectedly ({status}).": "Der Testdienst hat unerwartet geantwortet ({status}).",
+    "The test service could not be reached.": "Der Testdienst ist nicht erreichbar.",
 }

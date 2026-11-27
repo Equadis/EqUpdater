@@ -186,7 +186,7 @@ def build_turtle():
             "selected": f"buttons/{prefix}-hover.png"}
     gold_text = {"normal": GOLD, "hover": "#fff3c4", "pressed": "#d4ae3c", "disabled": "#85806a", "selected": "#fff3c4"}
     fonts = off.fonts("Friz Quadrata")
-    fonts["body"]["size"], fonts["dim"]["size"], fonts["heading"]["size"] = 12, 10, 14      # compact
+    fonts["body"]["size"], fonts["dim"]["size"], fonts["heading"]["size"] = 12, 11, 14      # compact
     fonts["button"]["size"], fonts["nav"]["size"], fonts["title"]["size"] = 12, 13, 22
     theme = {
         "palette": palette, "fonts": fonts,

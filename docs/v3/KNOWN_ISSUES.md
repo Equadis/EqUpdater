@@ -53,3 +53,9 @@ See `BETA.md`. Please include the support ZIP (Settings > Troubleshooting) and y
 * **Object Sans** was supplied without a licence file; it is in the local beta build only. Confirm its redistribution terms before any public installer (`tools/beta_check.py` warns).
 * At the smallest window (860 px) the friends list is 210 px wide and long status lines are cut with an ellipsis.
 * Friends are added by forum user name only and are not confirmed with the other person: there is no service to ask.
+
+## Temporary test login and friends (2026-11-27)
+* Sign-in by username has **no password**: anyone who can reach the test backend can claim any free name. It is for testing only and exposes no real account data.
+* There is **no hosted test backend yet** (`devsocial.DEFAULT_URL` is empty). Out of the box the launcher shows "Sign-in is not available yet"; set `EQU3_SOCIAL_URL` (or host the server and put its address in `DEFAULT_URL`) to use it. Across machines it needs an https address (plain http works on a private network).
+* Realm detection reads the realm the game itself writes to `WTF/Config.wtf` during the run; it has **not been verified with a real OctoWoW client logging into each realm**. When the client has not said, a player shows as `In-game` without a realm.
+* The Low-memory rendering setting is gone (it never affected the game).

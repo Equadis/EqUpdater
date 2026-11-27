@@ -30,7 +30,7 @@ FONT_KEYS = ("body", "dim", "heading", "title", "button", "nav")
 
 
 def fonts(family, scale=1.0):
-    base = {"body": 13, "dim": 11, "heading": 15, "title": 24, "button": 13, "nav": 13}
+    base = {"body": 13, "dim": 12, "heading": 15, "title": 24, "button": 13, "nav": 13}
     bold = {"heading", "title", "button", "nav"}
     out = {}
     for k in FONT_KEYS:
@@ -45,7 +45,8 @@ ICON_COMPONENTS = {"icon.logo": "logo", "icon.refresh": "refresh", "icon.setting
                    "icon.arrow-down": "arrow-down", "icon.discord": "discord",
                    "icon.support": "support", "icon.download": "download",
                    "icon.remove": "remove", "icon.release": "release", "icon.link": "link",
-                   "icon.check": "check", "icon.update": "swap"}
+                   "icon.check": "check", "icon.update": "swap",
+                   "icon.folder": "folder", "icon.close": "close"}
 
 
 def icon_components(prefix="icons/"):

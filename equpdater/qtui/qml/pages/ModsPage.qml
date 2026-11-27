@@ -128,21 +128,24 @@ SkinPanel {
                                 checked: model.ignore
                                 onToggled: mods.setIgnore(model.id, !model.ignore)
                             }
-                            SkinIconButton { visible: !model.here; kind: "icon.download"
-                                             tip: app.t("Download from repository")
-                                             onClicked: mods.install(model.id) }
-                            SkinIconButton { visible: model.here; kind: "icon.remove"
-                                             tip: app.t("Uninstall")
-                                             onClicked: mods.uninstall(model.id) }
-                            SkinIconButton { visible: model.here && model.managed && !model.custom
-                                             kind: "icon.release"
-                                             tip: app.t("Stop managing. Your files are kept.")
-                                             onClicked: mods.release(model.id) }
-                            SkinIconButton { visible: model.custom; kind: "icon.remove"
-                                             tip: app.t("Remove from the list")
-                                             onClicked: customSrc.remove(model.id) }
-                            SkinIconButton { kind: "icon.link"; tip: app.t("Open repository in browser")
-                                             onClicked: mods.openUrl(model.repoUrl) }
+                            Item {                                      // the Download slot keeps its width
+                                implicitWidth: 28; implicitHeight: 28
+                                SkinIconButton { visible: !model.here; anchors.centerIn: parent; kind: "icon.download"
+                                                 tip: app.t("Download from repository")
+                                                 onClicked: mods.install(model.id) }
+                            }
+                            SkinRowActions {
+                                folderEnabled: model.here
+                                linkEnabled: model.repoUrl !== ""
+                                uninstallEnabled: model.here
+                                releaseEnabled: model.custom || (model.here && model.managed)
+                                releaseTip: model.custom ? app.t("Remove from the list")
+                                                         : app.t("Stop managing. Your files are kept.")
+                                onFolder: mods.openFolder(model.id)
+                                onLink: mods.openUrl(model.repoUrl)
+                                onUninstall: mods.uninstall(model.id)
+                                onRelease: model.custom ? customSrc.remove(model.id) : mods.release(model.id)
+                            }
                         }
                     }
                     SkinText {

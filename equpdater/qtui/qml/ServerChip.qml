@@ -3,9 +3,9 @@ import QtQuick.Controls.Basic as C
 import EqUi
 
 // The footer chip: a status dot and the number of players online. Click for the
-// per-realm numbers and how old they are. The dot is coloured only by OctoBot's
-// own recent probe: old or missing data is dim, never red (nothing here claims
-// the server is down because EqUpdater could not fetch an update).
+// per-realm status. Green: every realm confirmed online. Red: every realm confirmed
+// offline. Yellow: anything else, including old, missing or unknown data (EqUpdater
+// never reports an outage because it could not fetch an update).
 Item {
     id: root
     objectName: "serverChip"
@@ -22,10 +22,7 @@ Item {
 
     function dotColour(state) {
         var c = Style.theme.components
-        return state === "online" ? Style.pick(c["text.ok"].textColors, "normal", "#6c6")
-             : state === "offline" ? Style.pick(c["text.error"].textColors, "normal", "#f66")
-             : state === "degraded" ? Style.pick(c["text.link"].textColors, "normal", "#fc6")
-             : Style.pick(c["text.dim"].textColors, "normal", "#888")
+        return state === "online" ? "#3ddc84" : state === "offline" ? "#ef5350" : "#f2c744"
     }
 
     Row {
@@ -82,9 +79,15 @@ Item {
                                    elide: Text.ElideRight; horizontalAlignment: Text.AlignRight; text: modelData.value }
                     }
                 }
-                Rectangle { width: parent.width; height: 1
-                            color: Style.pick(Style.theme.components["divider"].colors, "normal", "#444") }
-                SkinText { width: parent.width; kind: "text.dim"; wrapMode: Text.Wrap; text: server.footnote }
+                SkinText {
+                    objectName: "serverSourceLink"
+                    kind: "text.link"
+                    text: app.t("Open source") + " ↗"
+                    HoverHandler { cursorShape: Qt.PointingHandCursor }
+                    TapHandler { onTapped: server.openSource() }
+                    Accessible.role: Accessible.Link
+                    Accessible.name: text
+                }
             }
         }
     }

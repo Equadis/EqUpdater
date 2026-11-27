@@ -142,6 +142,7 @@ class FixturePresenceProvider:
     name = "fixture"
     available = True
     requires_account = False
+    syncs_friends = False
     capabilities = frozenset({"game_presence", "launcher_presence", "publish"})
     max_batch = 50
     unavailable_reason = ""

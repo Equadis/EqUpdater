@@ -28,6 +28,7 @@ login, and nothing here is needed to update, configure or play.
 from __future__ import annotations
 
 import base64
+import os
 import hashlib
 import json
 import secrets
@@ -307,6 +308,10 @@ class AccountService:
 
     def __init__(self, provider: AuthProvider, store: credstore.CredentialStore, settings, now=time.time):
         self.provider, self.store, self.settings, self.now = provider, store, settings, now
+        # a development run can name its profile (EQU3_PROFILE), so several launchers on one computer
+        # keep separate sessions in the one credential manager; a real install never sets it
+        profile = os.environ.get("EQU3_PROFILE", "")
+        self.key = ACCOUNT + ("-" + profile if profile else "")
         self.on_change = lambda: None
         self.state = SIGNED_OUT
         self.message = ""
@@ -339,19 +344,19 @@ class AccountService:
     # The credential store is optional machinery: if it fails, the session simply is not remembered.
     def _store_get(self):
         try:
-            return self.store.get(SERVICE, ACCOUNT)
+            return self.store.get(SERVICE, self.key)
         except Exception:                                              # noqa: BLE001
             return None
 
     def _store_set(self, text: str) -> bool:
         try:
-            return bool(self.store.set(SERVICE, ACCOUNT, text))
+            return bool(self.store.set(SERVICE, self.key, text))
         except Exception:                                              # noqa: BLE001
             return False
 
     def _store_delete(self) -> None:
         try:
-            self.store.delete(SERVICE, ACCOUNT)
+            self.store.delete(SERVICE, self.key)
         except Exception:                                              # noqa: BLE001
             pass
 

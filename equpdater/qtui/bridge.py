@@ -376,12 +376,19 @@ class TweaksBridge(QObject):
         return self.service.fov_hint()
 
     # -- Language (shown in Settings; the stored value is still the game-language tweak) -------------
+    #: how each game language is shown in Settings: (name in its own language, flag file in qml/flags)
+    LANGUAGES = {"enUS": ("English", "gb"), "deDE": ("Deutsch", "de"), "ruRU": ("Русский", "ru"),
+                 "zhCN": ("简体中文", "cn"), "esES": ("Español", "es"),
+                 "ptBR": ("Português (Brasil)", "br")}
+
     @Property("QVariantList", notify=changed)
     def languageChoices(self):
         from ..core.tweaks import DEFAULT_LOCALE, LOCALES
         from ..config import load_config
         current = (load_config().get("tweaks") or {}).get("locale", DEFAULT_LOCALE)
-        return [{"code": c, "label": label, "current": c == current} for c, (_i, label) in LOCALES.items()]
+        return [{"code": c, "id": c, "label": self.LANGUAGES.get(c, (label, ""))[0],
+                 "flag": self.LANGUAGES.get(c, (label, ""))[1], "current": c == current}
+                for c, (_i, label) in LOCALES.items()]
 
     @Slot(str)
     def setLanguage(self, code):
@@ -521,7 +528,6 @@ class SettingsBridge(QObject):
                  app_bridge):
         super().__init__()
         self.s, self.manager, self.skin_bridge, self.app = settings, manager, skin_bridge, app_bridge
-        self._started_software = (os.environ.get("EQU3_RENDERER") or settings.get("renderer")) == "software"
 
     @Property("QVariantList", notify=skinsChanged)
     def skins(self):
@@ -550,19 +556,6 @@ class SettingsBridge(QObject):
         self.s.set("animated_background", bool(v))
         self.optionsChanged.emit()
         self.app.animationChanged.emit()
-
-    @Property(bool, notify=optionsChanged)
-    def softwareRendering(self):
-        return self.s.get("renderer") == "software"
-
-    @softwareRendering.setter
-    def softwareRendering(self, v):
-        self.s.set("renderer", "software" if v else "auto")
-        self.optionsChanged.emit()
-
-    @Property(bool, notify=optionsChanged)
-    def rendererNeedsRestart(self):
-        return (self.s.get("renderer") == "software") != self._started_software
 
     @Property(bool, notify=optionsChanged)
     def pauseWhenUnfocused(self):
@@ -709,12 +702,25 @@ class ServerBridge(QObject):
 
     @Property(str, notify=changed)
     def dot(self):
-        """online | offline | degraded | unknown (dim). Only OctoBot's own,
-        recent sample colours it; old or missing data is dim, never red."""
+        """online (green) | offline (red) | degraded (yellow).
+
+        Green: every realm is confirmed online. Red: every realm is confirmed offline. Yellow:
+        anything else: some realms down, a degraded login service, no data, an unknown state, or
+        data too old to trust. Old or missing data is never red: EqUpdater not having heard from
+        OctoBot is not an outage."""
         v = self._view()
         if not v["has_data"] or v["status_stale"]:
-            return "unknown"
-        return v["state"]
+            return "degraded"
+        states = [r["state"] for r in v["realms"]]
+        if states and all(states):
+            if all(x == "online" for x in states):
+                return "online"
+            if all(x == "offline" for x in states):
+                return "offline"
+            return "degraded"
+        if any(states):
+            return "degraded"                            # some realms confirmed, others not: not "all"
+        return v["state"] if v["state"] in ("online", "offline") else "degraded"
 
     @Property(str, notify=changed)
     def summary(self):
@@ -730,47 +736,38 @@ class ServerBridge(QObject):
 
     @Property("QVariantList", notify=changed)
     def lines(self):
-        """Rows of the popover: [{label, value, tone}]."""
+        """Rows of the popover: [{label, value, tone}]. A stale value says so beside itself."""
         v = self._view()
         if not v["has_data"]:
             return [{"label": tr("Waiting for the first update."), "value": "", "tone": "dim"}]
+        pop_old = f" · {age_text(v['age'])}" if v["stale"] and v["age"] is not None else ""
+        st_old = f" · {age_text(v['status_age'])}" if v["status_stale"] and v.get("status_age") is not None else ""
         rows = []
         if v["total"] is not None:
-            rows.append({"label": tr("Players online"), "value": f"{v['total']:,}", "tone": "body"})
+            rows.append({"label": tr("Players online"), "value": f"{v['total']:,}{pop_old}",
+                         "tone": "dim" if pop_old else "body"})
         for r in v["realms"]:
             if r["online"] is not None:
-                value = f"{r['online']:,}"
+                value = f"{r['online']:,}" + (pop_old if v["stale"] else "")
             elif r["state"]:
-                value = tr("online") if r["state"] == "online" else tr("offline")
+                value = (tr("online") if r["state"] == "online" else tr("offline")) + st_old
             else:
                 value = tr("no data")
             rows.append({"label": r["name"], "value": value,
-                         "tone": "dim" if r["online"] is None and not r["state"] else "body"})
+                         "tone": "dim" if (r["online"] is None and not r["state"]) or (st_old and not r["online"]) else "body"})
         if v["website"]:
             rows.append({"label": tr("Website"),
-                         "value": tr("available") if v["website"] == "available" else tr("unavailable"),
-                         "tone": "body"})
+                         "value": (tr("available") if v["website"] == "available" else tr("unavailable")) + st_old,
+                         "tone": "dim" if st_old else "body"})
         if v["latency_ms"] is not None:
-            rows.append({"label": tr("Login response"), "value": f"{v['latency_ms']} ms", "tone": "dim"})
+            rows.append({"label": tr("Login response"), "value": f"{v['latency_ms']} ms" + st_old, "tone": "dim"})
         return rows
 
-    @Property(str, notify=changed)
-    def footnote(self):
-        v = self._view()
-        notes = []
-        if v["has_data"] and v.get("total_source"):
-            notes.append(tr("Player count: {source}", source=v["total_source"]))
-        if v["has_data"] and v["age"] is not None:
-            notes.append(tr("Updated {when}", when=age_text(v["age"])))
-        if v["has_data"] and v["stale"]:
-            notes.append(tr("This is out of date; the source has not been updated."))
-        elif v["has_data"] and v["status_stale"] and v.get("status_age") is not None:
-            notes.append(tr("Server status checked {when}; it may have changed.",
-                            when=age_text(v["status_age"])))
-        if v["unavailable"]:
-            notes.append(tr("Could not refresh just now; showing the last known values."))
-        notes.append(tr("Data from OctoBot. Server status is not checked by EqUpdater."))
-        return "\n".join(notes)
+    @Slot()
+    def openSource(self):
+        from ..core.server import STATUS_PAGE_URL
+        from .social_bridge import _open_url
+        _open_url(STATUS_PAGE_URL)
 
     @Slot()
     def refresh(self):
@@ -953,6 +950,20 @@ class AppBridge(QObject):
     def openUrl(self, url):
         if safe_url(url):
             QDesktopServices.openUrl(QUrl(url))
+
+    @Slot(str, result=bool)
+    def openFolder(self, path):
+        """Open a folder in the file manager. Only an existing folder inside the game folder."""
+        game = os.path.realpath(self.s.get("game_dir") or "")
+        real = os.path.realpath(path or "")
+        if not game or not os.path.isdir(real) or os.path.commonpath([game, real]) != game:
+            return False
+        try:
+            from .. import platforms
+            platforms.open_folder(real)
+        except OSError:
+            return False
+        return True
 
     def setStatus(self, text, error=False):
         self._status, self._status_err = text, bool(error)
