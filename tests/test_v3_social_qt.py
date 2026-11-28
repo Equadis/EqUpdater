@@ -428,132 +428,186 @@ class TestNoSocialSettings(Social):
 
 
 class TestTemporaryLoginAndSharedFriends(Social):
-    """The interface against a real test backend on localhost (equpdater/core/devsocial.py)."""
+    """The interface against a real test backend (the local Python twin): sign-in by username, the recovery code,
+    live friends and presence by push."""
 
     def setUp(self):
-        from tests.social_harness import Server
-        self.server = Server(time.time)
+        from tests.social_harness import PythonBackend
+        self.server = PythonBackend(ttl=3.0, register_per_ip_hour=1000, friend_adds_hour=1000)
         self.addCleanup(self.server.stop)
         os.environ["EQU3_SOCIAL_URL"] = self.server.url
         self.addCleanup(os.environ.pop, "EQU3_SOCIAL_URL", None)
 
-    def other(self, name):
+    def other(self, name, **kw):
         from tests.social_harness import Client
-        c = Client(self.server, time.time)
-        self.addCleanup(shutil.rmtree, c.tmp, True)
+        c = Client(self.server, **kw)
+        self.addCleanup(c.stop)
         self.assertTrue(c.login(name))
         return c
 
-    def sign_in(self, p, name):
-        field, confirm = find(self.win, "loginNameField"), find(self.win, "loginConfirm")
-        field.setProperty("text", name)
-        QMetaObject.invokeMethod(field, "edited", Qt.DirectConnection, Q_ARG(str, name))
-        pump(80)
-        QMetaObject.invokeMethod(confirm, "clicked")
-        pump(until=lambda: p["account"].signedIn or p["account"].message != "", limit=6000)
-        pump(150)
+    def type_into(self, name, text):
+        field = find(self.win, name)
+        field.setProperty("text", text)
+        QMetaObject.invokeMethod(field, "edited", Qt.DirectConnection, Q_ARG(str, text))
+        pump(60)
 
-    def test_the_sign_in_button_asks_for_a_username_and_nothing_else(self):
+    def sign_in(self, p, name, key=None, recovery=None):
+        self.type_into("loginNameField", name)
+        if find(self.win, "loginKeyField").property("visible"):
+            self.type_into("loginKeyField", self.server.key if key is None else key)
+        if recovery:
+            find(self.win, "loginOverlay").setProperty("useRecovery", True)
+            pump(80)
+            self.type_into("loginRecoveryField", recovery)
+        QMetaObject.invokeMethod(find(self.win, "loginConfirm"), "clicked")
+        pump(until=lambda: p["account"].signedIn or p["account"].message != "", limit=8000)
+        pump(250)
+
+    def open_login(self, p):
+        p["account"].openLogin()
+        pump(400)
+
+    def test_the_sign_in_button_asks_for_a_username_a_tester_key_once_and_nothing_else(self):
         p = self.start()
         pump(100)
         self.assertTrue(p["account"].usernameLogin)
         self.assertFalse(find(self.win, "createAccountLink").property("visible"))      # no accounts to create
         QMetaObject.invokeMethod(find(self.win, "signInButton"), "clicked")
-        pump(200)
+        pump(500)
         self.assertTrue(find(self.win, "loginOverlay").property("visible"))
+        self.assertTrue(p["account"].requiresKey)
+        self.assertTrue(find(self.win, "loginKeyField").property("visible"))           # the hosted/test backend asks for a key
         for banned in ("password", "email", "Password", "Email"):
             self.assertFalse([i for i in walk(find(self.win, "loginOverlay")) if i.property("placeholder") and banned in str(i.property("placeholder"))])
         self.sign_in(p, "Thrallfan")
         self.assertTrue(p["account"].signedIn)
         self.assertEqual(p["account"].username, "Thrallfan")
-        self.assertFalse(find(self.win, "loginOverlay").property("visible"))
         self.assertEqual(self.qml_errors(), [])
 
-    def test_a_name_that_is_taken_is_refused_in_the_dialog_whatever_the_case(self):
-        self.other("Thrallfan")
+    def test_a_new_account_shows_its_recovery_code_once_and_the_menu_can_show_it_again(self):
         p = self.start()
-        p["account"].openLogin()
+        self.open_login(p)
+        self.sign_in(p, "Thrallfan")
+        code = p["account"].recoveryCode
+        self.assertGreaterEqual(len(code), 20)                                          # a long random code
+        self.assertTrue(find(self.win, "loginOverlay").property("visible"))             # the dialog now shows the code
+        self.assertEqual(find(self.win, "recoveryCodeText").property("text"), code)
+        QMetaObject.invokeMethod(find(self.win, "recoveryDone"), "clicked")
         pump(200)
+        self.assertFalse(find(self.win, "loginOverlay").property("visible"))
+        self.assertEqual(p["account"].recoveryCode, "")                                  # gone from the screen
+        p["account"].showRecovery()                                                      # the menu entry
+        pump(200)
+        self.assertEqual(p["account"].recoveryCode, code)                                # from the credential store
+
+    def test_a_taken_name_is_refused_and_the_recovery_code_gets_it_back(self):
+        owner = self.other("Thrallfan")
+        code = owner.vault.get("recovery", "Thrallfan")
+        owner.logout()
+        p = self.start()
+        self.open_login(p)
         self.sign_in(p, "THRALLFAN")
         self.assertFalse(p["account"].signedIn)
-        self.assertTrue(find(self.win, "loginOverlay").property("visible"))               # stays open for another try
-        self.assertIn("in use", find(self.win, "loginError").property("text"))
-        self.assertTrue(find(self.win, "loginError").property("visible"))
+        self.assertTrue(find(self.win, "loginOverlay").property("visible"))
+        self.assertIn("already registered", find(self.win, "loginError").property("text"))
+        self.sign_in(p, "THRALLFAN", recovery="wrong-wrong-wrong-wrong")
+        self.assertFalse(p["account"].signedIn)
+        self.sign_in(p, "Thrallfan", recovery=code)
+        self.assertTrue(p["account"].signedIn)
+        self.assertEqual(p["account"].username, "Thrallfan")
+        self.assertEqual(p["account"].recoveryCode, "")                                   # nothing new to show
 
-    def test_switching_accounts_frees_the_old_name(self):
+    def test_switching_accounts_and_coming_back_without_typing_anything(self):
         p = self.start()
-        p["account"].openLogin()
-        pump(200)
+        self.open_login(p)
         self.sign_in(p, "FirstName")
-        self.assertEqual(p["account"].username, "FirstName")
-        p["account"].openLogin()
-        pump(200)
+        QMetaObject.invokeMethod(find(self.win, "recoveryDone"), "clicked")
+        pump(150)
+        self.open_login(p)
         self.sign_in(p, "SecondName")
-        pump(until=lambda: p["account"].username == "SecondName", limit=5000)
+        pump(until=lambda: p["account"].username == "SecondName", limit=6000)
         self.assertEqual(p["account"].username, "SecondName")
-        taker = self.other("firstname")                                                    # the old name is free again
-        self.assertEqual(taker.account.username, "FirstName")
+        QMetaObject.invokeMethod(find(self.win, "recoveryDone"), "clicked")
+        pump(150)
+        self.open_login(p)
+        self.type_into("loginNameField", "firstname")
+        QMetaObject.invokeMethod(find(self.win, "loginConfirm"), "clicked")
+        pump(until=lambda: p["account"].username == "FirstName", limit=8000)
+        self.assertEqual(p["account"].username, "FirstName")                              # the saved recovery code was used
 
-    def test_friends_come_from_the_shared_backend_and_show_what_they_are_doing(self):
-        import json as _json
+    def test_friends_arrive_by_push_and_show_what_they_are_doing(self):
         from tests.social_harness import SimActivity
         sim = SimActivity(tempfile.mkdtemp(prefix="equ-sim-"))
         self.addCleanup(shutil.rmtree, os.path.dirname(sim.path), True)
-        from tests.social_harness import Client
-        friend = Client(self.server, time.time, activity=sim)
-        self.addCleanup(shutil.rmtree, friend.tmp, True)
-        friend.login("Jainaprb")
+        friend = self.other("Jainaprb", activity=sim)
         p = self.start()
         p["social"].start()
-        p["account"].openLogin()
-        pump(200)
+        self.open_login(p)
         self.sign_in(p, "Thrallfan")
-        p["social"].addFriendAsync("jainaprb")                                            # any case finds the user
         added = []
         p["social"].addFinished.connect(added.append)
-        pump(until=lambda: p["social"].friendCount == 1 or added, limit=6000)
-        p["social"].kick()
+        p["social"].addFriendAsync("jainaprb")                                            # any case finds the user
+        pump(until=lambda: p["social"].friendCount == 1 and added, limit=8000)        # the push may beat the HTTP answer
+        self.assertEqual(added, [""])
+        pump(until=lambda: any(r.get("statusLine") == "Launcher open" for r in self.rows(p) if r["kind"] == "friend"), limit=6000)
+        before = len(friend.http.log)
         sim.set("in_game", "yshaarj")
-        friend.presence.poll()
-        pump(until=lambda: any(r.get("statusLine", "").startswith("In-game") for r in self.rows(p) if r["kind"] == "friend"), limit=9000)
+        friend.svc.refresh_activity()
+        pump(until=lambda: any(r.get("statusLine", "").startswith("In-game") for r in self.rows(p) if r["kind"] == "friend"), limit=4000)
         row = next(r for r in self.rows(p) if r["kind"] == "friend")
         self.assertEqual((row["name"], row["statusLine"]), ("Jainaprb", "In-game · Y'Shaarj"))
         for key in ("charClass", "level", "guild", "zone", "detail"):
             self.assertNotIn(key, row)
         self.assertEqual(p["social"].onlineText, "1 online")
+        self.assertEqual(len(friend.http.log), before)                                    # pushed: the friend made no request for it
+        # and the other direction: this player changes status, the friend sees it
+        friend.svc.add_friend("Thrallfan")
+        pump(until=lambda: friend.names() == ["Thrallfan"], limit=5000)
+        p["account"].setStatus("dnd")
+        self.assertTrue(wait_for_ui(lambda: friend.dot("Thrallfan") == "#ef5350", p))
 
     def test_adding_an_unknown_user_reports_it_in_the_add_dialog(self):
         p = self.start()
-        p["account"].openLogin()
-        pump(200)
+        self.open_login(p)
         self.sign_in(p, "Thrallfan")
+        QMetaObject.invokeMethod(find(self.win, "recoveryDone"), "clicked")
+        pump(150)
         p["social"].openAdd()
-        pump(200)
-        field, confirm = find(self.win, "friendNameField"), find(self.win, "addFriendConfirm")
-        field.setProperty("text", "Nobodyhere")
-        QMetaObject.invokeMethod(confirm, "clicked")
+        pump(250)
+        self.type_into("friendNameField", "Nobodyhere")
+        QMetaObject.invokeMethod(find(self.win, "addFriendConfirm"), "clicked")
         pump(until=lambda: find(self.win, "addFriendError").property("visible"), limit=6000)
         self.assertIn("No user", find(self.win, "addFriendError").property("text"))
         self.assertTrue(find(self.win, "addFriendOverlay").property("visible"))
 
-    def test_when_the_backend_goes_away_the_launcher_carries_on(self):
+    def test_when_the_backend_goes_away_the_launcher_carries_on_and_reconnects(self):
         friend = self.other("Jainaprb")
         p = self.start()
-        p["account"].openLogin()
-        pump(200)
+        p["social"].start()
+        self.open_login(p)
         self.sign_in(p, "Thrallfan")
         self.assertEqual(p["social_service"].add_friend("Jainaprb"), "")
-        p["presence_service"].poll()
-        self.server.stop()
-        p["presence_service"].last_try = 0
-        p["presence_service"].poll()
-        self.assertGreaterEqual(p["presence_service"].failures, 1)
+        pump(until=lambda: p["social"].friendCount == 1, limit=6000)
+        self.server.outage()
+        pump(until=lambda: not p["presence_service"].provider.link.connected, limit=6000)
         self.assertEqual(p["social"].friendCount, 1)                                       # the list stays on screen
         self.assertTrue(p["account"].signedIn)
         p["launch"].refresh()
         pump(150)
         self.assertTrue(p["launch"].playText)                                              # the launcher itself is unaffected
+        self.server.start()
+        pump(until=lambda: p["presence_service"].provider.link.connected, limit=20000)
+        self.assertTrue(p["presence_service"].provider.link.connected)
         self.assertEqual(self.qml_errors(), [])
+
+
+def wait_for_ui(cond, p, timeout=6.0):
+    end = time.time() + timeout
+    while time.time() < end:
+        pump(50)
+        if cond():
+            return True
+    return cond()
 
 
 if __name__ == "__main__":

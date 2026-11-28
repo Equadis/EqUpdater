@@ -28,6 +28,7 @@ class Realm:
     name: str
     kind: str = ""
     authoritative: bool = True
+    world: str = ""                 # "host:port" of this realm's world server, if OctoBot/OctoWoW publish it
 
 
 def parse(obj) -> list:
@@ -46,8 +47,11 @@ def parse(obj) -> list:
         m = re.match(r"^(.*?)\s*\(([^)]*)\)\s*$", raw)
         name, kind = (m.group(1), m.group(2)) if m else (raw, "")
         name = re.sub(r"[^\w' \-]", "'", name).strip()[:32] or rid
+        world = str(e.get("world") or "").strip()
+        if not re.fullmatch(r"[A-Za-z0-9.\-]{3,64}:\d{2,5}", world):
+            world = ""
         if rid not in {r.id for r in out}:
-            out.append(Realm(rid, name, kind.strip()[:16]))
+            out.append(Realm(rid, name, kind.strip()[:16], True, world))
     return out
 
 
@@ -94,7 +98,8 @@ class RealmList:
             return False
         self._realms = realms
         self.fetched_at = self.now()
-        self.store.set("realms", [{"id": r.id, "name": r.name + (f" ({r.kind})" if r.kind else "")} for r in realms])
+        self.store.set("realms", [{"id": r.id, "name": r.name + (f" ({r.kind})" if r.kind else ""), **({"world": r.world} if r.world else {})}
+                                   for r in realms])
         self.store.set("realms_at", self.fetched_at)
         self.on_change()
         return True

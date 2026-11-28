@@ -63,8 +63,33 @@ def run(cmd: list) -> None:
         raise SystemExit("build failed")
 
 
+#: Fonts whose licence does not (yet) allow redistribution. They are packaged only with proof of a licence
+#: (fonts/<Name>-LICENSE.txt beside them) or, for a LOCAL build only, with --with-unlicensed-fonts.
+LICENSE_GATED = ("ObjectSans",)
+
+
+def stage_fonts(dest: str, with_unlicensed: bool = False) -> list:
+    """Copy fonts/ to ``dest`` for packaging, leaving out gated fonts that have no licence file. Returns what was left out."""
+    src = os.path.join(HERE, "fonts")
+    if os.path.isdir(dest):
+        shutil.rmtree(dest)
+    os.makedirs(dest)
+    left_out = []
+    for name in sorted(os.listdir(src)):
+        gate = next((g for g in LICENSE_GATED if name.startswith(g)), None)
+        licensed = gate and os.path.isfile(os.path.join(src, gate + "-LICENSE.txt"))
+        if gate and not licensed and not with_unlicensed:
+            left_out.append(name)
+            continue
+        shutil.copy2(os.path.join(src, name), os.path.join(dest, name))
+    return left_out
+
+
 def pyinstaller_cmd() -> list:
     sep = os.pathsep
+    left_out = stage_fonts(os.path.join(WORK, "fonts_pkg"), "--with-unlicensed-fonts" in sys.argv)
+    if left_out:
+        print("  fonts left out (no licence file, see fonts/README.txt):", ", ".join(left_out))
     cmd = [sys.executable, "-m", "PyInstaller", "--onedir", "--windowed", "--noconfirm",
            "--name", NAME, "--distpath", DIST, "--workpath", WORK, "--specpath", WORK,
            "--hidden-import", "equpdater.qtui.main",
@@ -72,7 +97,7 @@ def pyinstaller_cmd() -> list:
            # QML files are read from disk by Qt: they sit where QML_DIR finds them.
            "--add-data", os.path.join(HERE, "equpdater", "qtui", "qml") + sep + "equpdater/qtui/qml",
            "--add-data", os.path.join(HERE, "skins") + sep + "skins",
-           "--add-data", os.path.join(HERE, "fonts") + sep + "fonts",
+           "--add-data", os.path.join(WORK, "fonts_pkg") + sep + "fonts",
            "--add-data", ICON_PNG + sep + ".",
            "--add-data", ICON + sep + "."]
     if WINDOWS and os.path.exists(ICON):

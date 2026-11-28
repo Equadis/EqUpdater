@@ -540,7 +540,11 @@ class GeneralBridge(QObject):
 
     @Property("QVariantList", constant=True)
     def fontChoices(self):
-        return self.service.font_choices()
+        """The fonts that can be chosen: a font that is not installed (Object Sans in a build without its licence,
+        until the player adds the files) is not offered."""
+        from PySide6.QtGui import QFontDatabase
+        have = set(QFontDatabase.families())
+        return [c for c in self.service.font_choices() if not c["id"] or c["family"] in have or c["id"] != "objectsans"]
 
     @Property(str, notify=logChanged)
     def sessionLog(self):

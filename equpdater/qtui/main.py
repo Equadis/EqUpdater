@@ -63,13 +63,16 @@ class OfflineFetcher:
 def _register_bundled_fonts():
     """Friz Quadrata and OpenDyslexic ship in fonts/ (see fonts/README.txt)."""
     from PySide6.QtGui import QFontDatabase
-    d = os.path.join(branding.resource_dir(), "fonts")
-    try:
-        for n in os.listdir(d):
-            if n.lower().endswith((".ttf", ".otf")):
-                QFontDatabase.addApplicationFont(os.path.join(d, n))
-    except OSError:
-        pass
+    # the fonts that ship with EqUpdater, then any the player put in <app data>/v3/fonts (a font they hold the
+    # licence for: Object Sans is not bundled in a build that has no licence for it, see fonts/README.txt)
+    for d in (os.path.join(branding.resource_dir(), "fonts"),
+              os.path.join(os.environ.get("EQU3_DATA_DIR") or core_settings.data_dir(), "fonts")):
+        try:
+            for n in os.listdir(d):
+                if n.lower().endswith((".ttf", ".otf")):
+                    QFontDatabase.addApplicationFont(os.path.join(d, n))
+        except OSError:
+            pass
 
 
 def build(argv=None):
@@ -166,26 +169,35 @@ def build(argv=None):
     friend_book = FriendBook(social_store, realms=realm_list.ids)
     auth_provider = _account.make_provider(auth_cfg)
     presence_provider = None
+    cred_store = credstore.open_store()
     # The temporary username login and shared test backend: only when a test backend address is configured
     # and OctoWoW's real sign-in is not (core/devsocial.py is the one module that knows about it).
     from ..core import devsocial
     test_url = devsocial.backend_url()
     if test_url and not _account.PROVIDER_CONFIG and not auth_cfg:
         backend = devsocial.Backend(test_url)
-        auth_provider = devsocial.DevAuthProvider(backend, settings.get("dev_tokens") or {},
-                                                  remember=lambda tokens: settings.set("dev_tokens", tokens))
+        auth_provider = devsocial.DevAuthProvider(backend, devsocial.Vault(cred_store, os.environ.get("EQU3_PROFILE", "")))
         presence_provider = devsocial.DevPresenceProvider(backend, friend_book)
     if presence_provider is None and os.environ.get("EQU3_PRESENCE_FIXTURE"):
         from .testing import FixturePresenceProvider
         presence_provider = FixturePresenceProvider(os.environ["EQU3_PRESENCE_FIXTURE"])
     if presence_provider is None:
         presence_provider = _presence.UnavailablePresenceProvider()
-    account_service = _account.AccountService(auth_provider, credstore.open_store(), settings)
+    account_service = _account.AccountService(auth_provider, cred_store, settings)
     presence_service = _presence.PresenceService(friend_book, presence_provider, account_service)
     if getattr(presence_provider, "syncs_friends", False):
         presence_provider.on_friends = friend_book.sync_from
+    if getattr(presence_provider, "push", False):
+        presence_provider.attach(presence_service, account_service.valid_access)
+
+        def signed_out_by_server(message):
+            account_service.sign_out()
+            account_service.message = message
+            account_service.on_change()
+        presence_provider.on_rejected = signed_out_by_server
     from ..core import gamewatch
-    activity = gamewatch.make_source(lambda: settings.get("game_dir") or "", realm_list.all)
+    activity = gamewatch.make_source(lambda: settings.get("game_dir") or "", realm_list.all,
+                                     known_path=os.path.join(data or core_settings.data_dir(), "realm_endpoints.json"))
     social_service = SocialService(settings, friend_book, presence_service, account_service, realm_list, activity=activity)
     social_bridge = SocialBridge(social_service, tasks)
     account_bridge = AccountBridge(account_service, social_service, tasks, dialog_bridge, dispatcher)

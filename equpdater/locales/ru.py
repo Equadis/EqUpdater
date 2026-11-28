@@ -1010,7 +1010,12 @@ STRINGS = {
     "No user has that name.": "Пользователя с таким именем нет.",
     "Sign in to add friends.": "Войдите, чтобы добавлять друзей.",
     "Sign in to change your friends.": "Войдите, чтобы изменять список друзей.",
-    "That username is in use right now.": "Это имя пользователя сейчас занято.",
     "The test service answered unexpectedly ({status}).": "Тестовый сервис ответил неожиданно ({status}).",
     "The test service could not be reached.": "Не удалось связаться с тестовым сервисом.",
+    "A tester key is needed to create an account, and that one was not accepted.": "Для создания учётной записи нужен тестовый ключ, и этот ключ не принят.",
+    "That recovery code does not match.": "Этот код восстановления не подходит.",
+    "That username is already registered. If it is yours, enter its recovery code.": "Это имя пользователя уже зарегистрировано. Если оно ваше, введите его код восстановления.",
+    "The test service is full or paused.": "Тестовый сервис переполнен или приостановлен.",
+    "Too many attempts. Please wait a while and try again.": "Слишком много попыток. Подождите и повторите.",
+    "You were signed out: this account was opened on another computer.": "Вы вышли из системы: эта учётная запись открыта на другом компьютере.",
 }

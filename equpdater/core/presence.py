@@ -176,7 +176,8 @@ class PresenceService:
     # -- when to poll --------------------------------------------------------------------------
     @property
     def stale_after(self) -> float:
-        return 6 * self.interval
+        """How long a value stays fresh without news. A push provider names its own (its heartbeat is slow)."""
+        return getattr(self.provider, "stale_after", None) or 6 * self.interval
 
     def active(self) -> bool:
         if not (self.provider.available and not self.minimized):
@@ -208,6 +209,8 @@ class PresenceService:
             self.before_poll()
         except Exception:                                            # noqa: BLE001 - detection must never stop presence
             pass
+        if getattr(self.provider, "push", False):
+            return False                                             # the server pushes: nothing is asked, only local detection runs
         token = None
         if self.provider.requires_account:
             token = self.account.valid_access()

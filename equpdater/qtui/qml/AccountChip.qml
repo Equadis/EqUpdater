@@ -110,6 +110,7 @@ Item {
         parent: C.Overlay.overlay
         entries: account.usernameLogin
                  ? [ { id: "switch", label: app.t("Switch account") },
+                     { id: "recovery", label: app.t("Recovery code") },
                      { separator: true },
                      { id: "signout", label: app.t("Sign Out"), tone: "danger" } ]
                  : [ { id: "profile", label: app.t("View Profile") },
@@ -123,6 +124,7 @@ Item {
         onChosen: function (id) {
             if (id === "profile") account.viewProfile()
             else if (id === "switch") account.openLogin()
+            else if (id === "recovery") account.showRecovery()
             else if (id === "signout") account.signOut()
         }
     }

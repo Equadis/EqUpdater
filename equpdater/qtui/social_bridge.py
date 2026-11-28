@@ -147,32 +147,69 @@ class AccountBridge(QObject):
         return self._login_open
 
     _login_open = False
+    _requires_key = False
+    _recovery = ""                       # a recovery code being shown (a new account's, or the current one on request)
+
+    @Property(bool, notify=changed)
+    def requiresKey(self):
+        """The test backend wants a tester key to create an account (asked once, in the background)."""
+        return self._requires_key
+
+    @Property(str, notify=changed)
+    def recoveryCode(self):
+        return self._recovery
 
     @Slot()
     def openLogin(self):
         self._login_open = True
+        self._recovery = ""
         self.changed.emit()
+        probe = getattr(self.service.provider, "requires_key", None)
+        if probe:
+            def done(need):
+                self._requires_key = bool(need)
+                self.changed.emit()
+            self.tasks.submit("account:info", probe, on_done=done, on_error=lambda e: None)
 
     @Slot()
     def closeLogin(self):
         self._login_open = False
+        self._recovery = ""
         self.changed.emit()
 
-    @Slot(str)
-    def signInAs(self, username):
-        """Test login. The answer (a refusal, say a name in use) arrives as ``message``; the dialog stays open then."""
-        self.service.provider.username = (username or "").strip()
-        prev = self.service.username
+    @Slot()
+    def dismissRecovery(self):
+        self.closeLogin()
+
+    @Slot()
+    def showRecovery(self):
+        """Show this account's recovery code again (kept in the credential manager on this computer)."""
+        vault = getattr(self.service.provider, "vault", None)
+        code = vault.get("recovery", self.service.username) if vault else None
+        if code:
+            self._recovery, self._login_open = code, True
+            self.changed.emit()
+
+    @Slot(str, str, str)
+    def signInAs(self, username, key="", recovery=""):
+        """Test login. The answer (a refusal, say a taken name) arrives as ``message``; the dialog stays open then."""
+        prov = self.service.provider
+        prov.username, prov.key, prov.recovery = (username or "").strip(), (key or "").strip(), (recovery or "").strip()
 
         def done(ok):
             self.changed.emit()
             if ok:
-                self._login_open = False
+                code = getattr(prov, "new_recovery", "")
+                if code:
+                    self._recovery = code                   # a new account: show its recovery code before closing
+                else:
+                    self._login_open = False
                 self.changed.emit()
                 self._publish_later()
         if self.service.state == A.SIGNED_IN:                      # switching accounts: end this session first
             def work():
                 self.service.sign_out()
+                self.social.presence.cache.clear()
                 return self.service.sign_in(lambda url: None)
         else:
             def work():
@@ -347,6 +384,7 @@ class SocialBridge(QObject):
         if self._started:
             return
         self._started = True
+        self.service.sync_link()
         self._idle.start()
         self.service.note_activity()
         if self.service.realms and self.service.realms.due():
@@ -377,7 +415,8 @@ class SocialBridge(QObject):
 
     @Slot()
     def kick(self):
-        """Something changed that decides whether presence is asked for (sign-in, sign-out): look again."""
+        """Something changed that decides whether presence flows (sign-in, sign-out): look again."""
+        self.service.sync_link()
         if self._started and not self._busy:
             self._schedule(0.3 if self.service.presence.delay() is not None else None)
 

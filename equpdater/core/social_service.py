@@ -90,10 +90,18 @@ class SocialService:
         self.activity = now
         prov = self.presence.provider
         if hasattr(prov, "own"):
-            prov.own = self.own()                                    # the heartbeat sends this
+            prov.own = self.own()
         if changed:
+            if getattr(prov, "push", False):
+                prov.publish(self.own(), None)                       # tell the server now, not at some next round
             self.on_change()
         return changed
+
+    def sync_link(self):
+        """Keep the live connection up exactly while someone is signed in (a push provider only)."""
+        prov = self.presence.provider
+        if getattr(prov, "push", False):
+            prov.ensure_link(bool(self.account and self.account.state == "signed_in"))
 
     def publish(self) -> bool:
         """Tell the service (only if one exists and the player is signed in). Blocking: a worker.

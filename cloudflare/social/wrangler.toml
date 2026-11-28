@@ -1,0 +1,39 @@
+# EqUpdater social TEST backend: its own Worker and its own Durable Object. It shares nothing with OctoBot's
+# Workers, databases or buckets, and uses no paid-only product (a SQLite-backed Durable Object works on the
+# Workers Free plan). Deploy: `npx wrangler deploy` from this folder. Secrets are set with `wrangler secret put`
+# and are never in this file: TESTER_KEYS (comma-separated SHA-256 hex of the keys testers type once) and
+# ADMIN_KEY_HASH (SHA-256 hex of the key for /v1/admin/metrics).
+name = "equpdater-social"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+workers_dev = true
+
+[[durable_objects.bindings]]
+name = "HUB"
+class_name = "SocialHub"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SocialHub"]
+
+[vars]
+PRESENCE_TTL_S = "100"        # a connection silent this long is dropped (clients ping every 45 s)
+ALARM_S = "45"                # how often an object with connections wakes to expire the silent ones
+DAILY_REQUEST_CAP = "40000"   # HTTP requests + connection attempts per UTC day; beyond it the service pauses (cost ceiling)
+MAX_ACCOUNTS = "500"
+MAX_CONNECTIONS = "400"
+REGISTER_PER_IP_HOUR = "20"   # sign-ups per address per hour
+RECOVER_PER_NAME_HOUR = "8"   # recovery-code guesses per username per hour
+WS_PER_ACCOUNT_10MIN = "40"   # connection attempts per account per 10 minutes
+FRIEND_ADDS_HOUR = "120"
+
+# Cheap, per-IP flood protection at the edge (before a Durable Object is woken). Uses the Workers Rate Limiting API.
+[[ratelimits]]
+name = "HTTP_LIMIT"
+namespace_id = "1701"
+simple = { limit = 120, period = 60 }
+
+[[ratelimits]]
+name = "WS_LIMIT"
+namespace_id = "1702"
+simple = { limit = 20, period = 60 }

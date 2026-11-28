@@ -1,65 +1,44 @@
 {
- "A username is 3 to 20 letters, numbers, dashes or underscores.": {
-  "de": "Ein Benutzername hat 3 bis 20 Buchstaben, Ziffern, Bindestriche oder Unterstriche.",
-  "es": "Un nombre de usuario tiene de 3 a 20 letras, números, guiones o guiones bajos.",
-  "pt_br": "Um nome de usuário tem de 3 a 20 letras, números, hifens ou sublinhados.",
-  "ru": "Имя пользователя — от 3 до 20 букв, цифр, дефисов или подчёркиваний.",
-  "zh_cn": "用户名为 3 到 20 个字母、数字、连字符或下划线。"
+ "A tester key is needed to create an account, and that one was not accepted.": {
+  "de": "Zum Erstellen eines Kontos wird ein Testschlüssel benötigt, und dieser wurde nicht akzeptiert.",
+  "es": "Se necesita una clave de prueba para crear una cuenta, y esa no fue aceptada.",
+  "pt_br": "É necessária uma chave de teste para criar uma conta, e essa não foi aceita.",
+  "ru": "Для создания учётной записи нужен тестовый ключ, и этот ключ не принят.",
+  "zh_cn": "创建账户需要测试密钥，而该密钥未被接受。"
  },
- "In-game": {
-  "de": "Im Spiel",
-  "es": "En el juego",
-  "pt_br": "No jogo",
-  "ru": "В игре",
-  "zh_cn": "游戏中"
+ "That recovery code does not match.": {
+  "de": "Dieser Wiederherstellungscode stimmt nicht.",
+  "es": "Ese código de recuperación no coincide.",
+  "pt_br": "Esse código de recuperação não corresponde.",
+  "ru": "Этот код восстановления не подходит.",
+  "zh_cn": "该恢复码不匹配。"
  },
- "Launcher open": {
-  "de": "Launcher geöffnet",
-  "es": "Launcher abierto",
-  "pt_br": "Launcher aberto",
-  "ru": "Лаунчер открыт",
-  "zh_cn": "启动器已打开"
+ "That username is already registered. If it is yours, enter its recovery code.": {
+  "de": "Dieser Benutzername ist bereits registriert. Wenn er dir gehört, gib seinen Wiederherstellungscode ein.",
+  "es": "Ese nombre de usuario ya está registrado. Si es tuyo, introduce su código de recuperación.",
+  "pt_br": "Esse nome de usuário já está registrado. Se for seu, digite o código de recuperação.",
+  "ru": "Это имя пользователя уже зарегистрировано. Если оно ваше, введите его код восстановления.",
+  "zh_cn": "该用户名已被注册。如果是你的，请输入其恢复码。"
  },
- "No user has that name.": {
-  "de": "Kein Benutzer hat diesen Namen.",
-  "es": "Ningún usuario tiene ese nombre.",
-  "pt_br": "Nenhum usuário tem esse nome.",
-  "ru": "Пользователя с таким именем нет.",
-  "zh_cn": "没有该名称的用户。"
+ "The test service is full or paused.": {
+  "de": "Der Testdienst ist voll oder pausiert.",
+  "es": "El servicio de prueba está lleno o en pausa.",
+  "pt_br": "O serviço de teste está cheio ou em pausa.",
+  "ru": "Тестовый сервис переполнен или приостановлен.",
+  "zh_cn": "测试服务已满或已暂停。"
  },
- "Sign in to add friends.": {
-  "de": "Melde dich an, um Freunde hinzuzufügen.",
-  "es": "Inicia sesión para añadir amigos.",
-  "pt_br": "Entre para adicionar amigos.",
-  "ru": "Войдите, чтобы добавлять друзей.",
-  "zh_cn": "登录后才能添加好友。"
+ "Too many attempts. Please wait a while and try again.": {
+  "de": "Zu viele Versuche. Bitte warte eine Weile und versuche es erneut.",
+  "es": "Demasiados intentos. Espera un rato e inténtalo de nuevo.",
+  "pt_br": "Muitas tentativas. Aguarde um pouco e tente novamente.",
+  "ru": "Слишком много попыток. Подождите и повторите.",
+  "zh_cn": "尝试次数过多。请稍后再试。"
  },
- "Sign in to change your friends.": {
-  "de": "Melde dich an, um deine Freunde zu ändern.",
-  "es": "Inicia sesión para cambiar tus amigos.",
-  "pt_br": "Entre para alterar seus amigos.",
-  "ru": "Войдите, чтобы изменять список друзей.",
-  "zh_cn": "登录后才能修改好友。"
- },
- "That username is in use right now.": {
-  "de": "Dieser Benutzername wird gerade verwendet.",
-  "es": "Ese nombre de usuario está en uso ahora mismo.",
-  "pt_br": "Esse nome de usuário está em uso agora.",
-  "ru": "Это имя пользователя сейчас занято.",
-  "zh_cn": "该用户名目前正被使用。"
- },
- "The test service answered unexpectedly ({status}).": {
-  "de": "Der Testdienst hat unerwartet geantwortet ({status}).",
-  "es": "El servicio de prueba respondió de forma inesperada ({status}).",
-  "pt_br": "O serviço de teste respondeu de forma inesperada ({status}).",
-  "ru": "Тестовый сервис ответил неожиданно ({status}).",
-  "zh_cn": "测试服务返回了意外的响应（{status}）。"
- },
- "The test service could not be reached.": {
-  "de": "Der Testdienst ist nicht erreichbar.",
-  "es": "No se pudo contactar con el servicio de prueba.",
-  "pt_br": "Não foi possível acessar o serviço de teste.",
-  "ru": "Не удалось связаться с тестовым сервисом.",
-  "zh_cn": "无法连接到测试服务。"
+ "You were signed out: this account was opened on another computer.": {
+  "de": "Du wurdest abgemeldet: Dieses Konto wurde auf einem anderen Computer geöffnet.",
+  "es": "Se cerró tu sesión: esta cuenta se abrió en otro ordenador.",
+  "pt_br": "Você foi desconectado: esta conta foi aberta em outro computador.",
+  "ru": "Вы вышли из системы: эта учётная запись открыта на другом компьютере.",
+  "zh_cn": "你已被登出：此账户已在另一台电脑上打开。"
  }
 }

@@ -41,6 +41,7 @@ os.environ["EQUPDATER_NO_MIGRATION_PROMPT"] = "1"
 os.environ["EQUPDATER_NO_DEFENDER_PROMPT"] = "1"
 os.environ["EQUPDATER_OFFLINE"] = "1"
 os.environ["EQU3_CREDSTORE"] = "memory"       # tests never touch the real credential manager
+os.environ.setdefault("EQU3_SOCIAL_URL", "off")  # ... nor the hosted test backend (tests that want one set their own address)
 os.environ["EQU3_NO_SETUP"] = "1"          # the first-run "find your game" panel stays shut
 
 # ── worker accounting ────────────────────────────────────────────────────────

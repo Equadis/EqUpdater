@@ -1,0 +1,15 @@
+{
+  "name": "equpdater-social",
+  "private": true,
+  "version": "0.1.0",
+  "description": "EqUpdater social test backend: a Cloudflare Worker with one SQLite-backed Durable Object (WebSocket hibernation).",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "node --test tests/",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

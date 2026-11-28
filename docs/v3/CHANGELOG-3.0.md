@@ -55,3 +55,11 @@ Automated tests: 1,200 (2.x branch: 881), all passing; see `TESTING.md`. Measure
 * **One set of row actions** on Addons, Mods and MPQ: open folder, open repository, uninstall (trash), stop managing (X), always in that order and place, from one shared component.
 * **Simplification**: explanatory paragraphs moved into tooltips (Tweaks rows, Linux launcher settings), dim text enlarged by 1 px.
 * **Temporary username login and a shared test backend** (development only, see `SOCIAL_TEST_BACKEND.md`): friends are kept on the server, presence is a five-second heartbeat that expires, Invisible reads as offline to others, launcher-open versus in-game and the realm are detected (`core/gamewatch.py`), and a development-only simulation and multi-launcher tool allow testing without a game or several PCs.
+
+## Beta 1 revision 3 (2026-11-28)
+* **Hosted social test backend** (`cloudflare/social`, Worker `equpdater-social`, one SQLite-backed Durable Object with WebSocket Hibernation) and its local Python twin, protocol v2: real accounts behind the username sign-in (random session token and recovery code stored only as hashes; names owned for good; recovery on another computer; tester key; rate limits, caps and a daily request ceiling; private aggregate metrics).
+* **Presence is pushed, not polled**: one WebSocket per launcher, state changes sent at once, only the changer's friends told, a tiny ping as heartbeat, expiry of silent connections, reconnection with exponential back-off and jitter that restores friends and presence. Invisible never exposes activity or realm.
+* **Secrets in the credential manager** (session, recovery code, tester key); never in settings or the package.
+* **Realm detection investigated on a real client**: `Config.wtf` is not a reliable current realm and is no longer used; "connected to a realm" is read from the connection table; the realm is named only from a known world-server address.
+* **Object Sans** is no longer packaged without a licence (the free trial files are personal-use only); the Font choice appears only where the files exist.
+* Cost model and safeguards: `SOCIAL_COSTS.md`.

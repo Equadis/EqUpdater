@@ -25,8 +25,14 @@ Downloads / Desktop / Documents (friz*.zip, arial*.zip, opendyslexic*.zip),
 copying their .ttf/.otf files into %LOCALAPPDATA%\EqUpdater\fonts.
 
   ObjectSansRegular.otf, ObjectSansSlanted.otf, ObjectSansHeavy.otf, ObjectSansHeavySlanted.otf
-      Object Sans, supplied by the EqUpdater maintainer (family name "Object Sans"; weights
-      Regular 400 and Heavy 800, each with a Slanted style). No licence file came with the
-      files and the redistribution terms have NOT been confirmed. Confirm the licence (and put
-      its text beside the fonts as ObjectSans-LICENSE.txt) before any public installer ships
-      them. tools/beta_check.py warns until that file is present.
+      Object Sans by Alex Slobzheninov, published by Pangram Pangram Foundry. **Not licensed for redistribution
+      here.** The files supplied (Regular, Slanted, Heavy, Heavy Slanted) are the foundry's free trial set, which the
+      foundry's FAQ and licence terms (https://pangrampangram.com/products/object-sans) allow for personal use
+      only: shipping them inside a public installer, or in any commercial product, needs a paid licence from the
+      foundry (a "Video Game" licence is listed separately). No licence was supplied with the files. So:
+        * the build (tools/build_v3.py) leaves these files OUT of every package unless a licence text is placed
+          beside them as ObjectSans-LICENSE.txt, or a LOCAL build is made with --with-unlicensed-fonts;
+        * tools/beta_check.py FAILS if a package contains them without that file;
+        * a player who holds a licence can put the files in the fonts folder (in the v3 folder) of EqUpdater's app data (next to settings.json): the font then
+          appears in Settings > Font; without the files the choice is not offered.
+      To distribute it: buy the appropriate licence, save its text as fonts/ObjectSans-LICENSE.txt, rebuild.

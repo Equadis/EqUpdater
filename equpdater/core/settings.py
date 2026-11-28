@@ -40,7 +40,8 @@ SOCIAL_DEFAULTS = {
 OBSOLETE_SOCIAL_KEYS = ("social_enabled", "sidebar_collapsed", "show_launcher_presence", "show_game_presence",
                         "show_character", "show_realm", "show_zone", "friend_notifications", "auto_away_minutes",
                         "default_status", "friends_sort", "friends_realm", "presence_interval",
-                        "renderer")        # "Low-memory rendering": only changed how the launcher itself draws; removed
+                        "renderer",        # "Low-memory rendering": only changed how the launcher itself draws; removed
+                        "dev_tokens")      # session tokens an early test build kept in this file: secrets belong in the credential store
 DEFAULTS.update(SOCIAL_DEFAULTS)
 
 

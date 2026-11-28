@@ -29,7 +29,7 @@ sys.path.insert(0, ROOT)
 REQUIRED_DOCS = ("BETA.md", "KNOWN_ISSUES.md", "CHANGELOG-3.0.md", "QA_CHECKLIST.md", "PARITY_LEDGER.md",
                  "INSTALLATION.md", "MIGRATION.md", "SAFETY.md", "PERFORMANCE.md", "SKINNING.md",
                  "COMPONENTS.md", "SKIN_ASSETS.md", "OCTOBOT.md", "SOCIAL.md", "TESTING.md", "ARCHITECTURE.md", "LINUX.md",
-                 "OCTOWOW_INTEGRATION_PROPOSAL.md", "QA_REPORT.md", "SOCIAL_TEST_BACKEND.md")
+                 "OCTOWOW_INTEGRATION_PROPOSAL.md", "QA_REPORT.md", "SOCIAL_TEST_BACKEND.md", "SOCIAL_COSTS.md")
 #: The 2.x release machinery: the beta must not change any of it.
 TWO_X_FILES = ("build.py", "EqUpdater.py", "EqUpdaterSetup.py", "equpdater/installer.py",
                "equpdater/deploy.py", "install", ".github/workflows/release.yml")
@@ -134,6 +134,12 @@ def check_skins():
         m = json.load(open(os.path.join(ROOT, "skins", sid, "manifest.json"), encoding="utf-8"))
         if "confirm" in m.get("license", "").lower():
             add("WARN", f"skin {sid}: artwork rights unconfirmed", m["license"])
+    from equpdater.core import devsocial
+    if devsocial.DEFAULT_URL:
+        add("WARN", "a test backend address is compiled in (devsocial.DEFAULT_URL)", "fine for the beta; clear it for a release")
+    packaged = os.path.join(ROOT, "dist", "EqUpdater3", "_internal", "fonts")
+    if os.path.isdir(packaged) and any(n.startswith("ObjectSans") for n in os.listdir(packaged))             and not os.path.isfile(os.path.join(packaged, "ObjectSans-LICENSE.txt")):
+        add("FAIL", "the package contains Object Sans without a licence file", packaged)
     fonts = os.path.join(ROOT, "fonts")
     if any(n.startswith("ObjectSans") for n in os.listdir(fonts)) and not os.path.isfile(os.path.join(fonts, "ObjectSans-LICENSE.txt")):
         add("WARN", "font Object Sans: redistribution terms unconfirmed", "no ObjectSans-LICENSE.txt beside the font files; fonts/README.txt")

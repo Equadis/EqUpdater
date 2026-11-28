@@ -368,15 +368,35 @@ class TestFonts(UI):
         self.assertEqual({f["family"] for f in theme["fonts"].values() if f}, {"Object Sans"})
         self.assertEqual(p["settings"].get("font_override"), "objectsans")        # persisted
 
-    def test_object_sans_files_are_bundled_with_the_other_fonts_in_dev_and_package_builds(self):
+    def test_object_sans_is_not_packaged_without_a_licence_but_the_other_fonts_are(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("build_v3_for_test", os.path.join(ROOT, "tools", "build_v3.py"))
+        build = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(build)
+        dest = tempfile.mkdtemp(prefix="equ-fonts-")
+        self.addCleanup(shutil.rmtree, dest, True)
+        have_licence = os.path.isfile(os.path.join(ROOT, "fonts", "ObjectSans-LICENSE.txt"))
+        left_out = build.stage_fonts(dest)
+        staged = os.listdir(dest)
+        for keep in ("FrizQuadrata-Regular.ttf", "OpenDyslexic-Regular.otf", "OpenDyslexic-OFL.txt"):
+            self.assertIn(keep, staged)
+        if have_licence:
+            self.assertEqual(left_out, [])
+            self.assertIn("ObjectSansRegular.otf", staged)
+        else:
+            self.assertEqual(sorted(left_out), ["ObjectSansHeavy.otf", "ObjectSansHeavySlanted.otf", "ObjectSansRegular.otf", "ObjectSansSlanted.otf"])
+            self.assertFalse([n for n in staged if n.startswith("ObjectSans")])
+            self.assertEqual(build.stage_fonts(dest, with_unlicensed=True), [])         # a LOCAL build can still carry them
+            self.assertIn("ObjectSansRegular.otf", os.listdir(dest))
+        readme = open(os.path.join(ROOT, "fonts", "README.txt"), encoding="utf-8").read()
+        self.assertIn("personal use", readme)                                            # the finding is written down
+        self.assertIn("Pangram Pangram", readme)
+
+    def test_the_font_files_are_present_for_development_and_a_player_can_add_their_own(self):
         for n in ("ObjectSansRegular.otf", "ObjectSansSlanted.otf", "ObjectSansHeavy.otf", "ObjectSansHeavySlanted.otf"):
             self.assertTrue(os.path.isfile(os.path.join(ROOT, "fonts", n)), n)
-        with open(os.path.join(ROOT, "tools", "build_v3.py"), encoding="utf-8") as f:
-            self.assertIn('"fonts") + sep + "fonts"', f.read())            # the whole folder goes into the package
-        with open(os.path.join(ROOT, "fonts", "README.txt"), encoding="utf-8") as f:
-            text = f.read()
-        self.assertIn("Object Sans", text)
-        self.assertIn("NOT been confirmed", text)                          # the licence question is written down
+        with open(os.path.join(ROOT, "equpdater", "qtui", "main.py"), encoding="utf-8") as f:
+            self.assertIn('"fonts"),', f.read())                                         # the player's own fonts folder is read too
 
 
 class TestShellLayout(UI):

@@ -31,7 +31,7 @@ A is useful on its own. B is optional and can come later or never; the friends l
 2. **Optional everywhere.** Updating, configuring and launching the game never wait for, or depend on, sign-in or presence. If your service is down, slow or removed, the launcher behaves exactly as it does today.
 3. **Forum identity is separate from game accounts.** Nothing here touches a game login or game password.
 4. **Minimal data.** What is exchanged about a player is: forum user name, avatar, a presence status, and **the realm they are playing on, only while in game**. No character name, class, level, guild or zone is requested, sent or displayed. Players do not configure this: they choose a status (Online, Away, Do Not Disturb, Invisible) and that is all.
-5. **Polite traffic.** One batched request about every five seconds (fixed, not a setting), only while the player is signed in, has friends and the window is not minimised; honouring `Retry-After`, `ETag`/`304` and with exponential back-off. If you offer push (SSE or WebSocket), EqUpdater will use it instead and stop polling (section 5.5).
+5. **Polite traffic.** Presence by push over one WebSocket per launcher (section 5.5): no periodic requests, a tiny heartbeat, exponential back-off with jitter on reconnection, `Retry-After` honoured; if you prefer polling the client can poll one batched request about every five seconds instead (ETag/`304`).
 6. **No new cost to you beyond the endpoints themselves,** and no collector accounts, bots or scraping on our side.
 
 ## 4. A. Sign-in
@@ -137,12 +137,12 @@ PUT {presence_url}/me                  Authorization: Bearer <access token>
 ### 5.4 Adding friends
 EqUpdater adds a friend by forum user name and stores the list on the player's computer only. If you prefer friend relationships to live on your side (so that "add friend" sends a request the other person accepts, as in Steam), that is a larger design and we would adopt it: `GET/POST/DELETE {presence_url}/friends`. Until then nobody is told they were added.
 
-### 5.5 Push instead of polling (preferred if cheap for you)
-`GET {presence_url}/stream` as Server-Sent Events, carrying the same `results` objects for the signed-in player's friends when they change. EqUpdater would open it once per run and stop polling. One long-lived connection per launcher is less load than a request every five seconds.
+### 5.5 Push over a WebSocket (what EqUpdater's test backend already does)
+`GET {presence_url}/ws` upgraded to a WebSocket, authenticated with the same bearer token: the server sends `{"t":"friends","friends":[...]}` when the connection opens and after friend edits, and `{"t":"presence","u":name,"state","activity","realm"}` to exactly the friends of a player whose state changed; the client sends `{"t":"state","status":"online|away|dnd|invisible","activity":"launcher|in_game","realm":""}` when its state changes and the text `ping` about every 45 seconds (answered `pong`). A connection silent for about 100 seconds counts as offline. One long-lived connection per launcher replaces polling entirely; the client reconnects with exponential back-off and then receives everything again. The reference implementation is `cloudflare/social` in the EqUpdater repository.
 
 ## 6. Performance and cost expectations
 
-* Polling fallback: one request about every five seconds, fixed. One request carries up to 50 names and one token; typical response well under 2 KB, usually `304`.
+* Push (preferred): no periodic requests at all. One request carries up to 50 names and one token; typical response well under 2 KB, usually `304`.
 * With 1,000 launchers that is up to 200 requests per second on a read that can be served from a cache keyed by the set of names and invalidated when a status changes. If that is more than you want to serve, tell us the interval you prefer (it is one constant in EqUpdater) or provide 5.5.
 * EqUpdater makes no presence requests when the player is signed out, has no friends, has the window minimised, or your service is down (it backs off 30 s, 60 s, 2 min ... up to 10 min).
 * We will not poll anything else of yours: no `/api/*` calls beyond those agreed here.

@@ -1011,7 +1011,12 @@ STRINGS = {
     "No user has that name.": "没有该名称的用户。",
     "Sign in to add friends.": "登录后才能添加好友。",
     "Sign in to change your friends.": "登录后才能修改好友。",
-    "That username is in use right now.": "该用户名目前正被使用。",
     "The test service answered unexpectedly ({status}).": "测试服务返回了意外的响应（{status}）。",
     "The test service could not be reached.": "无法连接到测试服务。",
+    "A tester key is needed to create an account, and that one was not accepted.": "创建账户需要测试密钥，而该密钥未被接受。",
+    "That recovery code does not match.": "该恢复码不匹配。",
+    "That username is already registered. If it is yours, enter its recovery code.": "该用户名已被注册。如果是你的，请输入其恢复码。",
+    "The test service is full or paused.": "测试服务已满或已暂停。",
+    "Too many attempts. Please wait a while and try again.": "尝试次数过多。请稍后再试。",
+    "You were signed out: this account was opened on another computer.": "你已被登出：此账户已在另一台电脑上打开。",
 }

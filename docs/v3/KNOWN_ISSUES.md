@@ -59,3 +59,10 @@ See `BETA.md`. Please include the support ZIP (Settings > Troubleshooting) and y
 * There is **no hosted test backend yet** (`devsocial.DEFAULT_URL` is empty). Out of the box the launcher shows "Sign-in is not available yet"; set `EQU3_SOCIAL_URL` (or host the server and put its address in `DEFAULT_URL`) to use it. Across machines it needs an https address (plain http works on a private network).
 * Realm detection reads the realm the game itself writes to `WTF/Config.wtf` during the run; it has **not been verified with a real OctoWoW client logging into each realm**. When the client has not said, a player shows as `In-game` without a realm.
 * The Low-memory rendering setting is gone (it never affected the game).
+
+## Hosted test backend, realm detection, Object Sans (2026-11-28)
+* The launcher in this beta signs in against a **hosted test backend** (`devsocial.DEFAULT_URL`, Cloudflare Worker `equpdater-social`). Creating an account needs a tester key (given to authorised testers); without one the launcher works exactly as before and only the account chip's sign-in is refused. A release must clear that address.
+* **Realm is usually not shown**: the launcher can tell "game open" from "connected to a realm", but it names the realm only from a known world-server address (none is published yet), never from `Config.wtf`. Players show as "In-game" without a realm until OctoWoW publishes the addresses or a tester records them (`tools/qa/realm_probe.py --learn`). See `SOCIAL_TEST_BACKEND.md`.
+* **Cross-machine behaviour has not been verified**: the hosted backend has only been exercised from one computer.
+* **Object Sans is not in the installer.** The supplied files are Pangram Pangram's free trial set, licensed for personal use only; redistribution needs a paid licence. The font is offered in Settings only where its files are present (a player with a licence can add them to the app-data fonts folder). Local builds can include it with `--with-unlicensed-fonts`.
+* A lost recovery code with no signed-in computer means the username is lost; there is no email and no admin override.

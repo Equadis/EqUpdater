@@ -1010,7 +1010,12 @@ STRINGS = {
     "No user has that name.": "Ningún usuario tiene ese nombre.",
     "Sign in to add friends.": "Inicia sesión para añadir amigos.",
     "Sign in to change your friends.": "Inicia sesión para cambiar tus amigos.",
-    "That username is in use right now.": "Ese nombre de usuario está en uso ahora mismo.",
     "The test service answered unexpectedly ({status}).": "El servicio de prueba respondió de forma inesperada ({status}).",
     "The test service could not be reached.": "No se pudo contactar con el servicio de prueba.",
+    "A tester key is needed to create an account, and that one was not accepted.": "Se necesita una clave de prueba para crear una cuenta, y esa no fue aceptada.",
+    "That recovery code does not match.": "Ese código de recuperación no coincide.",
+    "That username is already registered. If it is yours, enter its recovery code.": "Ese nombre de usuario ya está registrado. Si es tuyo, introduce su código de recuperación.",
+    "The test service is full or paused.": "El servicio de prueba está lleno o en pausa.",
+    "Too many attempts. Please wait a while and try again.": "Demasiados intentos. Espera un rato e inténtalo de nuevo.",
+    "You were signed out: this account was opened on another computer.": "Se cerró tu sesión: esta cuenta se abrió en otro ordenador.",
 }

@@ -1,12 +1,14 @@
-"""The temporary username login and the shared social test backend, end to end: a REAL server on localhost
-and several independent launchers (core level, no Qt). This is the multi-launcher test environment:
-nothing here is mocked at the network layer except where a test breaks the connection on purpose.
+"""The temporary username login and the live friends/presence link against the LOCAL PYTHON BACKEND (a real server
+on localhost, real WebSockets, real time), plus unit tests of the client pieces that need no server: the
+WebSocket client, the reconnect back-off, address rules, activity detection and isolation.
 
-Automated tests against the reference server in tools/socialserver. They are not tests of a real OctoWoW
-service (there is none) and the reference server has not been exercised across machines or over https."""
+The same scenarios run against the Cloudflare Worker in tests/test_v3_social_worker.py and, as a smoke test,
+against the deployed Worker in tests/test_v3_social_live.py. Automated; not a test of any real OctoWoW service."""
 
+import json
 import os
 import shutil
+import socket
 import tempfile
 import unittest
 
@@ -14,477 +16,355 @@ from equpdater.core import account as A
 from equpdater.core import devsocial as D
 from equpdater.core import gamewatch as G
 from equpdater.core import presence as P
-from tests.social_harness import NOW, Client, Clock, Server, Settings, SimActivity
-from tools.socialserver import server as S
+from equpdater.core import wsclient
+from tests.social_harness import Client, PythonBackend, TESTER_KEY, wait_for
+from tests.social_scenarios import AccountScenarios, FriendScenarios, MetricsScenarios, PresenceScenarios, uname
 
-GREEN, YELLOW, RED, GREY = "#3ddc84", "#f2c744", "#ef5350", "#7d8590"
-
-
-class Env(unittest.TestCase):
-    def setUp(self):
-        self.clock = Clock()
-        self.server = Server(self.clock)
-        self.addCleanup(self.server.stop)
-        self.dirs = []
-
-    def client(self, **kw):
-        c = Client(self.server, self.clock, **kw)
-        self.addCleanup(shutil.rmtree, c.tmp, True)
-        return c
-
-    def pair(self, a="Alice", b="Bobby"):
-        """Two signed-in launchers that are friends of each other."""
-        x, y = self.client(), self.client()
-        self.assertTrue(x.login(a))
-        self.assertTrue(y.login(b))
-        self.assertEqual(x.svc.add_friend(b), "")
-        self.assertEqual(y.svc.add_friend(a), "")
-        x.sync(), y.sync()
-        return x, y
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-class TestUsernameLogin(Env):
-    def test_a_username_is_all_it_takes(self):
-        c = self.client()
-        self.assertTrue(c.login("Thrall"))
-        self.assertEqual((c.account.state, c.account.username), (A.SIGNED_IN, "Thrall"))
+class PythonBackendCase(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.backend = PythonBackend(ttl=3.0, recover_per_name_hour=5, ws_per_account_10min=25, register_per_ip_hour=1000,
+                                    friend_adds_hour=1000)
 
-    def test_bad_names_are_refused_with_a_reason(self):
-        for bad in ("", "ab", "x" * 21, "bad name", "<b>", "emoji\u263a"):
-            c = self.client()
-            self.assertFalse(c.login(bad), bad)
-            self.assertEqual(c.account.state, A.SIGNED_OUT)
-            self.assertIn("username", c.account.message.lower())
-
-    def test_names_are_unique_whatever_the_case_while_in_use(self):
-        a, b = self.client(), self.client()
-        self.assertTrue(a.login("Thrall"))
-        self.assertFalse(b.login("thrall"))
-        self.assertFalse(b.login("THRALL"))
-        self.assertIn("in use", b.account.message)
-        self.assertEqual(S.NAME_RE.match("Thrall") is not None, True)
-
-    def test_the_name_keeps_the_case_it_was_claimed_with(self):
-        a, b = self.client(), self.client()
-        a.login("ThrallFan")
-        b.login("Other")
-        self.assertEqual(b.svc.add_friend("thrallfan"), "")          # any case finds the user
-        b.sync()
-        self.assertEqual(b.names(), ["ThrallFan"])
-
-    def test_a_name_is_free_again_after_logging_out_or_when_the_session_lapses(self):
-        a, b = self.client(), self.client()
-        a.login("Thrall")
-        a.sync()
-        self.assertFalse(b.login("Thrall"))
-        a.logout()
-        self.assertTrue(b.login("thrall"))                           # free again
-        self.assertEqual(b.account.username, "Thrall")
-        c = self.client()
-        b.sync()
-        self.clock.tick(S.TTL + 1)                                   # b vanished without logging out
-        self.assertTrue(c.login("THRALL"))
-
-    def test_the_session_survives_a_restart(self):
-        a = self.client()
-        a.login("Thrall")
-        again = self.client(settings=a.settings, store=a.cred)       # a new launcher process: same settings and credentials
-        self.assertTrue(again.restore())
-        self.assertEqual(again.account.username, "Thrall")
-        self.assertTrue(again.account.verified)
-
-    def test_logging_out_and_switching_accounts(self):
-        a = self.client()
-        a.login("Thrall")
-        a.logout()
-        self.assertEqual(a.account.state, A.SIGNED_OUT)
-        self.assertIsNone(a.cred.get(A.SERVICE, A.ACCOUNT))
-        self.assertTrue(a.login("Jaina"))
-        self.assertEqual(a.account.username, "Jaina")
-        a.logout()
-        self.assertTrue(a.login("thrall"))                           # back to the first one: its token was remembered
-        self.assertEqual(a.account.username, "Thrall")
-
-    def test_a_restart_with_a_server_that_forgot_the_session_signs_out_cleanly(self):
-        a = self.client()
-        a.login("Thrall")
-        fresh_server = Server(self.clock)
-        self.addCleanup(fresh_server.stop)
-        b = Client(fresh_server, self.clock, settings=a.settings, store=a.cred)
-        self.addCleanup(shutil.rmtree, b.tmp, True)
-        self.assertFalse(b.restore())
-        self.assertEqual(b.account.state, A.SIGNED_OUT)
-
-    def test_backend_unreachable_at_sign_in_says_so(self):
-        a = self.client()
-        self.server.stop()
-        self.assertFalse(a.login("Thrall"))
-        self.assertIn("could not be reached", a.account.message)
-        self.server.start()
-        self.assertTrue(a.login("Thrall"))
+    @classmethod
+    def tearDownClass(cls):
+        cls.backend.stop()
 
 
-class TestFriends(Env):
-    def test_add_remove_and_the_errors(self):
-        a, b = self.client(), self.client()
-        a.login("Alice")
-        b.login("Bobby")
-        self.assertEqual(a.svc.add_friend("Bobby"), "")
-        self.assertIn("already", a.svc.add_friend("bobby"))
-        self.assertIn("No user", a.svc.add_friend("Nobody"))             # a nonexistent username
-        self.assertNotEqual(a.svc.add_friend("Alice"), "")                # yourself
-        self.assertNotEqual(a.svc.add_friend("x"), "")
-        a.sync()
-        self.assertEqual(a.names(), ["Bobby"])
-        fid = a.book.all()[0].id
-        self.assertEqual(a.svc.remove_friend(fid), "")
-        a.sync()
-        self.assertEqual(a.names(), [])
-        self.assertEqual(a.svc.add_friend("Bobby"), "")                   # and can be added again
+class TestAccounts(AccountScenarios, PythonBackendCase):
+    def test_sign_up_flood_from_one_address_is_limited(self):
+        local = PythonBackend(ttl=3.0, register_per_ip_hour=4)
+        self.addCleanup(local.stop)
+        results = []
+        for _ in range(7):
+            c = Client(local)
+            self.addCleanup(c.stop)
+            results.append(c.login(uname("fl")))
+            if "Too many" in c.account.message:
+                break
+        self.assertIn(False, results)
+        self.assertEqual(results[:4], [True] * 4)
 
-    def test_favourites_search_and_ordering(self):
-        a = self.client()
-        a.login("Alice")
-        others = [self.client() for _ in range(3)]
-        for c, n in zip(others, ("Bobby", "Carol", "Dave")):
-            c.login(n)
-            a.svc.add_friend(n)
-        a.sync()
-        carol = next(f for f in a.book.all() if f.label == "Carol")
-        self.assertEqual(a.svc.toggle_favourite(carol.id), "")
-        a.sync()
-        rows = [r["name"] if r["kind"] == "friend" else "#" + r["group"] for r in a.svc.rows()]
-        self.assertEqual(rows[:2], ["#favourites", "Carol"])
-        a.svc.search = "bo"
-        self.assertEqual([r["name"] for r in a.svc.rows() if r["kind"] == "friend"], ["Bobby"])
-        a.svc.search = ""
-        self.assertEqual(a.svc.toggle_favourite(carol.id), "")
-        self.assertNotIn("Favourites", [r["title"] for r in a.svc.rows() if r["kind"] == "header"])
-
-    def test_the_list_follows_the_player_to_another_machine(self):
-        a, b = self.client(), self.client()
-        a.login("Alice")
-        b.login("Bobby")
-        a.svc.add_friend("Bobby")
-        fid = a.book.all()[0].id if a.book.all() else None
-        a.sync()
-        a.svc.toggle_favourite(a.book.all()[0].id)
-        a.logout()
-        other_machine = self.client()
-        self.assertTrue(other_machine.login("Alice"))
-        other_machine.sync()
-        self.assertEqual(other_machine.names(), ["Bobby"])
-        self.assertTrue(other_machine.lines()["Bobby"]["favourite"])
-
-    def test_when_signed_out_there_is_no_list_and_no_editing(self):
-        a = self.client()
-        a.login("Alice")
-        b = self.client()
-        b.login("Bobby")
-        a.svc.add_friend("Bobby")
-        a.sync()
-        a.logout()
-        self.assertEqual(a.svc.rows(), [])
-        self.assertEqual(a.svc.friend_count(), 0)
-        self.assertIn("Sign in", a.svc.add_friend("Bobby"))
-        self.assertIsNone(a.presence.delay())                               # and nothing is requested
-
-    def test_the_friend_cache_is_made_equal_to_the_server(self):
-        a, b = self.client(), self.client()
-        a.login("Alice")
-        b.login("Bobby")
-        a.social_store.set("friends", [{"id": "old", "name": "Thrall", "realm": "nzoth", "forum": "", "favourite": True, "added": 1}])
-        a.book.__init__(a.social_store)
-        a.svc.add_friend("Bobby")
-        a.sync()
-        self.assertEqual(a.names(), ["Bobby"])                              # the first-beta character entry is gone
+    def test_the_account_cap_stops_registration(self):
+        local = PythonBackend(ttl=3.0, accounts=2)
+        self.addCleanup(local.stop)
+        cs = [Client(local) for _ in range(3)]
+        for c in cs:
+            self.addCleanup(c.stop)
+        self.assertTrue(cs[0].login(uname()) and cs[1].login(uname()))
+        self.assertFalse(cs[2].login(uname()))
+        self.assertIn("full", cs[2].account.message)
 
 
-class TestPresence(Env):
-    def test_all_five_states_as_a_friend_sees_them(self):
-        x, y = self.pair()
-        seen = {}
-        for status in ("online", "away", "dnd", "invisible", "online"):
-            y.svc.set_status(status)
-            x.sync()
-            seen.setdefault(status, []).append((x.line("Bobby"), x.dot("Bobby")))
-        self.assertEqual(seen["online"][0], ("Launcher open", GREEN))
-        self.assertEqual(seen["away"][0], ("Launcher open", YELLOW))
-        self.assertEqual(seen["dnd"][0], ("Launcher open", RED))
-        self.assertEqual(seen["invisible"][0], ("Offline", GREY))             # appears offline
-        self.assertEqual(seen["online"][1], ("Launcher open", GREEN))
-
-    def test_invisible_users_still_see_everything(self):
-        x, y = self.pair()
-        y.svc.set_status("invisible")
-        self.assertEqual(x.sync()["Bobby"]["statusLine"], "Offline")
-        view = y.sync()
-        self.assertEqual(view["Alice"]["statusLine"], "Launcher open")          # y keeps full social functionality
-        self.assertIn("No user", y.svc.add_friend("Carol"))                       # editing works while invisible
-        self.assertEqual(y.account.state, A.SIGNED_IN)
-        self.assertEqual(y.svc.status, "invisible")
-
-    def test_status_changes_are_pushed_at_once_not_after_the_next_heartbeat(self):
-        x, y = self.pair()
-        y.svc.set_status("dnd")                                                 # publish() is immediate
-        self.clock.tick(1.0)
-        x.presence.poll()
-        self.assertEqual(x.dot("Bobby"), RED)
-
-    def test_automatic_away_after_fifteen_minutes_without_overriding_dnd_or_invisible(self):
-        x, y = self.pair()
-        self.clock.tick(15 * 60 + 1)
-        y.svc.check_idle()
-        self.assertEqual(x.sync()["Bobby"]["dot"].lower(), YELLOW)
-        y.svc.note_activity()
-        y.svc.check_idle()
-        self.assertEqual(x.sync()["Bobby"]["dot"].lower(), GREEN)
-        for manual, expect in (("dnd", RED), ("invisible", GREY)):
-            y.svc.set_status(manual)
-            y.svc.last_activity -= 15 * 60 + 1                         # fifteen quiet minutes (the launcher kept its heartbeat going)
-            y.svc.check_idle()
-            x.sync()
-            self.assertEqual(x.dot("Bobby"), expect, manual)
-            y.svc.note_activity()
-
-    def test_launcher_open_versus_in_game_and_the_realm(self):
-        x = self.client()
-        sim = SimActivity(tempfile.mkdtemp(prefix="equ-sim-"))
-        self.addCleanup(shutil.rmtree, os.path.dirname(sim.path), True)
-        y = self.client(activity=sim)
-        x.login("Alice")
-        y.login("Bobby")
-        x.svc.add_friend("Bobby")
-        y.svc.add_friend("Alice")
-        self.assertEqual(x.sync()["Bobby"]["statusLine"], "Launcher open")
-        for realm, name in (("nzoth", "N'Zoth"), ("yshaarj", "Y'Shaarj"), ("cthun", "C'Thun")):
-            sim.set("in_game", realm)
-            y.sync()
-            self.assertEqual(x.sync()["Bobby"]["statusLine"], f"In-game \u00b7 {name}", realm)    # realm switching
-        sim.set("in_game", "")                                                  # in game, realm not known
-        y.sync()
-        self.assertEqual(x.sync()["Bobby"]["statusLine"], "In-game")
-        sim.set("launcher")                                                     # the game closes, the launcher stays
-        y.sync()
-        self.assertEqual(x.sync()["Bobby"]["statusLine"], "Launcher open")
-
-    def test_invisible_hides_the_game_and_the_realm_too(self):
-        x = self.client()
-        sim = SimActivity(tempfile.mkdtemp(prefix="equ-sim-"))
-        self.addCleanup(shutil.rmtree, os.path.dirname(sim.path), True)
-        y = self.client(activity=sim)
-        x.login("Alice")
-        y.login("Bobby")
-        x.svc.add_friend("Bobby")
-        sim.set("in_game", "nzoth")
-        y.svc.set_status("invisible")
-        y.sync()
-        self.assertEqual(x.sync()["Bobby"]["statusLine"], "Offline")
-        self.assertEqual(y.provider.own.realm, "")                                # nothing about the game is even sent
-
-    def test_closing_the_launcher_is_offline_at_once_and_a_crash_after_the_heartbeat_expires(self):
-        x, y = self.pair()
-        y.logout()                                                               # a clean close
-        self.assertEqual(x.sync()["Bobby"]["statusLine"], "Offline")
-        self.assertTrue(y.login("Bobby"))
-        y.sync()
-        self.assertEqual(x.sync()["Bobby"]["statusLine"], "Launcher open")
-        # a crash: Bobby never syncs again
-        for _ in range(5):
-            self.clock.tick(5)
-            x.presence.poll()
-        self.assertEqual(x.line("Bobby"), "Launcher open")                       # 25 s: still inside the lease
-        self.clock.tick(10)
-        x.presence.poll()
-        self.assertEqual(x.line("Bobby"), "Offline")                              # lapsed: not online for ever
-
-    def test_a_stale_session_never_shows_as_online_indefinitely(self):
-        x, y = self.pair()
-        self.clock.tick(S.TTL + 5)
-        self.assertEqual(x.sync(advance=0)["Bobby"]["statusLine"], "Offline")
-
-    def test_reconnection(self):
-        x, y = self.pair()
-        self.clock.tick(S.TTL + 5)
-        self.assertEqual(x.sync()["Bobby"]["statusLine"], "Offline")
-        y.sync()                                                                   # the same launcher comes back
-        self.assertEqual(x.sync()["Bobby"]["statusLine"], "Launcher open")
-
-    def test_backend_unavailable_keeps_the_last_data_backs_off_and_recovers(self):
-        x, y = self.pair()
-        self.server.stop()
-        x.sync()
-        self.assertEqual(x.presence.failures, 1)
-        self.assertEqual(x.line("Bobby"), "Launcher open")                         # the last known value stays
-        self.assertIn("could not be reached", x.svc.add_friend("Carol"))            # editing says why it failed
-        d1 = x.presence.delay()
-        x.clock.tick(d1)
-        x.presence.poll()
-        self.assertGreater(x.presence.delay(), d1 - 0.5)                            # exponential back-off
-        self.assertEqual(x.presence.failures, 2)
-        self.server.start()
-        self.clock.tick(x.presence.delay())
-        y.sync()
-        x.presence.poll()
-        self.assertEqual((x.presence.failures, x.line("Bobby")), (0, "Launcher open"))
-
-    def test_the_heartbeat_is_one_request_and_a_304_when_nothing_changed(self):
-        x, y = self.pair()
-        before = len(x.http.statuses("/sync"))
-        for _ in range(3):
-            x.sync(advance=5)
-            y.sync(advance=0)
-        statuses = x.http.statuses("/sync")[before:]
-        self.assertEqual(len(statuses), 3)                                          # one request per round, not per friend
-        self.assertEqual(statuses[1:], [304, 304])                                   # nothing changed: nothing sent back
-        y.svc.set_status("away")
-        x.sync(advance=5)
-        self.assertEqual(x.http.statuses("/sync")[-1], 200)                          # a change comes through
-        self.assertEqual(x.dot("Bobby"), YELLOW)
-
-    def test_a_304_still_counts_as_fresh_so_a_quiet_friend_is_not_marked_old(self):
-        x, y = self.pair()
-        for _ in range(20):
-            x.sync(advance=5)
-            y.sync(advance=0)
-        self.assertFalse(x.lines()["Bobby"]["stale"])
-
-    def test_the_server_slows_a_client_that_asks_too_fast(self):
-        x, y = self.pair()
-        x.clock.tick(2)
-        x.presence.poll()
-        x.presence.poll()                                                           # no time passed
-        self.assertTrue(x.presence.rate_limited)
-        self.assertEqual(x.presence.failures, 0)                                    # not counted as a failure
-        self.assertGreaterEqual(x.presence.delay(), 1)
-
-    def test_nothing_is_asked_when_signed_out(self):
-        a = self.client()
-        self.assertIsNone(a.presence.delay())
-        self.assertFalse(a.presence.poll())
-        self.assertEqual(a.http.log, [])
-
-    def test_the_interval_is_five_seconds_and_not_a_setting(self):
-        x, y = self.pair()
-        x.presence.poll()
-        self.assertAlmostEqual(x.presence.delay(), 5.0, delta=1.0)
-        self.assertFalse(hasattr(x.presence, "set_interval"))
+class TestFriends(FriendScenarios, PythonBackendCase):
+    pass
 
 
-class TestProtocolAndSafety(Env):
-    def call(self, method, path, body=None, token=""):
-        return D.default_http(method, self.server.url + path, body, {"Authorization": "Bearer " + token} if token else {})
+class TestPresence(PresenceScenarios, PythonBackendCase):
+    def test_backend_outage_keeps_the_last_data_dims_it_and_recovers_by_itself(self):
+        local = PythonBackend(ttl=3.0)
+        self.addCleanup(local.stop)
+        a, b = Client(local), Client(local)
+        self.addCleanup(a.stop)
+        self.addCleanup(b.stop)
+        na, nb = uname("al"), uname("bo")
+        a.login(na)
+        b.login(nb)
+        a.svc.add_friend(nb)
+        self.assertTrue(a.sees(nb, "Launcher open", 4))
+        local.outage()
+        self.assertTrue(wait_for(lambda: not a.link_up(), 5))
+        self.assertEqual(a.line(nb), "Launcher open")                                  # the last known value is kept ...
+        self.assertTrue(a.rows()[nb]["stale"])                                         # ... and shown as old
+        self.assertIn("could not be reached", a.svc.add_friend(uname("zz")))
+        self.assertEqual(a.account.state, A.SIGNED_IN)                                 # still signed in
+        local.start()
+        self.assertTrue(wait_for(lambda: a.link_up() and b.link_up(), 20), "both reconnect by themselves")
+        self.assertTrue(wait_for(lambda: a.line(nb) == "Launcher open" and not a.rows()[nb]["stale"], 6))
 
-    def test_every_call_but_login_needs_a_token(self):
-        for method, path in (("GET", "/v1/me"), ("POST", "/v1/sync"), ("POST", "/v1/friends"), ("DELETE", "/v1/friends/x")):
-            self.assertEqual(self.call(method, path, {} if method != "GET" else None)[0], 401, path)
-        self.assertEqual(self.call("GET", "/v1/me", token="made-up")[0], 401)
 
-    def test_bad_input_is_refused_not_crashed_on(self):
-        status, obj, _ = self.call("POST", "/v1/login", {"username": "<script>"})
-        self.assertEqual(status, 400)
-        status, obj, _ = self.call("POST", "/v1/login", {"username": ["a"]})
-        self.assertEqual(status, 400)
-        tok = self.call("POST", "/v1/login", {"username": "Alice"})[1]["token"]
-        for body in ({"status": "root", "activity": "x", "realm": "<>"}, {"status": 5}, {}):
-            self.clock.tick(2)
-            status, obj, _ = self.call("POST", "/v1/sync", body, tok)
-            self.assertEqual(status, 200)
-        self.assertEqual(self.call("POST", "/v1/friends", {"username": 5}, tok)[0], 400)
-        self.assertEqual(self.call("GET", "/v1/nothing", None, tok)[0], 404)
+class TestMetrics(MetricsScenarios, PythonBackendCase):
+    pass
 
-    def test_an_unknown_realm_or_a_realm_outside_the_game_is_dropped(self):
-        a = self.call("POST", "/v1/login", {"username": "Alice"})[1]["token"]
-        b = self.call("POST", "/v1/login", {"username": "Bobby"})[1]["token"]
-        self.call("POST", "/v1/friends", {"username": "Bobby"}, a)
-        self.call("POST", "/v1/sync", {"status": "online", "activity": "in_game", "realm": "madeup"}, b)
-        row = self.call("POST", "/v1/sync", {}, a)[1]["friends"][0]
-        self.assertEqual((row["activity"], row["realm"]), ("in_game", ""))
-        self.clock.tick(2)
-        self.call("POST", "/v1/sync", {"status": "online", "activity": "launcher", "realm": "nzoth"}, b)
-        self.clock.tick(2)
-        row = self.call("POST", "/v1/sync", {}, a)[1]["friends"][0]
-        self.assertEqual((row["activity"], row["realm"]), ("launcher", ""))
 
-    def test_the_server_never_returns_more_than_a_name_a_favourite_and_a_presence(self):
-        x, y = self.pair()
-        row = self.call("POST", "/v1/sync", {}, x.account.tokens.access)[1]["friends"][0]
-        self.assertEqual(set(row), {"username", "favourite", "state", "activity", "realm"})
+class FakeWs:
+    """A stand-in connection for the link tests."""
 
-    def test_the_address_rules(self):
+    def __init__(self, script):
+        self.script, self.sent, self.closed = list(script), [], False
+
+    def send_text(self, t):
+        self.sent.append(t)
+
+    def recv(self, timeout=None):
+        if not self.script:
+            raise wsclient.WebSocketError("closed")
+        item = self.script.pop(0)
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    def close(self, code=1000):
+        self.closed = True
+
+
+class TestTheLink(unittest.TestCase):
+    def link(self, connect, **kw):
+        events = {"msgs": [], "link": [], "rejected": []}
+        lk = D.SocialLink("ws://x/v1/ws", lambda: "tok", events["msgs"].append, events["link"].append, events["rejected"].append,
+                          connect, rng=lambda: 0.5, **kw)
+        return lk, events
+
+    def test_back_off_doubles_to_a_cap_and_has_jitter(self):
+        def connect(url, headers):
+            raise wsclient.WebSocketError("no route")
+        lk, ev = self.link(connect)
+        lk.stop_flag.wait = lambda t: len(lk.delays) >= 9 and (lk.stop_flag.set() or True)      # do not really wait
+        lk.start()
+        lk.thread.join(10)
+        self.assertEqual([round(d, 2) for d in lk.delays[:8]], [1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 60.0, 60.0])   # jitter 0.5 -> factor 1.0
+        lk.rng = lambda: 0.0
+        self.assertAlmostEqual(0.75, 0.75 + 0.5 * lk.rng())
+        lk.rng = lambda: 1.0
+        self.assertAlmostEqual(1.25, 0.75 + 0.5 * lk.rng())                                                     # jitter is +-25 %
+
+    def test_a_refusal_with_retry_after_is_honoured(self):
+        def connect(url, headers):
+            raise wsclient.WebSocketError("busy", 429, retry_after=30.0)
+        lk, ev = self.link(connect)
+        lk.stop_flag.wait = lambda t: lk.stop_flag.set() or True
+        lk.start()
+        lk.thread.join(5)
+        self.assertGreaterEqual(lk.delays[0], 30.0)
+
+    def test_a_rejected_session_stops_the_link_and_says_so(self):
+        def connect(url, headers):
+            raise wsclient.WebSocketError("no", 401)
+        lk, ev = self.link(connect)
+        lk.start()
+        lk.thread.join(5)
+        self.assertEqual(ev["rejected"], ["rejected"])
+        self.assertFalse(lk.running())
+
+    def test_another_launcher_taking_over_stops_it_without_a_fight(self):
+        conns = []
+
+        def connect(url, headers):
+            conns.append(1)
+            return FakeWs(['{"t":"friends","friends":[]}', '{"t":"bye","reason":"replaced"}'])
+        lk, ev = self.link(connect)
+        lk.start()
+        lk.thread.join(5)
+        self.assertEqual(len(conns), 1)
+        self.assertEqual(ev["rejected"], [])
+
+    def test_an_account_recovered_elsewhere_is_reported_and_stops(self):
+        lk, ev = self.link(lambda u, h: FakeWs(['{"t":"bye","reason":"recovered elsewhere"}']))
+        lk.start()
+        lk.thread.join(5)
+        self.assertEqual(ev["rejected"], ["recovered elsewhere"])
+
+    def test_the_players_state_is_resent_on_every_reconnect(self):
+        calls = {"n": 0}
+        sockets = []
+
+        def connect(url, headers):
+            calls["n"] += 1
+            ws = FakeWs(['{"t":"friends","friends":[]}', wsclient.WebSocketError("dropped")])
+            sockets.append(ws)
+            if calls["n"] >= 3:
+                lk.stop_flag.set()
+            return ws
+        lk, ev = self.link(connect)
+        lk.send_state(P.OwnStatus("dnd", "in_game", "nzoth"))
+        lk.stop_flag.wait = lambda t: lk.stop_flag.is_set()
+        lk.start()
+        lk.thread.join(5)
+        self.assertGreaterEqual(len(sockets), 2)
+        for ws in sockets:
+            self.assertEqual(json.loads(ws.sent[0]), {"t": "state", "status": "dnd", "activity": "in_game", "realm": "nzoth"})
+
+    def test_it_pings_when_quiet_and_not_otherwise(self):
+        ws = FakeWs([socket.timeout(), socket.timeout(), '{"t":"friends","friends":[]}', wsclient.WebSocketError("end")])
+        lk, ev = self.link(lambda u, h: ws, ping_every=0.01)
+        lk.stop_flag.wait = lambda t: lk.stop_flag.set() or True
+        lk.start()
+        lk.thread.join(5)
+        self.assertEqual(ws.sent.count("ping"), 2)
+
+    def test_a_signed_out_player_makes_no_connection(self):
+        calls = []
+        lk = D.SocialLink("ws://x/v1/ws", lambda: None, lambda m: None, lambda c: None, lambda r: None,
+                          lambda u, h: calls.append(1))
+        lk.start()
+        lk.thread.join(3)
+        self.assertEqual(calls, [])
+
+
+class TestWebSocketClient(unittest.TestCase):
+    def test_it_speaks_to_the_local_server_and_rejects_a_bad_handshake(self):
+        backend = PythonBackend()
+        self.addCleanup(backend.stop)
+        c = Client(backend)
+        self.addCleanup(c.stop)
+        c.login(uname())
+        ws = c.raw_ws()
+        self.addCleanup(ws.close)
+        self.assertIn('"t":"friends"', ws.recv(3))
+        ws.send_text("ping")
+        self.assertEqual(ws.recv(3), "pong")
+        with self.assertRaises(socket.timeout):
+            ws.recv(0.2)
+        with self.assertRaises(wsclient.WebSocketError) as ctx:
+            wsclient.connect(D.ws_url(backend.url), {"Authorization": "Bearer nope"})
+        self.assertEqual(ctx.exception.status, 401)
+        with self.assertRaises(wsclient.WebSocketError):
+            wsclient.connect("http://127.0.0.1:1/x")
+
+    def test_addresses(self):
         for ok in ("https://social.example.org", "http://127.0.0.1:8787", "http://localhost:1", "http://192.168.1.5:80",
                    "http://10.1.2.3", "http://172.16.0.9"):
             self.assertTrue(D.url_ok(ok), ok)
         for bad in ("http://example.org", "ftp://127.0.0.1", "", "http://172.32.0.1", "https://", "javascript:alert(1)"):
             self.assertFalse(D.url_ok(bad), bad)
+        self.assertEqual(D.ws_url("https://a.b"), "wss://a.b/v1/ws")
+        self.assertEqual(D.ws_url("http://127.0.0.1:9"), "ws://127.0.0.1:9/v1/ws")
         self.assertEqual(D.backend_url({"EQU3_SOCIAL_URL": "http://example.org"}), "")
         self.assertEqual(D.backend_url({"EQU3_SOCIAL_URL": "http://127.0.0.1:9/"}), "http://127.0.0.1:9")
-        self.assertEqual(D.backend_url({}), D.DEFAULT_URL if D.url_ok(D.DEFAULT_URL) else "")
 
+
+class TestIsolationAndSecrets(unittest.TestCase):
     def test_the_test_system_is_isolated_from_the_rest_of_the_program(self):
-        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         users = []
-        for d, _s, files in os.walk(os.path.join(root, "equpdater")):
+        for d, _s, files in os.walk(os.path.join(ROOT, "equpdater")):
             for f in files:
                 if f.endswith((".py", ".qml")) and "__pycache__" not in d:
                     p = os.path.join(d, f)
-                    with open(p, encoding="utf-8", errors="ignore") as fh:
-                        text = fh.read()
-                    if "devsocial" in text:
-                        users.append(os.path.relpath(p, root).replace("\\", "/"))
-        self.assertEqual(sorted(users), ["equpdater/qtui/main.py"])          # the one place that picks the providers
-        with open(os.path.join(root, "equpdater", "qtui", "main.py"), encoding="utf-8") as f:
-            main = f.read()
-        self.assertIn("not _account.PROVIDER_CONFIG", main)                           # OctoWoW's real sign-in always wins
+                    if "devsocial" in open(p, encoding="utf-8", errors="ignore").read():
+                        users.append(os.path.relpath(p, ROOT).replace("\\", "/"))
+        self.assertEqual(sorted(users), ["equpdater/qtui/main.py"])                          # the one place that picks the providers
+        main = open(os.path.join(ROOT, "equpdater", "qtui", "main.py"), encoding="utf-8").read()
+        self.assertIn("not _account.PROVIDER_CONFIG", main)                                   # OctoWoW's real sign-in always wins
+
+    def test_no_secret_is_in_the_source_or_the_package_inputs(self):
+        """No tester key, admin key, token or recovery code in source: secrets are Cloudflare secrets and the
+        credential manager. (The keys the tests use are made up and only ever start a local server.)"""
+        import re
+        pat = re.compile(r"(ADMIN_KEY|TESTER_KEYS?|RECOVERY)\s*[:=]\s*[\"'][A-Za-z0-9_\-]{24,}[\"']")
+        hits = []
+        for base in ("equpdater", "cloudflare/social/src", "tools/socialserver"):
+            for d, _s, files in os.walk(os.path.join(ROOT, base)):
+                for f in files:
+                    if f.endswith((".py", ".js", ".qml")) and "node_modules" not in d:
+                        if pat.search(open(os.path.join(d, f), encoding="utf-8", errors="ignore").read()):
+                            hits.append(f)
+        self.assertEqual(hits, [])
+        toml = open(os.path.join(ROOT, "cloudflare", "social", "wrangler.toml"), encoding="utf-8").read()
+        self.assertNotIn("TESTER_KEYS =", toml)
+        self.assertNotIn("ADMIN_KEY_HASH =", toml)
+        self.assertTrue(D.DEFAULT_URL == "" or D.url_ok(D.DEFAULT_URL))
+
+    def test_the_secrets_stay_out_of_settings_and_use_the_credential_store(self):
+        backend = PythonBackend()
+        self.addCleanup(backend.stop)
+        c = Client(backend)
+        self.addCleanup(c.stop)
+        name = uname()
+        c.login(name)
+        blob = json.dumps(c.settings)
+        for secret in (c.account.tokens.access, c.vault.get("recovery", name), TESTER_KEY):
+            self.assertNotIn(secret, blob)
+        for kind in ("session", "recovery"):
+            self.assertTrue(c.vault.get(kind, name))
+        self.assertEqual(c.vault.get("tester-key"), TESTER_KEY)
+
+    def test_an_early_builds_plaintext_tokens_are_removed_from_settings(self):
+        from equpdater.core import settings as S
+        d = tempfile.mkdtemp(prefix="equ-set-")
+        self.addCleanup(shutil.rmtree, d, True)
+        with open(os.path.join(d, "settings.json"), "w") as f:
+            json.dump({"_schema": 1, "imported_from_2x": True, "dev_tokens": {"alice": "secret"}}, f)
+        self.assertNotIn("dev_tokens", S.open_settings(d).data)
+
+
+class TestPresenceProviderUnit(unittest.TestCase):
+    def book(self):
+        from equpdater.core import friends as F
+        from equpdater.core.store import JsonStore
+        tmp = tempfile.mkdtemp(prefix="equ-pp-")
+        self.addCleanup(shutil.rmtree, tmp, True)
+        return F.FriendBook(JsonStore(os.path.join(tmp, "s.json"), {"friends": []}, delay=0))
+
+    def test_a_lost_connection_ages_what_is_known_and_a_pong_freshens_it(self):
+        book = self.book()
+        book.add("Thrall")
+        now = [1000.0]
+        prov = D.DevPresenceProvider(D.Backend("http://127.0.0.1:9"), book, now=lambda: now[0])
+        pres = P.PresenceService(book, prov, None, now=lambda: now[0])
+        prov.attach(pres, lambda: "t")
+        prov._on_message({"t": "friends", "friends": [{"username": "Thrall", "favourite": False, "state": "online", "activity": "launcher", "realm": ""}]})
+        self.assertEqual(pres.state_of(book.all()[0]), (P.LAUNCHER, False))
+        now[0] += 100
+        self.assertFalse(pres.state_of(book.all()[0])[1])                                    # 100 s of quiet is fine for a push link
+        prov._on_message({"t": "pong"})
+        now[0] += 100
+        self.assertFalse(pres.state_of(book.all()[0])[1])
+        prov._on_link(False)                                                                  # the link drops
+        self.assertEqual(pres.state_of(book.all()[0]), (P.LAUNCHER, True))                   # kept, but old
+        prov._on_message({"t": "presence", "u": "thrall", "state": "dnd", "activity": "in_game", "realm": "nzoth"})
+        self.assertEqual(pres.state_of(book.all()[0]), (P.IN_GAME, False))
+        self.assertEqual(pres.observation(book.all()[0]).realm, "nzoth")
+
+    def test_polling_is_gone_for_a_push_provider(self):
+        book = self.book()
+        prov = D.DevPresenceProvider(D.Backend("http://127.0.0.1:9"), book)
+        pres = P.PresenceService(book, prov, type("Acct", (), {"state": "signed_in", "valid_access": lambda s: "t"})())
+        calls = []
+        pres.before_poll = lambda: calls.append(1)
+        self.assertFalse(pres.poll())
+        self.assertEqual((calls, pres.requests), ([1], 0))                                   # local detection ran, nothing was requested
 
 
 class TestActivityDetection(unittest.TestCase):
-    def test_a_launcher_alone_is_launcher_and_a_running_game_is_in_game(self):
-        clock = Clock()
-        state = {"running": False, "cfg": ("", 0.0)}
-        w = G.GameWatcher(lambda: "C:/g", lambda: [], running=lambda d: state["running"], config=lambda d, r: state["cfg"], now=clock)
+    def test_a_launcher_alone_is_launcher_an_open_game_is_not_in_game_and_a_realm_connection_is(self):
+        state = {"running": False, "connected": False}
+        w = G.GameWatcher(lambda: "C:/g", lambda: [], running=lambda d: state["running"],
+                          connected=lambda d: state["connected"], realm=lambda d, r: "")
         self.assertEqual(w.read(), G.Activity("launcher"))
-        state["running"] = True
-        self.assertEqual(w.read(), G.Activity("in_game", ""))
+        state["running"] = True                                                              # the game is open (login screen)
+        self.assertEqual(w.read(), G.Activity("launcher"))
+        state["connected"] = True                                                            # connected to a realm
+        self.assertEqual(w.read(), G.Activity("in_game", ""))                                # connected, realm unknown: no guess
+        state["connected"] = False
+        self.assertEqual(w.read(), G.Activity("launcher"))
         state["running"] = False
-        self.assertEqual(w.read(), G.Activity("launcher"))                            # the game closed, the launcher stays
+        self.assertEqual(w.read(), G.Activity("launcher"))
 
-    def test_the_realm_counts_only_if_the_game_wrote_it_this_run(self):
-        clock = Clock()
-        state = {"running": True, "cfg": ("nzoth", NOW - 3600)}                       # written an hour ago: a previous session
-        w = G.GameWatcher(lambda: "C:/g", lambda: [], running=lambda d: state["running"], config=lambda d, r: state["cfg"], now=clock)
-        self.assertEqual(w.read(), G.Activity("in_game", ""))                        # not inferred from an old file
-        clock.tick(10)
-        state["cfg"] = ("yshaarj", clock.t)                                           # the client wrote it now
-        self.assertEqual(w.read(), G.Activity("in_game", "yshaarj"))
-        state["running"] = False
-        w.read()
-        state["running"] = True
-        state["cfg"] = ("cthun", NOW)                                                 # a new run: the old write does not count
-        clock.tick(60)
-        self.assertEqual(w.read(), G.Activity("in_game", ""))
-
-    def test_config_wtf_is_read_and_matched_to_a_real_realm(self):
-        d = tempfile.mkdtemp(prefix="equ-wtf-")
-        self.addCleanup(shutil.rmtree, d, True)
-        os.makedirs(os.path.join(d, "WTF"))
-        with open(os.path.join(d, "WTF", "Config.wtf"), "w", encoding="utf-8") as f:
-            f.write('SET realmList "play.octowow.st"\nSET realmName "N\'Zoth"\n')
+    def test_the_realm_comes_only_from_a_known_world_server_never_from_config_wtf_alone(self):
         from equpdater.core import realms as R
-        realm, mtime = G.realm_from_config(d, [R.Realm("nzoth", "N'Zoth"), R.Realm("cthun", "C'Thun")])
-        self.assertEqual(realm, "nzoth")
-        self.assertGreater(mtime, 0)
-        with open(os.path.join(d, "WTF", "Config.wtf"), "w", encoding="utf-8") as f:
-            f.write('SET realmName "Some Other Server"\n')
-        self.assertEqual(G.realm_from_config(d, [R.Realm("nzoth", "N'Zoth")])[0], "")
+        realms = [R.Realm("nzoth", "N'Zoth"), R.Realm("cthun", "C'Thun")]
+        endpoints = [("203.0.113.5", 8092)]
+        # connected to a world server nobody has told us about: no realm, whatever Config.wtf says
+        self.assertEqual(G.realm_for(realms, endpoints, known={}), "")
+        self.assertEqual(G.realm_for(realms, endpoints, known={"203.0.113.5:8092": "cthun"}), "cthun")
+        self.assertEqual(G.realm_for(realms, endpoints, known={"203.0.113.5:8092": "madeup"}), "")       # not a real realm
+        self.assertEqual(G.realm_for(realms, [], known={"203.0.113.5:8092": "cthun"}), "")                # not connected
+        self.assertEqual(G.realm_for(realms, [("203.0.113.5", 8092), ("198.51.100.7", 8092)],
+                                     known={"203.0.113.5:8092": "cthun", "198.51.100.7:8092": "nzoth"}), "")   # two answers: no guess
+
+    def test_world_connections_are_told_from_the_login_connection_and_from_local_traffic(self):
+        conns = [("185.246.188.177", 3724), ("92.114.107.49", 8092), ("127.0.0.1", 40041)]
+        self.assertEqual(G.world_endpoints(conns, login_ports=(3724,), login_hosts={"185.246.188.177"}), [("92.114.107.49", 8092)])
+        self.assertEqual(G.world_endpoints([("185.246.188.177", 3724)], (3724,), {"185.246.188.177"}), [])
+        self.assertEqual(G.world_endpoints([], (3724,), set()), [])
 
     def test_the_simulation_is_only_used_when_asked_for_and_never_in_a_packaged_build(self):
-        real = G.make_source(lambda: "", lambda: [], env={}, frozen=False)
-        self.assertIsInstance(real, G.GameWatcher)
-        sim = G.make_source(lambda: "", lambda: [], env={"EQU3_SIM_ACTIVITY": "x.json"}, frozen=False)
-        self.assertIsInstance(sim, G.SimulatedActivity)
-        packaged = G.make_source(lambda: "", lambda: [], env={"EQU3_SIM_ACTIVITY": "x.json"}, frozen=True)
-        self.assertIsInstance(packaged, G.GameWatcher)
+        self.assertIsInstance(G.make_source(lambda: "", lambda: [], env={}, frozen=False), G.GameWatcher)
+        self.assertIsInstance(G.make_source(lambda: "", lambda: [], env={"EQU3_SIM_ACTIVITY": "x.json"}, frozen=False), G.SimulatedActivity)
+        self.assertIsInstance(G.make_source(lambda: "", lambda: [], env={"EQU3_SIM_ACTIVITY": "x.json"}, frozen=True), G.GameWatcher)
 
     def test_a_game_that_is_not_installed_is_not_running(self):
         self.assertFalse(G.game_running(""))
