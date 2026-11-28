@@ -57,7 +57,7 @@ Colours are `#RRGGBB` or `#AARRGGBB` (alpha first, as Qt writes it); `$name` ref
 
 ## Icons
 
-`icon.logo icon.refresh icon.settings icon.arrow-down icon.discord icon.support icon.download icon.remove icon.release icon.link icon.check icon.update icon.external icon.folder icon.close`. PNG, square, 64×64 recommended (the logo 128×128). A skin that omits one gets the built-in icon.
+`icon.logo icon.refresh icon.settings icon.arrow-down icon.discord icon.support icon.download icon.remove icon.release icon.link icon.check icon.update icon.external icon.folder icon.close icon.wrench`. PNG, square, 64×64 recommended (the logo 128×128). A skin that omits one gets the built-in icon.
 
 ## Palette names the app uses
 

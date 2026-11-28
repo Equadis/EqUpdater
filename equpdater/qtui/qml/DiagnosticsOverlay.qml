@@ -10,6 +10,7 @@ Item {
     objectName: "diagnosticsOverlay"
     visible: diag.isOpen
     focus: visible
+    onVisibleChanged: if (visible) forceActiveFocus()          // so Escape reaches this window
     Keys.onEscapePressed: diag.close()
     property bool deep: true
     property bool mpq: false
@@ -50,7 +51,7 @@ Item {
                              selected: diag.view === "scan"; onClicked: diag.openView("scan") }
                 SkinButton { kind: "button.small"; text: app.t("Login Doctor")
                              selected: diag.view === "doctor"; onClicked: diag.openView("doctor") }
-                SkinButton { kind: "button.small"; text: app.t("Close"); onClicked: diag.close() }
+                SkinCloseButton { anchors.verticalCenter: parent.verticalCenter; onClicked: diag.close() }
             }
         }
 

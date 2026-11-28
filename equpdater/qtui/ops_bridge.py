@@ -426,6 +426,13 @@ class MpqBridge(QObject):
 
 
 _FONT_DOWNLOAD_WORD = N_("download")        # shown in Settings > Font as "Friz Quadrata (download)": SettingsOverlay.qml
+# Text used by QML (SettingsOverlay.qml, TroubleshootingOverlay.qml, EqUi/SkinCloseButton.qml): registered so it is translated
+_QML_TEXT = (N_("Troubleshooting"), N_("Close"), N_("Browse"), N_("Find"), N_("Login Doctor"), N_("Open logs folder"),
+             N_("Compares each game file with the client manifest. It only reads: nothing is changed or downloaded."),
+             N_("Checks for common login problems. It changes nothing unless you press Repair and confirm."),
+             N_("Shows what happened on recent launches and can export a support report. It changes nothing."),
+             N_("Opens the folder where EqUpdater saves error reports. Nothing is changed or sent."),
+             N_("Shows what EqUpdater has done since it started. It is read-only."))
 
 
 class GeneralBridge(QObject):

@@ -46,7 +46,7 @@ ICON_COMPONENTS = {"icon.logo": "logo", "icon.refresh": "refresh", "icon.setting
                    "icon.support": "support", "icon.download": "download",
                    "icon.remove": "remove", "icon.release": "release", "icon.link": "link",
                    "icon.check": "check", "icon.update": "swap",
-                   "icon.folder": "folder", "icon.close": "close"}
+                   "icon.folder": "folder", "icon.close": "close", "icon.wrench": "wrench"}
 
 
 def icon_components(prefix="icons/"):

@@ -9,6 +9,7 @@ Item {
     objectName: "customOverlay"
     visible: customSrc.isOpen
     focus: visible
+    onVisibleChanged: if (visible) forceActiveFocus()          // so Escape reaches this window
     Keys.onEscapePressed: customSrc.close()
     readonly property bool isMod: customSrc.kind === "mod"
     function tone(t) { return t === "err" ? "text.error" : t === "ok" ? "text.ok" : "text.dim" }
@@ -31,9 +32,8 @@ Item {
             height: 30
             SkinText { kind: "panel.header"; anchors.verticalCenter: parent.verticalCenter
                        text: root.isMod ? app.t("ADD CUSTOM GIT MOD") : app.t("ADD CUSTOM GIT ADDON") }
-            SkinButton { kind: "button.small"; text: app.t("Close")
-                         anchors { right: parent.right; verticalCenter: parent.verticalCenter }
-                         onClicked: customSrc.close() }
+            SkinCloseButton { anchors { right: parent.right; verticalCenter: parent.verticalCenter }
+                              onClicked: customSrc.close() }
         }
         Column {
             anchors { left: parent.left; right: parent.right; top: head.bottom; topMargin: 10; bottom: parent.bottom }

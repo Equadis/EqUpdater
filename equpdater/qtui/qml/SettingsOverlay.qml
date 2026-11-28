@@ -10,12 +10,12 @@ Item {
     id: root
     objectName: "settingsOverlay"
     visible: false
-    property bool showLog: false
     property string folderError: ""
-    function open() { visible = true; showLog = false; settings.rescanSkins() }
+    function open() { visible = true; settings.rescanSkins() }
     function close() { if (visible) { visible = false; general.closed() } }
     focus: visible
-    Keys.onEscapePressed: if (showLog) showLog = false; else close()
+    onVisibleChanged: if (visible) forceActiveFocus()          // so Escape reaches this window
+    Keys.onEscapePressed: close()
 
     Rectangle {
         anchors.fill: parent
@@ -43,17 +43,15 @@ Item {
             id: head
             anchors { left: parent.left; right: parent.right; top: parent.top }
             height: 30
-            SkinText { kind: "panel.header"; text: root.showLog ? app.t("Show Session Log") : app.t("SETTINGS")
+            SkinText { kind: "panel.header"; text: app.t("SETTINGS")
                        anchors.verticalCenter: parent.verticalCenter }
-            SkinButton { kind: "button.small"; text: root.showLog ? app.t("Back") : app.t("Close")
-                         anchors { right: parent.right; verticalCenter: parent.verticalCenter }
-                         onClicked: root.showLog ? root.showLog = false : root.close() }
+            SkinCloseButton { anchors { right: parent.right; verticalCenter: parent.verticalCenter }
+                              onClicked: root.close() }
         }
 
         Flickable {
             id: flick
-            visible: !root.showLog
-            anchors { left: parent.left; right: parent.right; top: head.bottom; bottom: parent.bottom
+                        anchors { left: parent.left; right: parent.right; top: head.bottom; bottom: parent.bottom
                       topMargin: 8 }
             contentWidth: width
             contentHeight: col.implicitHeight
@@ -80,8 +78,8 @@ Item {
                     }
                     SkinButton { kind: "button.small"; text: app.t("Change")
                                  onClicked: root.folderError = general.changeGameDir(dirField.text) }
-                    SkinButton { kind: "button.small"; text: app.t("Browse…"); onClicked: folderDialog.open() }
-                    SkinButton { kind: "button.small"; text: app.t("Find…")
+                    SkinButton { kind: "button.small"; text: app.t("Browse"); onClicked: folderDialog.open() }
+                    SkinButton { kind: "button.small"; text: app.t("Find")
                                  onClicked: { root.close(); setup.open() }
                                  SkinToolTipArea { tip: app.t("Looks for a game already on this computer, or extracts an archive you downloaded.") } }
                     SkinIconButton { kind: "icon.folder"; tip: app.t("Open folder"); onClicked: general.openGameDir() }
@@ -265,56 +263,6 @@ Item {
                                return "" }
                     onChosen: function (id) { tweaks.setLanguage(id) }
                     SkinToolTipArea { tip: app.t("The language of EqUpdater and of the game. EqUpdater offers to restart to show the change.") }
-                }
-                Rectangle { width: parent.width; height: 1
-                            color: Style.pick(Style.theme.components["divider"].colors, "normal", "#444") }
-
-                // ── TROUBLESHOOTING ─────────────────────────────────────
-                SkinText { kind: "text.heading"; text: app.t("TROUBLESHOOTING") }
-                Flow {
-                    width: parent.width
-                    spacing: 8
-                    SkinButton { kind: "button.small"; text: app.t("Verify game files")
-                                 onClicked: { root.close(); diag.openView("scan") }
-                                 SkinToolTipArea { tip: app.t("Reads every file in the game folder and compares it with the client's manifest. Nothing is changed or downloaded.") } }
-                    SkinButton { kind: "button.small"; text: app.t("Login Doctor")
-                                 onClicked: { root.close(); diag.openView("doctor") }
-                                 SkinToolTipArea { tip: app.t("Checks this computer for common login problems: the game client, its login settings, OctoLogin and the connection to OctoWoW.") } }
-                    SkinButton { kind: "button.small"; text: app.t("Game Diagnostics")
-                                 onClicked: { root.close(); diag.openView("attempt") }
-                                 SkinToolTipArea { tip: app.t("What happened after you pressed PLAY, a check of the game folder, and a report you can send for help.") } }
-                    SkinButton { objectName: "openLogsButton"; kind: "button.small"; text: app.t("Open logs folder")
-                                 onClicked: general.openLogsFolder()
-                                 SkinToolTipArea { tip: app.t("Where EqUpdater saves a report if it stops with an error. Nothing is sent anywhere: attach a report yourself if you ask for help.") } }
-                    SkinButton { kind: "button.small"; text: app.t("Show Session Log")
-                                 onClicked: { general.refreshLog(); root.showLog = true }
-                                 SkinToolTipArea { tip: app.t("Everything EqUpdater has done since it started: what it checked, what it changed and why anything failed.") } }
-                }
-            }
-        }
-
-        Item {
-            visible: root.showLog
-            anchors { left: parent.left; right: parent.right; top: head.bottom; bottom: parent.bottom; topMargin: 8 }
-            Flickable {
-                id: logFlick
-                anchors.fill: parent
-                clip: true
-                contentWidth: width
-                contentHeight: logText.contentHeight + 8
-                boundsBehavior: Flickable.StopAtBounds
-                C.ScrollBar.vertical: SkinScrollBar {}
-                TextEdit {
-                    id: logText
-                    objectName: "sessionLogText"
-                    width: logFlick.width - 14
-                    readOnly: true
-                    selectByMouse: true
-                    wrapMode: TextEdit.Wrap
-                    text: general.sessionLog
-                    color: Style.pick(Style.theme.components["text.dim"].textColors, "normal", "#aaa")
-                    font.family: "Consolas"
-                    font.pixelSize: Style.theme.fonts.dim.size
                 }
             }
         }

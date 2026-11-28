@@ -158,12 +158,25 @@ def icon_swap(color):
     return finish(im)
 
 
+def icon_wrench(color):
+    """A spanner: a handle and an open-jaw head, drawn level then turned 45 degrees."""
+    n = S * K
+    im = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    cy = n // 2
+    d.rounded_rectangle((4 * K, cy - 5 * K, 40 * K, cy + 5 * K), radius=5 * K, fill=color)
+    d.ellipse((34 * K, cy - 15 * K, 62 * K, cy + 13 * K), fill=color)
+    d.rectangle((50 * K, cy - 6 * K, 64 * K, cy + 4 * K), fill=(0, 0, 0, 0))
+    im = im.rotate(45, resample=Image.Resampling.BICUBIC)
+    return finish(im)
+
+
 def write_icons(skin, color, extra=True):
     icons = {"refresh": icon_refresh, "settings": icon_settings,
              "arrow-down": icon_arrow_down, "download": icon_download,
              "remove": icon_remove, "release": icon_release, "link": icon_link,
              "check": icon_check, "swap": icon_swap,
-             "folder": icon_folder, "close": icon_close}
+             "folder": icon_folder, "close": icon_close, "wrench": icon_wrench}
     if extra:
         icons.update({"support": icon_support, "discord": icon_chat})
     for name, fn in icons.items():

@@ -209,6 +209,9 @@
     },
     "icon.close": {
       "icon": "icons/close.png"
+    },
+    "icon.wrench": {
+      "icon": "icons/wrench.png"
     }
   }
 }

@@ -342,7 +342,7 @@ class TestSettingsStaysOpen(UI):
     def test_only_an_outside_click_the_close_button_or_escape_closes_it(self):
         self.start()
         self.open_settings()
-        close = item_with_text(self.overlay, "Close")
+        close = next((i for i in walk(self.overlay) if i.objectName() == "closeButton"), None)   # the X
         self.assertIsNotNone(close)
         self.click(close, scroll=False)
         self.assertFalse(self.overlay.property("visible"))
@@ -363,7 +363,7 @@ class TestSettingsStaysOpen(UI):
 
 
 class TestFonts(UI):
-    FAMILIES = {"": None, "arial": "Arial", "friz": "Friz Quadrata", "opendyslexic": "OpenDyslexic", "objectsans": "Object Sans"}
+    FAMILIES = {"": None, "arial": "Arial", "friz": "Friz Quadrata", "objectsans": "Object Sans", "opendyslexic": "OpenDyslexic"}
 
     def fake_archive(self, prefix="FrizQuadrata"):
         return font_zip(prefix)

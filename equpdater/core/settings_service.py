@@ -22,12 +22,12 @@ from .av_ops import LauncherSettings
 from .ops_host import OpsHost
 
 #: font override -> (family, size scale). "" means: the skin's own fonts.
-FONT_OVERRIDES = {
+FONT_OVERRIDES = {          # the order of the Font list in Settings
     "": ("", 1.0),
     "arial": ("Arial", 1.0),
-    "friz": ("Friz Quadrata", 1.0),
-    "opendyslexic": ("OpenDyslexic", 0.92),      # 2.x's footprint compromise
-    "objectsans": ("Object Sans", 1.0),          # downloaded on request (core/fontstore.py)
+    "friz": ("Friz Quadrata", 1.0),                # downloaded on request (core/fontstore.py)
+    "objectsans": ("Object Sans", 1.0),            # downloaded on request
+    "opendyslexic": ("OpenDyslexic", 0.92),        # bundled; 2.x's footprint compromise
 }
 
 

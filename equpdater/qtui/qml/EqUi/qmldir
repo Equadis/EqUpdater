@@ -19,3 +19,4 @@ SkinSearchField 1.0 SkinSearchField.qml
 SkinActionMenu 1.0 SkinActionMenu.qml
 SkinRowActions 1.0 SkinRowActions.qml
 SkinSelect 1.0 SkinSelect.qml
+SkinCloseButton 1.0 SkinCloseButton.qml

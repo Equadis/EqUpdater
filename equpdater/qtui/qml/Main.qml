@@ -37,6 +37,7 @@ Window {
         function onMinimizeRequested() { win.showMinimized() }
         function onDebugAction(name) {
             if (name === "settings") win.openSettings()
+            else if (name === "troubleshooting") win.openTroubleshooting()
             else if (name === "menu") menu.open()
             else if (name === "server") footerChip.toggle()
             else if (name.indexOf("diag:") === 0) diag.openView(name.substring(5))
@@ -88,7 +89,30 @@ Window {
         }
         AccountChip {
             id: accountChip
-            anchors { right: gear.left; rightMargin: 12; verticalCenter: gear.verticalCenter }
+            anchors { right: wrench.left; rightMargin: 12; verticalCenter: gear.verticalCenter }
+        }
+        // Troubleshooting: the wrench sits immediately left of Settings and is built exactly like it
+        Item {
+            id: wrench
+            objectName: "troubleshootingWrench"
+            width: 28; height: 28
+            anchors { right: gear.left; rightMargin: 4; top: parent.top; topMargin: 8 }
+            activeFocusOnTab: true
+            Accessible.role: Accessible.Button
+            Accessible.name: app.t("Troubleshooting")
+            Keys.onSpacePressed: win.openTroubleshooting()
+            readonly property bool skinned: Style.theme.components["icon.wrench"].icon !== ""
+            SkinIcon { visible: wrench.skinned; kind: "icon.wrench"; size: 18; anchors.centerIn: parent
+                       opacity: wh.hovered ? 1 : 0.7 }
+            Image {                                          // a skin made before the wrench existed
+                visible: !wrench.skinned
+                source: "EqUi/wrench-default.png"
+                width: 18; height: 18; anchors.centerIn: parent; smooth: true; mipmap: true
+                opacity: wh.hovered ? 1 : 0.7
+            }
+            HoverHandler { id: wh; cursorShape: Qt.PointingHandCursor }
+            TapHandler { onTapped: win.openTroubleshooting() }
+            SkinToolTipArea { tip: app.t("Troubleshooting") }
         }
         Item {
             id: gear
@@ -243,6 +267,7 @@ Window {
 
     // Overlays are built the first time they are wanted, not at start-up.
     LazyOverlay { id: settingsL; z: 90; source: "SettingsOverlay.qml" }      // above the friends list (z 20)
+    LazyOverlay { id: troubleL; z: 90; source: "TroubleshootingOverlay.qml" }
     LazyOverlay { z: 90; source: "DiagnosticsOverlay.qml"; wanted: diag.isOpen }
     LazyOverlay { z: 90; source: "CustomOverlay.qml"; wanted: customSrc.isOpen }
     LazyOverlay { z: 90; source: "SetupOverlay.qml"; wanted: setup.isOpen }
@@ -255,5 +280,9 @@ Window {
     function openSettings() {
         settingsL.seen = true
         if (settingsL.item) settingsL.item.open()
+    }
+    function openTroubleshooting() {
+        troubleL.seen = true
+        if (troubleL.item) troubleL.item.open()
     }
 }

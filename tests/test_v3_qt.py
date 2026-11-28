@@ -1093,7 +1093,7 @@ class TestLazyOverlays(Base):
     def test_nothing_is_built_until_it_is_wanted_and_a_real_question_still_shows(self):
         p = self.start()
         built = lambda n: self.win.findChild(QObject, n) is not None
-        for name in ("settingsOverlay", "diagnosticsOverlay", "customOverlay", "setupOverlay",
+        for name in ("settingsOverlay", "troubleshootingOverlay", "diagnosticsOverlay", "customOverlay", "setupOverlay",
                      "languageOverlay", "dialogHost"):
             self.assertFalse(built(name), name)
         # a real question (not the test shortcut) must build the dialog host and be answerable

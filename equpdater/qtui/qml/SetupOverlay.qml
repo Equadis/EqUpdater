@@ -10,6 +10,7 @@ Item {
     objectName: "setupOverlay"
     visible: setup.isOpen
     focus: visible
+    onVisibleChanged: if (visible) forceActiveFocus()          // so Escape reaches this window
     Keys.onEscapePressed: setup.close()
     function tone(t) { return t === "err" ? "text.error" : t === "ok" ? "text.ok"
                             : t === "warn" ? "text.link" : "text.dim" }
@@ -32,9 +33,9 @@ Item {
             anchors { left: parent.left; right: parent.right; top: parent.top }
             height: 30
             SkinText { kind: "panel.header"; text: app.t("FIND YOUR GAME"); anchors.verticalCenter: parent.verticalCenter }
-            SkinButton { kind: "button.small"; text: app.t("Close"); enabled: !setup.extracting
-                         anchors { right: parent.right; verticalCenter: parent.verticalCenter }
-                         onClicked: setup.close() }
+            SkinCloseButton { enabled: !setup.extracting
+                              anchors { right: parent.right; verticalCenter: parent.verticalCenter }
+                              onClicked: setup.close() }
         }
         Flickable {
             anchors { left: parent.left; right: parent.right; top: head.bottom; bottom: parent.bottom; topMargin: 8 }
