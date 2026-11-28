@@ -66,7 +66,7 @@ Automated: 1,190+ tests (core logic, every page and overlay in all six skins, in
 ## 8. Not breaking 2.x
 - [ ] After using 3, 2.x starts, shows the same game folder, mods and addons, and works.
 - [ ] Uninstalling the beta (delete its folder) leaves 2.x untouched.
-- [ ] Settings stays open when a skin, font, language or checkbox is chosen and when the default skin is restored; the scroll position is kept; each font button is drawn in its own face (Arial, Friz Quadrata, OpenDyslexic, Object Sans); Language is in Settings and not on the Tweaks page.
+- [ ] Settings stays open when a skin, font, language or checkbox is chosen and when the default skin is restored; the scroll position is kept; each font button is drawn in its own face; Friz Quadrata and Object Sans read "(download)" until clicked, then download into the fonts folder and apply (needs the real font.download: NOT yet verified); Arial and OpenDyslexic need no download; Language is in Settings and not on the Tweaks page.
 - [ ] Classic (2004): PLAY has the same steel button as Add Friend (hover, pressed, disabled).
 - [ ] The skin list reads Bubbles, Classic (2004), Blizzard, Turtle, Minimal (Dark), Minimal (Light); a profile that had the removed Minimal skin now has Minimal (Dark).
 

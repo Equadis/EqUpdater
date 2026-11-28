@@ -63,22 +63,20 @@ def run(cmd: list) -> None:
         raise SystemExit("build failed")
 
 
-#: Fonts whose licence does not (yet) allow redistribution. They are packaged only with proof of a licence
-#: (fonts/<Name>-LICENSE.txt beside them) or, for a LOCAL build only, with --with-unlicensed-fonts.
-LICENSE_GATED = ("ObjectSans",)
+#: The only fonts packaged: OpenDyslexic (SIL Open Font Licence) with its licence text, and the README. Friz Quadrata and
+#: Object Sans are not redistributed: Settings > Font downloads them into the player's fonts folder (core/fontstore.py).
+BUNDLED_FONTS = ("opendyslexic", "readme")
 
 
-def stage_fonts(dest: str, with_unlicensed: bool = False) -> list:
-    """Copy fonts/ to ``dest`` for packaging, leaving out gated fonts that have no licence file. Returns what was left out."""
+def stage_fonts(dest: str) -> list:
+    """Copy the bundled fonts to ``dest`` for packaging. Returns the files in fonts/ that were left out."""
     src = os.path.join(HERE, "fonts")
     if os.path.isdir(dest):
         shutil.rmtree(dest)
     os.makedirs(dest)
     left_out = []
     for name in sorted(os.listdir(src)):
-        gate = next((g for g in LICENSE_GATED if name.startswith(g)), None)
-        licensed = gate and os.path.isfile(os.path.join(src, gate + "-LICENSE.txt"))
-        if gate and not licensed and not with_unlicensed:
+        if not name.lower().startswith(BUNDLED_FONTS):
             left_out.append(name)
             continue
         shutil.copy2(os.path.join(src, name), os.path.join(dest, name))
@@ -87,9 +85,9 @@ def stage_fonts(dest: str, with_unlicensed: bool = False) -> list:
 
 def pyinstaller_cmd() -> list:
     sep = os.pathsep
-    left_out = stage_fonts(os.path.join(WORK, "fonts_pkg"), "--with-unlicensed-fonts" in sys.argv)
+    left_out = stage_fonts(os.path.join(WORK, "fonts_pkg"))
     if left_out:
-        print("  fonts left out (no licence file, see fonts/README.txt):", ", ".join(left_out))
+        print("  fonts left out (not bundled, downloaded on request; see fonts/README.txt):", ", ".join(left_out))
     cmd = [sys.executable, "-m", "PyInstaller", "--onedir", "--windowed", "--noconfirm",
            "--name", NAME, "--distpath", DIST, "--workpath", WORK, "--specpath", WORK,
            "--hidden-import", "equpdater.qtui.main",

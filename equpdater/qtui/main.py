@@ -60,17 +60,26 @@ class OfflineFetcher:
     first_post = feed = lambda self, *a, **k: (_ for _ in ()).throw(OSError("offline"))
 
 
+#: the only font files read from the install's fonts folder (and the only ones packaged: tools/build_v3.py)
+BUNDLED_FONT_PREFIXES = ("opendyslexic",)
+
+
 def _register_bundled_fonts():
-    """Friz Quadrata and OpenDyslexic ship in fonts/ (see fonts/README.txt)."""
+    """Only OpenDyslexic ships in fonts/ (see fonts/README.txt); Arial is the system's. Fonts the player
+    downloaded (Friz Quadrata, Object Sans: core/fontstore.py) or added by hand sit in <app data>/v3/fonts."""
     from PySide6.QtGui import QFontDatabase
-    # the fonts that ship with EqUpdater, then any the player put in <app data>/v3/fonts (a font they hold the
-    # licence for: Object Sans is not bundled in a build that has no licence for it, see fonts/README.txt)
-    for d in (os.path.join(branding.resource_dir(), "fonts"),
-              os.path.join(os.environ.get("EQU3_DATA_DIR") or core_settings.data_dir(), "fonts")):
+    bundled = os.path.join(branding.resource_dir(), "fonts")
+    own = os.path.join(os.environ.get("EQU3_DATA_DIR") or core_settings.data_dir(), "fonts")
+    for d in (bundled, own):
         try:
             for n in os.listdir(d):
-                if n.lower().endswith((".ttf", ".otf")):
-                    QFontDatabase.addApplicationFont(os.path.join(d, n))
+                if not n.lower().endswith((".ttf", ".otf")):
+                    continue
+                # the bundled folder is read for OpenDyslexic only: a font that is not redistributable
+                # must come from the player's own folder, never from a stray file in the install
+                if d == bundled and not n.lower().startswith(BUNDLED_FONT_PREFIXES):
+                    continue
+                QFontDatabase.addApplicationFont(os.path.join(d, n))
         except OSError:
             pass
 

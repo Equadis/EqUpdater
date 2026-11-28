@@ -215,14 +215,30 @@ Item {
                         controlWidth: 200
                         options: { var out = [], ch = general.fontChoices
                                    for (var i = 0; i < ch.length; i++)
-                                       // each option is drawn in its own typeface, whatever font is in use now
-                                       out.push({ id: ch[i].id, enabled: !ch[i].locked,
-                                                  label: ch[i].id === "" ? app.t("Skin default") : ch[i].family,
-                                                  family: ch[i].id === "" ? skin.nativeFont : ch[i].family })
+                                       // each option is drawn in its own typeface, whatever font is in use now;
+                                       // a font that is not installed is offered as a download (to the fonts folder)
+                                       out.push({ id: ch[i].id, enabled: !ch[i].locked && general.fontBusy === "",
+                                                  label: ch[i].id === "" ? app.t("Skin default")
+                                                         : ch[i].installed ? ch[i].family
+                                                         : ch[i].family + " (" + app.t("download") + ")",
+                                                  family: ch[i].id === "" ? skin.nativeFont : ch[i].family,
+                                                  installed: ch[i].installed })
                                    return out }
                         current: general.fontOverride
-                        onChosen: function (id) { general.setFontOverride(id) }
+                        onChosen: function (id) {
+                            var ch = general.fontChoices, missing = false
+                            for (var i = 0; i < ch.length; i++) if (ch[i].id === id && !ch[i].installed) missing = true
+                            if (missing) general.downloadFont(id); else general.setFontOverride(id)
+                        }
                     }
+                }
+                SkinText {
+                    objectName: "fontStatus"
+                    visible: general.fontStatus !== ""
+                    width: parent.width
+                    kind: "text.dim"
+                    wrapMode: Text.Wrap
+                    text: general.fontStatus
                 }
                 SkinText {
                     visible: settings.skinProblems.length > 0

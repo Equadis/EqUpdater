@@ -1,5 +1,5 @@
 """Interface changes after the manual beta tests: six skins and their order, the skin migration, Settings
-(Appearance, Language with flags, staying open), font previews and Object Sans, Low-memory rendering gone,
+(Appearance, Language with flags, staying open), font previews and downloadable fonts, Low-memory rendering gone,
 the shell layout (spacing constants, symmetric margins, the friends list in its own space), and the shared
 Addons/Mods/MPQ row actions. Automated (offscreen Qt, real mouse events through QTest)."""
 
@@ -38,6 +38,42 @@ def as_list(v):
 def rect(item):
     tl = item.mapToScene(item.boundingRect().topLeft())
     return (tl.x(), tl.y(), tl.x() + item.width(), tl.y() + item.height())
+
+
+def font_zip(prefix):
+    """A zip that looks like a font download: a real font file renamed, a junk file and a path-traversal name."""
+    import io
+    import zipfile
+    with open(os.path.join(ROOT, "fonts", "OpenDyslexic-Regular.otf"), "rb") as f:
+        blob = f.read()
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr(prefix + "-Regular.otf", blob)
+        z.writestr("../../escaped.ttf", blob)
+        z.writestr("readme.txt", b"not a font")
+    return buf.getvalue()
+
+
+def fake_font_net(payloads):
+    """An opener for GeneralBridge.font_opener: serves payloads by URL fragment and records every request."""
+    import io
+
+    class Resp(io.BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            self.close()
+    requested = []
+
+    def opener(url):
+        requested.append(url)
+        for key, data in payloads.items():
+            if key in url:
+                return Resp(data)
+        raise OSError("no such font in the fake network: " + url)
+    opener.requested = requested
+    return opener
 
 
 class UI(Base):
@@ -250,10 +286,14 @@ class TestSettingsStaysOpen(UI):
             self.choose("skinSelect", sid)
             self.assertTrue(self.overlay.property("visible"), sid)
             self.assertEqual(p["settings_bridge"].currentSkin, sid)
+        net = fake_font_net({"friz": font_zip("FrizQuadrata"), "object-sans": font_zip("ObjectSans")})
+        p["general"].font_opener = net                                  # Friz and Object Sans download on the click: no real network
         for fid in ("arial", "friz", "opendyslexic", "objectsans", ""):
             self.choose("fontSelect", fid)
-            self.assertTrue(self.overlay.property("visible"), fid)
+            pump(until=lambda: p["general"].property("fontBusy") == "")
+            self.assertTrue(self.overlay.property("visible"), fid)      # a download does not close Settings either
             self.assertEqual(p["general"].fontOverride, fid)
+        self.assertEqual(len(net.requested), 2)
         self.choose("skinSelect", "turtle-wow")
         self.click(find(self.win, "restoreSkinButton"))
         self.assertTrue(self.overlay.property("visible"))
@@ -325,6 +365,17 @@ class TestSettingsStaysOpen(UI):
 class TestFonts(UI):
     FAMILIES = {"": None, "arial": "Arial", "friz": "Friz Quadrata", "opendyslexic": "OpenDyslexic", "objectsans": "Object Sans"}
 
+    def fake_archive(self, prefix="FrizQuadrata"):
+        return font_zip(prefix)
+
+    def opener_for(self, payload):
+        net = fake_font_net({"": payload})
+        self.requested = net.requested
+        return net
+
+    def installed_msg(self, p):
+        return p["general"].property("fontBusy") == "" and p["general"].property("fontStatus").endswith("installed.")
+
     def test_every_option_is_drawn_in_its_own_face_whatever_font_is_active(self):
         p = self.start()
         self.open_settings()
@@ -341,7 +392,7 @@ class TestFonts(UI):
         for fid, fam in self.FAMILIES.items():
             if fam:
                 self.assertEqual(first[fid], (fam, fam), fid)                           # the label is drawn in that family
-        for choice in ("arial", "friz", "opendyslexic", "objectsans", ""):
+        for choice in ("arial", "opendyslexic", ""):
             p["general"].setFontOverride(choice)
             pump(200)
             self.assertEqual(faces(), first, choice)                                     # no preview changes with the app font
@@ -349,54 +400,88 @@ class TestFonts(UI):
     def test_the_selected_font_label_is_drawn_in_that_font(self):
         p = self.start()
         self.open_settings()
-        p["general"].setFontOverride("friz")
+        p["general"].setFontOverride("opendyslexic")
         pump(200)
         sel = find(self.win, "fontSelect")
-        label = next(i for i in walk(sel) if i.metaObject().className() == "QQuickText" and i.property("text") == "Friz Quadrata")
-        self.assertEqual(label.property("font").family(), "Friz Quadrata")
+        label = next(i for i in walk(sel) if i.metaObject().className() == "QQuickText" and i.property("text") == "OpenDyslexic")
+        self.assertEqual(label.property("font").family(), "OpenDyslexic")
 
-    def test_object_sans_is_registered_with_its_weights_and_drives_the_theme(self):
+    def test_friz_and_object_sans_are_offered_as_downloads_and_the_others_are_not(self):
         p = self.start()
-        self.assertIn("Object Sans", QFontDatabase.families())
-        styles = QFontDatabase.styles("Object Sans")
-        self.assertIn("Regular", styles)
-        self.assertIn("Heavy", styles)
-        self.assertEqual(QFontDatabase.weight("Object Sans", "Regular"), 400)
-        self.assertEqual(QFontDatabase.weight("Object Sans", "Heavy"), 800)
-        p["general"].setFontOverride("objectsans")
-        theme = p["skin"].theme
-        self.assertEqual({f["family"] for f in theme["fonts"].values() if f}, {"Object Sans"})
-        self.assertEqual(p["settings"].get("font_override"), "objectsans")        # persisted
+        self.open_settings()
+        opts = {o["id"]: o for o in self.options("fontSelect")}
+        self.assertEqual(opts["friz"]["label"], "Friz Quadrata (download)")
+        self.assertEqual(opts["objectsans"]["label"], "Object Sans (download)")
+        for fid in ("", "arial", "opendyslexic"):
+            self.assertNotIn("download", opts[fid]["label"].lower(), fid)
+        self.assertNotIn("Friz Quadrata", QFontDatabase.families())                    # nothing ships: not registered at start
+        self.assertNotIn("Object Sans", QFontDatabase.families())
+        self.assertFalse(os.path.isdir(os.path.join(self.data, "fonts")))              # and no fonts folder was created
 
-    def test_object_sans_is_not_packaged_without_a_licence_but_the_other_fonts_are(self):
+    def test_clicking_a_missing_font_downloads_it_to_the_fonts_folder_registers_it_and_selects_it(self):
+        p = self.start()
+        self.open_settings()
+        p["general"].font_opener = self.opener_for(self.fake_archive("FrizQuadrata"))
+        self.choose("fontSelect", "friz")                                               # a real click on "Friz Quadrata (download)"
+        self.assertTrue(pump(until=lambda: self.installed_msg(p)), p["general"].property("fontStatus"))
+        self.assertEqual(self.requested, ["https://font.download/dl/font/friz-quadrata.zip"])
+        folder = os.path.join(self.data, "fonts")
+        self.assertIn("FrizQuadrata-Regular.otf", os.listdir(folder))
+        self.assertTrue(all(n.lower().endswith((".otf", ".ttf")) for n in os.listdir(folder)))   # fonts only, no readme.txt
+        self.assertFalse(os.path.exists(os.path.join(self.data, "escaped.ttf")))
+        self.assertFalse(os.path.exists(os.path.join(os.path.dirname(self.data), "escaped.ttf")))
+        self.assertEqual(p["settings"].get("font_override"), "friz")                    # now in use, and saved
+        self.assertTrue({o["id"]: o for o in as_list(p["general"].property("fontChoices"))}["friz"]["installed"])
+        self.assertEqual({o["id"]: o["label"] for o in self.options("fontSelect")}["friz"], "Friz Quadrata")
+        self.assertTrue(find(self.win, "fontStatus").property("visible"))
+
+    def test_a_second_click_on_an_installed_font_does_not_download_again(self):
+        p = self.start()
+        self.open_settings()
+        p["general"].font_opener = self.opener_for(self.fake_archive("FrizQuadrata"))
+        p["general"].downloadFont("friz")
+        pump(until=lambda: self.installed_msg(p))
+        self.assertEqual(len(self.requested), 1)
+        p["general"].setFontOverride("")
+        self.choose("fontSelect", "friz")
+        pump(300)
+        self.assertEqual(len(self.requested), 1)
+        self.assertEqual(p["settings"].get("font_override"), "friz")
+
+    def test_a_failed_download_says_so_changes_nothing_and_can_be_retried(self):
+        p = self.start()
+        self.open_settings()
+        p["general"].font_opener = self.opener_for(b"<html>blocked</html>")
+        p["general"].setFontOverride("arial")
+        self.choose("fontSelect", "objectsans")
+        self.assertTrue(pump(until=lambda: p["general"].property("fontBusy") == "" and
+                             "not a font archive" in p["general"].property("fontStatus")), p["general"].property("fontStatus"))
+        self.assertEqual(p["settings"].get("font_override"), "arial")                   # unchanged
+        self.assertFalse(os.path.isdir(os.path.join(self.data, "fonts")))
+        p["general"].font_opener = self.opener_for(self.fake_archive("ObjectSans"))
+        p["general"].downloadFont("objectsans")                                         # retry works
+        self.assertTrue(pump(until=lambda: self.installed_msg(p)))
+        self.assertEqual(p["settings"].get("font_override"), "objectsans")
+
+    def test_only_opendyslexic_is_packaged_and_read_from_the_install(self):
         import importlib.util
         spec = importlib.util.spec_from_file_location("build_v3_for_test", os.path.join(ROOT, "tools", "build_v3.py"))
         build = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(build)
         dest = tempfile.mkdtemp(prefix="equ-fonts-")
         self.addCleanup(shutil.rmtree, dest, True)
-        have_licence = os.path.isfile(os.path.join(ROOT, "fonts", "ObjectSans-LICENSE.txt"))
-        left_out = build.stage_fonts(dest)
-        staged = os.listdir(dest)
-        for keep in ("FrizQuadrata-Regular.ttf", "OpenDyslexic-Regular.otf", "OpenDyslexic-OFL.txt"):
-            self.assertIn(keep, staged)
-        if have_licence:
-            self.assertEqual(left_out, [])
-            self.assertIn("ObjectSansRegular.otf", staged)
-        else:
-            self.assertEqual(sorted(left_out), ["ObjectSansHeavy.otf", "ObjectSansHeavySlanted.otf", "ObjectSansRegular.otf", "ObjectSansSlanted.otf"])
-            self.assertFalse([n for n in staged if n.startswith("ObjectSans")])
-            self.assertEqual(build.stage_fonts(dest, with_unlicensed=True), [])         # a LOCAL build can still carry them
-            self.assertIn("ObjectSansRegular.otf", os.listdir(dest))
+        build.stage_fonts(dest)
+        staged = sorted(os.listdir(dest))
+        self.assertEqual([n for n in staged if n.lower().endswith((".ttf", ".otf"))],
+                         ["OpenDyslexic-Bold.otf", "OpenDyslexic-BoldItalic.otf", "OpenDyslexic-Italic.otf", "OpenDyslexic-Regular.otf"])
+        self.assertIn("OpenDyslexic-OFL.txt", staged)                                    # the licence travels with it
+        self.assertFalse([n for n in staged if n.lower().startswith(("friz", "objectsans"))])
+        self.assertFalse([n for n in os.listdir(os.path.join(ROOT, "fonts")) if n.startswith("ObjectSans")])
+        from equpdater.qtui import main as m
+        self.assertEqual(m.BUNDLED_FONT_PREFIXES, ("opendyslexic",))
         readme = open(os.path.join(ROOT, "fonts", "README.txt"), encoding="utf-8").read()
-        self.assertIn("personal use", readme)                                            # the finding is written down
-        self.assertIn("Pangram Pangram", readme)
-
-    def test_the_font_files_are_present_for_development_and_a_player_can_add_their_own(self):
-        for n in ("ObjectSansRegular.otf", "ObjectSansSlanted.otf", "ObjectSansHeavy.otf", "ObjectSansHeavySlanted.otf"):
-            self.assertTrue(os.path.isfile(os.path.join(ROOT, "fonts", n)), n)
-        with open(os.path.join(ROOT, "equpdater", "qtui", "main.py"), encoding="utf-8") as f:
-            self.assertIn('"fonts"),', f.read())                                         # the player's own fonts folder is read too
+        for needle in ("font.download/dl/font/friz-quadrata.zip", "font.download/dl/font/object-sans.zip", "personal use"):
+            self.assertIn(needle, readme)
 
 
 class TestShellLayout(UI):

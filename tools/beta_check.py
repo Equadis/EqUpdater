@@ -138,11 +138,10 @@ def check_skins():
     if devsocial.DEFAULT_URL:
         add("WARN", "a test backend address is compiled in (devsocial.DEFAULT_URL)", "fine for the beta; clear it for a release")
     packaged = os.path.join(ROOT, "dist", "EqUpdater3", "_internal", "fonts")
-    if os.path.isdir(packaged) and any(n.startswith("ObjectSans") for n in os.listdir(packaged))             and not os.path.isfile(os.path.join(packaged, "ObjectSans-LICENSE.txt")):
-        add("FAIL", "the package contains Object Sans without a licence file", packaged)
-    fonts = os.path.join(ROOT, "fonts")
-    if any(n.startswith("ObjectSans") for n in os.listdir(fonts)) and not os.path.isfile(os.path.join(fonts, "ObjectSans-LICENSE.txt")):
-        add("WARN", "font Object Sans: redistribution terms unconfirmed", "no ObjectSans-LICENSE.txt beside the font files; fonts/README.txt")
+    if os.path.isdir(packaged):
+        extra = [n for n in os.listdir(packaged) if n.lower().endswith((".ttf", ".otf")) and not n.lower().startswith("opendyslexic")]
+        if extra:
+            add("FAIL", "the package contains fonts that are not redistributable (they are downloaded on request instead)", ", ".join(extra))
 
 
 def check_package():

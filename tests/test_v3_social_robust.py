@@ -144,6 +144,22 @@ class TestUnavailableServicesNeverGetInTheWay(Social):
 class TestEverySkinHasTheAccountChipAndTheSidebar(Social):
     WIDTHS = (860, 1000, 1280)
 
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # The offscreen platform has no system fonts, so Segoe UI, Arial and Friz Quadrata never resolve and Qt
+        # falls back to whatever application font exists. EqUpdater now bundles only OpenDyslexic (very tall
+        # lines), which would fail these geometry checks for a reason that does not exist on a real desktop.
+        # Friz Quadrata (kept in the source tree for the 2.x build) stands in as a normal-height fallback here.
+        from PySide6.QtGui import QFontDatabase
+        cls._stand_in = QFontDatabase.addApplicationFont(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fonts", "FrizQuadrata-Regular.ttf"))
+
+    @classmethod
+    def tearDownClass(cls):
+        from PySide6.QtGui import QFontDatabase
+        QFontDatabase.removeApplicationFont(cls._stand_in)
+        super().tearDownClass()
+
     def geometry_ok(self, p, sid, width, signed_in):
         problems = []
         win = self.win

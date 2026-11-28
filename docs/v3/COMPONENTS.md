@@ -65,7 +65,7 @@ Colours are `#RRGGBB` or `#AARRGGBB` (alpha first, as Qt writes it); `$name` ref
 
 ## Fonts
 
-Names: `body dim heading title button nav`, each `{family, size, bold?}`. Add files with `fontFiles` (`.ttf`/`.otf`, 6 MB each). EqUpdater also registers its own bundled fonts (Friz Quadrata, OpenDyslexic), so naming those families needs no file. The player can override the font from Settings.
+Names: `body dim heading title button nav`, each `{family, size, bold?}`. Add files with `fontFiles` (`.ttf`/`.otf`, 6 MB each). EqUpdater bundles OpenDyslexic and uses the system's Arial; Friz Quadrata and Object Sans are downloaded on request from Settings > Font (a skin that names them needs them downloaded first or ships its own `fontFiles`). The player can override the font from Settings.
 
 ## Layout
 

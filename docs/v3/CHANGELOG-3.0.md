@@ -61,5 +61,5 @@ Automated tests: 1,200 (2.x branch: 881), all passing; see `TESTING.md`. Measure
 * **Presence is pushed, not polled**: one WebSocket per launcher, state changes sent at once, only the changer's friends told, a tiny ping as heartbeat, expiry of silent connections, reconnection with exponential back-off and jitter that restores friends and presence. Invisible never exposes activity or realm.
 * **Secrets in the credential manager** (session, recovery code, tester key); never in settings or the package.
 * **Realm detection investigated on a real client**: `Config.wtf` is not a reliable current realm and is no longer used; "connected to a realm" is read from the connection table; the realm is named only from a known world-server address.
-* **Object Sans** is no longer packaged without a licence (the free trial files are personal-use only); the Font choice appears only where the files exist.
+* **Fonts are downloaded, not bundled**: only OpenDyslexic ships (Arial is the system's). Friz Quadrata and Object Sans show as "(download)" in Settings > Font until clicked; the click downloads the archive over HTTPS (font.download only) into the app-data fonts folder, registers it and selects it. `core/fontstore.py`; the Object Sans licence gate and `--with-unlicensed-fonts` are gone.
 * Cost model and safeguards: `SOCIAL_COSTS.md`.

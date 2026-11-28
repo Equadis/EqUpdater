@@ -50,7 +50,7 @@ See `BETA.md`. Please include the support ZIP (Settings > Troubleshooting) and y
 * The OctoBot snapshot endpoint is not deployed; the footer chip uses the static feed, which is often hours old, and says so.
 * The Linux AppImage has never been built or run. Starting the game through Wine, UMU or Proton is untested.
 * The installer is unsigned (SmartScreen may warn).
-* **Object Sans** was supplied without a licence file; it is in the local beta build only. Confirm its redistribution terms before any public installer (`tools/beta_check.py` warns).
+* **Friz Quadrata and Object Sans are not bundled** (2026-11-28): Settings > Font offers them as "(download)"; a click fetches them from font.download into the app-data fonts folder. Their licences are the foundries' own (Object Sans: free trial, personal use only). The download has been tested against a fake network only; **the real font.download addresses have not been contacted**, and a site that blocks automated clients (a bot check) would make the download fail with a message.
 * At the smallest window (860 px) the friends list is 210 px wide and long status lines are cut with an ellipsis.
 * Friends are added by forum user name only and are not confirmed with the other person: there is no service to ask.
 
@@ -64,5 +64,5 @@ See `BETA.md`. Please include the support ZIP (Settings > Troubleshooting) and y
 * The launcher in this beta signs in against a **hosted test backend** (`devsocial.DEFAULT_URL`, Cloudflare Worker `equpdater-social`). Creating an account needs a tester key (given to authorised testers); without one the launcher works exactly as before and only the account chip's sign-in is refused. A release must clear that address.
 * **Realm is usually not shown**: the launcher can tell "game open" from "connected to a realm", but it names the realm only from a known world-server address (none is published yet), never from `Config.wtf`. Players show as "In-game" without a realm until OctoWoW publishes the addresses or a tester records them (`tools/qa/realm_probe.py --learn`). See `SOCIAL_TEST_BACKEND.md`.
 * **Cross-machine behaviour has not been verified**: the hosted backend has only been exercised from one computer.
-* **Object Sans is not in the installer.** The supplied files are Pangram Pangram's free trial set, licensed for personal use only; redistribution needs a paid licence. The font is offered in Settings only where its files are present (a player with a licence can add them to the app-data fonts folder). Local builds can include it with `--with-unlicensed-fonts`.
+* **Bundled fonts**: only OpenDyslexic (SIL OFL) ships; Arial is the system's own (on a system without it Qt substitutes a similar sans). The two Friz Quadrata files stay in the source tree for the legacy 2.x build only; the 3.0 package and app ignore them. Object Sans files were removed from the repository tree (they remain in git history of commit cf2dedd and earlier).
 * A lost recovery code with no signed-in computer means the username is lost; there is no email and no admin override.

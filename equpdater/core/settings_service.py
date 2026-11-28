@@ -27,7 +27,7 @@ FONT_OVERRIDES = {
     "arial": ("Arial", 1.0),
     "friz": ("Friz Quadrata", 1.0),
     "opendyslexic": ("OpenDyslexic", 0.92),      # 2.x's footprint compromise
-    "objectsans": ("Object Sans", 1.0),          # ships in fonts/ (registered by name at start)
+    "objectsans": ("Object Sans", 1.0),          # downloaded on request (core/fontstore.py)
 }
 
 
@@ -139,11 +139,29 @@ class GeneralService:
         if choice in FONT_OVERRIDES:
             self.settings.set("font_override", choice)
 
+    @staticmethod
+    def data_dir() -> str:
+        from . import settings as core_settings
+        return os.environ.get("EQU3_DATA_DIR") or core_settings.data_dir()
+
     def font_choices(self) -> list:
+        """Every font choice. ``download`` marks the ones EqUpdater does not ship (fontstore.DOWNLOADS);
+        ``installed`` is true for those once their files are in the fonts folder (the bridge also counts a
+        font the system already has)."""
         from ..i18n import SYSTEM_FONT_LANGUAGES
+        from . import fontstore
         locked = i18n.language() in SYSTEM_FONT_LANGUAGES
-        return [{"id": k, "family": v[0], "locked": locked and bool(k)}
-                for k, v in FONT_OVERRIDES.items()]
+        out = []
+        for k, v in FONT_OVERRIDES.items():
+            dl = k in fontstore.DOWNLOADS
+            out.append({"id": k, "family": v[0], "locked": locked and bool(k), "download": dl,
+                        "installed": (not dl) or fontstore.is_installed(self.data_dir(), k)})
+        return out
+
+    def download_font(self, font_id: str, opener=None) -> list:
+        """Fetch a downloadable font into the fonts folder (blocking: run it on a task). Returns the files."""
+        from . import fontstore
+        return fontstore.download(self.data_dir(), font_id, opener)
 
     def language_choices(self) -> list:
         from .tweaks import DEFAULT_LOCALE, LOCALES, load_tweaks_config

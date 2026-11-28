@@ -24,7 +24,7 @@ from ..core.setup_service import SetupService
 from ..core.mpq_service import MpqService
 from ..core.settings_service import GeneralService
 from ..core.ops_host import OpsHost
-from ..i18n import tr
+from ..i18n import N_, tr
 from .models import KeyedListModel
 
 
@@ -425,6 +425,9 @@ class MpqBridge(QObject):
         self.app.openUrl(url)
 
 
+_FONT_DOWNLOAD_WORD = N_("download")        # shown in Settings > Font as "Friz Quadrata (download)": SettingsOverlay.qml
+
+
 class GeneralBridge(QObject):
     """Settings page: game folder, launch/auto-install toggles, font, language,
     session log. Skin and animation options stay on ``settings``."""
@@ -538,13 +541,60 @@ class GeneralBridge(QObject):
     def fontOverride(self):
         return self.service.font_override()
 
-    @Property("QVariantList", constant=True)
+    fontsChanged = Signal()
+    _font_busy = ""
+    _font_status = ""
+    font_opener = None            # tests inject a fake network
+
+    @Property("QVariantList", notify=fontsChanged)
     def fontChoices(self):
-        """The fonts that can be chosen: a font that is not installed (Object Sans in a build without its licence,
-        until the player adds the files) is not offered."""
+        """Every font. A font EqUpdater does not ship (Friz Quadrata, Object Sans) is offered as a download
+        until its files are in the fonts folder or the system has it."""
         from PySide6.QtGui import QFontDatabase
         have = set(QFontDatabase.families())
-        return [c for c in self.service.font_choices() if not c["id"] or c["family"] in have or c["id"] != "objectsans"]
+        out = self.service.font_choices()
+        for c in out:
+            c["installed"] = bool(c["installed"] or c["family"] in have)
+        return out
+
+    @Property(str, notify=fontsChanged)
+    def fontBusy(self):
+        """The id of the font being downloaded, or ''."""
+        return self._font_busy
+
+    @Property(str, notify=fontsChanged)
+    def fontStatus(self):
+        """A short message about the last download (progress, success or why it failed)."""
+        return self._font_status
+
+    @Slot(str)
+    def downloadFont(self, font_id):
+        """Download a font that is not installed, register it, then use it. Does nothing if one is running."""
+        from ..core import fontstore
+        if self._font_busy or font_id not in fontstore.DOWNLOADS:
+            return
+        spec = fontstore.DOWNLOADS[font_id]
+        self._font_busy = font_id
+        self._font_status = tr("Downloading {font}...").format(font=spec["family"])
+        self.fontsChanged.emit()
+
+        def done(paths):
+            fontstore.register(paths)
+            self._font_busy = ""
+            self._font_status = tr("{font} installed.").format(font=spec["family"])
+            self.service.set_font_override(font_id)
+            self.skin.refresh()
+            self.fontsChanged.emit()
+            self.changed.emit()
+
+        def failed(exc):
+            self._font_busy = ""
+            msg = str(exc) if isinstance(exc, fontstore.FontError) else tr("Could not download the font.")
+            self._font_status = msg
+            self.fontsChanged.emit()
+        tasks = self.service.tasks
+        tasks.submit("font:" + font_id, lambda: self.service.download_font(font_id, self.font_opener),
+                     on_done=done, on_error=failed)
 
     @Property(str, notify=logChanged)
     def sessionLog(self):
